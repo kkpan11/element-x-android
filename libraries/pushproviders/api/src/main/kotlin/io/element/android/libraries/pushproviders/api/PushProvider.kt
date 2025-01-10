@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.pushproviders.api
 
 import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.matrix.api.core.SessionId
 
 /**
  * This is the main API for this module.
@@ -33,24 +25,35 @@ interface PushProvider {
     val name: String
 
     /**
-     * Return true if the push provider is available on this device.
+     * Return the list of available distributors.
      */
-    fun isAvailable(): Boolean
-
     fun getDistributors(): List<Distributor>
 
     /**
      * Register the pusher to the homeserver.
      */
-    suspend fun registerWith(matrixClient: MatrixClient, distributor: Distributor)
+    suspend fun registerWith(matrixClient: MatrixClient, distributor: Distributor): Result<Unit>
+
+    /**
+     * Return the current distributor, or null if none.
+     */
+    suspend fun getCurrentDistributor(sessionId: SessionId): Distributor?
 
     /**
      * Unregister the pusher.
      */
-    suspend fun unregister(matrixClient: MatrixClient)
+    suspend fun unregister(matrixClient: MatrixClient): Result<Unit>
 
     /**
-     * Attempt to troubleshoot the push provider.
+     * To invoke when the session is deleted.
      */
-    suspend fun troubleshoot(): Result<Unit>
+    suspend fun onSessionDeleted(sessionId: SessionId)
+
+    suspend fun getCurrentUserPushConfig(): CurrentUserPushConfig?
+
+    fun canRotateToken(): Boolean
+
+    suspend fun rotateToken(): Result<Unit> {
+        error("rotateToken() not implemented, you need to override this method in your implementation")
+    }
 }

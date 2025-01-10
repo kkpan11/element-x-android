@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.user.editprofile
@@ -21,6 +12,7 @@ import app.cash.molecule.RecompositionMode
 import app.cash.molecule.moleculeFlow
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import io.element.android.libraries.androidutils.file.TemporaryUriDeleter
 import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.user.MatrixUser
@@ -38,6 +30,9 @@ import io.element.android.libraries.permissions.test.FakePermissionsPresenterFac
 import io.element.android.tests.testutils.WarmUpRule
 import io.element.android.tests.testutils.consumeItemsUntilPredicate
 import io.element.android.tests.testutils.consumeItemsUntilTimeout
+import io.element.android.tests.testutils.fake.FakeTemporaryUriDeleter
+import io.element.android.tests.testutils.lambda.lambdaRecorder
+import io.element.android.tests.testutils.lambda.value
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -82,12 +77,14 @@ class EditUserProfilePresenterTest {
         matrixClient: MatrixClient = FakeMatrixClient(),
         matrixUser: MatrixUser = aMatrixUser(),
         permissionsPresenter: PermissionsPresenter = FakePermissionsPresenter(),
+        temporaryUriDeleter: TemporaryUriDeleter = FakeTemporaryUriDeleter(),
     ): EditUserProfilePresenter {
         return EditUserProfilePresenter(
             matrixClient = matrixClient,
             matrixUser = matrixUser,
             mediaPickerProvider = fakePickerProvider,
             mediaPreProcessor = fakeMediaPreProcessor,
+            temporaryUriDeleter = temporaryUriDeleter,
             permissionsPresenterFactory = FakePermissionsPresenterFactory(permissionsPresenter),
         )
     }
@@ -116,7 +113,12 @@ class EditUserProfilePresenterTest {
     @Test
     fun `present - updates state in response to changes`() = runTest {
         val user = aMatrixUser(id = A_USER_ID.value, displayName = "Name", avatarUrl = AN_AVATAR_URL)
-        val presenter = createEditUserProfilePresenter(matrixUser = user)
+        val presenter = createEditUserProfilePresenter(
+            matrixUser = user,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = { assertThat(it).isEqualTo(userAvatarUri) }
+            ),
+        )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
@@ -145,7 +147,12 @@ class EditUserProfilePresenterTest {
     fun `present - obtains avatar uris from gallery`() = runTest {
         val user = aMatrixUser(id = A_USER_ID.value, displayName = "Name", avatarUrl = AN_AVATAR_URL)
         fakePickerProvider.givenResult(anotherAvatarUri)
-        val presenter = createEditUserProfilePresenter(matrixUser = user)
+        val presenter = createEditUserProfilePresenter(
+            matrixUser = user,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = { assertThat(it).isEqualTo(userAvatarUri) }
+            ),
+        )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
@@ -163,9 +170,13 @@ class EditUserProfilePresenterTest {
         val user = aMatrixUser(id = A_USER_ID.value, displayName = "Name", avatarUrl = AN_AVATAR_URL)
         fakePickerProvider.givenResult(anotherAvatarUri)
         val fakePermissionsPresenter = FakePermissionsPresenter()
+        val deleteCallback = lambdaRecorder<Uri?, Unit> {}
         val presenter = createEditUserProfilePresenter(
             matrixUser = user,
             permissionsPresenter = fakePermissionsPresenter,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = deleteCallback,
+            ),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
@@ -186,6 +197,10 @@ class EditUserProfilePresenterTest {
             stateWithNewAvatar.eventSink(EditUserProfileEvents.HandleAvatarAction(AvatarAction.TakePhoto))
             val stateWithNewAvatar2 = awaitItem()
             assertThat(stateWithNewAvatar2.userAvatarUrl).isEqualTo(userAvatarUri)
+            deleteCallback.assertions().isCalledExactly(2).withSequence(
+                listOf(value(userAvatarUri)),
+                listOf(value(anotherAvatarUri)),
+            )
         }
     }
 
@@ -193,7 +208,13 @@ class EditUserProfilePresenterTest {
     fun `present - updates save button state`() = runTest {
         val user = aMatrixUser(id = A_USER_ID.value, displayName = "Name", avatarUrl = AN_AVATAR_URL)
         fakePickerProvider.givenResult(userAvatarUri)
-        val presenter = createEditUserProfilePresenter(matrixUser = user)
+        val deleteCallback = lambdaRecorder<Uri?, Unit> {}
+        val presenter = createEditUserProfilePresenter(
+            matrixUser = user,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = deleteCallback
+            ),
+        )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
@@ -219,6 +240,10 @@ class EditUserProfilePresenterTest {
             awaitItem().apply {
                 assertThat(saveButtonEnabled).isFalse()
             }
+            deleteCallback.assertions().isCalledExactly(2).withSequence(
+                listOf(value(userAvatarUri)),
+                listOf(value(null)),
+            )
         }
     }
 
@@ -226,7 +251,13 @@ class EditUserProfilePresenterTest {
     fun `present - updates save button state when initial values are null`() = runTest {
         val user = aMatrixUser(id = A_USER_ID.value, displayName = "Name", avatarUrl = null)
         fakePickerProvider.givenResult(userAvatarUri)
-        val presenter = createEditUserProfilePresenter(matrixUser = user)
+        val deleteCallback = lambdaRecorder<Uri?, Unit> {}
+        val presenter = createEditUserProfilePresenter(
+            matrixUser = user,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = deleteCallback
+            ),
+        )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
@@ -252,6 +283,10 @@ class EditUserProfilePresenterTest {
             awaitItem().apply {
                 assertThat(saveButtonEnabled).isFalse()
             }
+            deleteCallback.assertions().isCalledExactly(2).withSequence(
+                listOf(value(null)),
+                listOf(value(userAvatarUri)),
+            )
         }
     }
 
@@ -261,7 +296,10 @@ class EditUserProfilePresenterTest {
         val user = aMatrixUser(id = A_USER_ID.value, displayName = "Name", avatarUrl = AN_AVATAR_URL)
         val presenter = createEditUserProfilePresenter(
             matrixClient = matrixClient,
-            matrixUser = user
+            matrixUser = user,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = { assertThat(it).isEqualTo(userAvatarUri) }
+            ),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
@@ -327,7 +365,10 @@ class EditUserProfilePresenterTest {
         givenPickerReturnsFile()
         val presenter = createEditUserProfilePresenter(
             matrixClient = matrixClient,
-            matrixUser = user
+            matrixUser = user,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = { assertThat(it).isEqualTo(userAvatarUri) }
+            ),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
@@ -346,7 +387,10 @@ class EditUserProfilePresenterTest {
         val user = aMatrixUser(id = A_USER_ID.value, displayName = "Name", avatarUrl = AN_AVATAR_URL)
         val presenter = createEditUserProfilePresenter(
             matrixClient = matrixClient,
-            matrixUser = user
+            matrixUser = user,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = { assertThat(it).isEqualTo(userAvatarUri) }
+            ),
         )
         fakePickerProvider.givenResult(anotherAvatarUri)
         fakeMediaPreProcessor.givenResult(Result.failure(Throwable("Oh no")))
@@ -412,7 +456,13 @@ class EditUserProfilePresenterTest {
     }
 
     private suspend fun saveAndAssertFailure(matrixUser: MatrixUser, matrixClient: MatrixClient, event: EditUserProfileEvents) {
-        val presenter = createEditUserProfilePresenter(matrixUser = matrixUser, matrixClient = matrixClient)
+        val presenter = createEditUserProfilePresenter(
+            matrixUser = matrixUser,
+            matrixClient = matrixClient,
+            temporaryUriDeleter = FakeTemporaryUriDeleter(
+                deleteLambda = { assertThat(it).isEqualTo(userAvatarUri) }
+            ),
+        )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.tests.testutils
@@ -29,8 +20,27 @@ class EnsureCalledOnce : () -> Unit {
     }
 }
 
+class EnsureCalledTimes(val times: Int) : () -> Unit {
+    private var counter = 0
+    override fun invoke() {
+        counter++
+    }
+
+    fun assertSuccess() {
+        if (counter != times) {
+            throw AssertionError("Expected to be called $times, but was called $counter times")
+        }
+    }
+}
+
 fun ensureCalledOnce(block: (callback: () -> Unit) -> Unit) {
     val callback = EnsureCalledOnce()
+    block(callback)
+    callback.assertSuccess()
+}
+
+fun ensureCalledTimes(times: Int, block: (callback: () -> Unit) -> Unit) {
+    val callback = EnsureCalledTimes(times)
     block(callback)
     callback.assertSuccess()
 }
@@ -83,6 +93,12 @@ fun <T> ensureCalledOnceWithParam(param: T, block: (callback: EnsureCalledOnceWi
 
 fun <T, R> ensureCalledOnceWithParam(param: T, block: (callback: EnsureCalledOnceWithParam<T, R>) -> R, result: R) {
     val callback = EnsureCalledOnceWithParam(param, result)
+    block(callback)
+    callback.assertSuccess()
+}
+
+fun <P1, P2> ensureCalledOnceWithTwoParams(param1: P1, param2: P2, block: (callback: EnsureCalledOnceWithTwoParams<P1, P2>) -> Unit) {
+    val callback = EnsureCalledOnceWithTwoParams(param1, param2)
     block(callback)
     callback.assertSuccess()
 }

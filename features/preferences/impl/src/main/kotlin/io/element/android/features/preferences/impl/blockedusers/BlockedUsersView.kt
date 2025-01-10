@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.blockedusers
@@ -51,7 +42,7 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun BlockedUsersView(
     state: BlockedUsersState,
-    onBackPressed: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier) {
@@ -65,7 +56,7 @@ fun BlockedUsersView(
                         )
                     },
                     navigationIcon = {
-                        BackButton(onClick = onBackPressed)
+                        BackButton(onClick = onBackClick)
                     }
                 )
             }
@@ -73,9 +64,9 @@ fun BlockedUsersView(
             LazyColumn(
                 modifier = Modifier.padding(padding)
             ) {
-                items(state.blockedUsers) { userId ->
+                items(state.blockedUsers) { matrixUser ->
                     BlockedUserItem(
-                        userId = userId,
+                        matrixUser = matrixUser,
                         onClick = { state.eventSink(BlockedUsersEvents.Unblock(it)) }
                     )
                 }
@@ -100,12 +91,17 @@ fun BlockedUsersView(
                     }
                 }
             }
+            is AsyncAction.Success -> {
+                LaunchedEffect(state.unblockUserAction) {
+                    asyncIndicatorState.clear()
+                }
+            }
             is AsyncAction.Confirming -> {
                 ConfirmationDialog(
                     title = stringResource(R.string.screen_blocked_users_unblock_alert_title),
                     content = stringResource(R.string.screen_blocked_users_unblock_alert_description),
                     submitText = stringResource(R.string.screen_blocked_users_unblock_alert_action),
-                    onSubmitClicked = { state.eventSink(BlockedUsersEvents.ConfirmUnblock) },
+                    onSubmitClick = { state.eventSink(BlockedUsersEvents.ConfirmUnblock) },
                     onDismiss = { state.eventSink(BlockedUsersEvents.Cancel) }
                 )
             }
@@ -116,22 +112,22 @@ fun BlockedUsersView(
 
 @Composable
 private fun BlockedUserItem(
-    userId: UserId,
+    matrixUser: MatrixUser,
     onClick: (UserId) -> Unit,
 ) {
     MatrixUserRow(
-        modifier = Modifier.clickable { onClick(userId) },
-        matrixUser = MatrixUser(userId),
+        modifier = Modifier.clickable { onClick(matrixUser.userId) },
+        matrixUser = matrixUser,
     )
 }
 
 @PreviewsDayNight
 @Composable
-internal fun BlockedUsersViewPreview(@PreviewParameter(BlockedUsersStatePreviewProvider::class) state: BlockedUsersState) {
+internal fun BlockedUsersViewPreview(@PreviewParameter(BlockedUsersStateProvider::class) state: BlockedUsersState) {
     ElementPreview {
         BlockedUsersView(
             state = state,
-            onBackPressed = {}
+            onBackClick = {}
         )
     }
 }

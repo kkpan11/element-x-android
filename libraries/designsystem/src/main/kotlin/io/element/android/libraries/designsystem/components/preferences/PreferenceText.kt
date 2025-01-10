@@ -1,28 +1,16 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.preferences
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.progressSemantics
@@ -36,19 +24,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
+import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
 import io.element.android.libraries.designsystem.atomic.atoms.RedIndicatorAtom
-import io.element.android.libraries.designsystem.components.preferences.components.PreferenceIcon
+import io.element.android.libraries.designsystem.components.list.ListItemContent
+import io.element.android.libraries.designsystem.components.preferences.components.preferenceIcon
 import io.element.android.libraries.designsystem.preview.ElementPreviewDark
 import io.element.android.libraries.designsystem.preview.ElementPreviewLight
 import io.element.android.libraries.designsystem.preview.PreviewGroup
 import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
+import io.element.android.libraries.designsystem.theme.components.ListItem
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.toEnabledColor
 import io.element.android.libraries.designsystem.toSecondaryEnabledColor
 
-/**
- * Tried to use ListItem, but it cannot really match the design. Keep custom Layout for now.
- */
 @Composable
 fun PreferenceText(
     title: String,
@@ -66,76 +54,76 @@ fun PreferenceText(
     tintColor: Color? = null,
     onClick: () -> Unit = {},
 ) {
-    val minHeight = if (subtitle == null && subtitleAnnotated == null) preferenceMinHeightOnlyTitle else preferenceMinHeight
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .defaultMinSize(minHeight = minHeight)
-            .clickable { onClick() }
-            .padding(horizontal = preferencePaddingHorizontal, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        PreferenceIcon(
+    ListItem(
+        modifier = modifier,
+        enabled = enabled,
+        onClick = onClick,
+        leadingContent = preferenceIcon(
             icon = icon,
             iconResourceId = iconResourceId,
             showIconBadge = showIconBadge,
             enabled = enabled,
-            isVisible = showIconAreaIfNoIcon,
-            tintColor = tintColor ?: enabled.toSecondaryEnabledColor(),
-        )
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .align(Alignment.CenterVertically)
-        ) {
+            showIconAreaIfNoIcon = showIconAreaIfNoIcon,
+            tintColor = tintColor,
+        ),
+        headlineContent = {
             Text(
                 style = ElementTheme.typography.fontBodyLgRegular,
                 text = title,
                 color = tintColor ?: enabled.toEnabledColor(),
             )
-            if (subtitle != null) {
+        },
+        supportingContent = if (subtitle != null) {
+            {
                 Text(
                     style = ElementTheme.typography.fontBodyMdRegular,
                     text = subtitle,
                     color = tintColor ?: enabled.toSecondaryEnabledColor(),
                 )
-            } else if (subtitleAnnotated != null) {
-                Text(
-                    style = ElementTheme.typography.fontBodyMdRegular,
-                    text = subtitleAnnotated,
-                    color = tintColor ?: enabled.toSecondaryEnabledColor(),
-                )
             }
+        } else {
+            subtitleAnnotated?.let {
+                {
+                    Text(
+                        style = ElementTheme.typography.fontBodyMdRegular,
+                        text = it,
+                        color = tintColor ?: enabled.toSecondaryEnabledColor(),
+                    )
+                }
+            }
+        },
+        trailingContent = if (currentValue != null || loadingCurrentValue || showEndBadge) {
+            ListItemContent.Custom {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (currentValue != null) {
+                        Text(
+                            text = currentValue,
+                            style = ElementTheme.typography.fontBodyXsMedium,
+                            color = enabled.toSecondaryEnabledColor(),
+                        )
+                    } else if (loadingCurrentValue) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .progressSemantics()
+                                .size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    if (showEndBadge) {
+                        val endBadgeStartPadding = if (currentValue != null || loadingCurrentValue) 16.dp else 0.dp
+                        RedIndicatorAtom(
+                            modifier = Modifier
+                                .padding(start = endBadgeStartPadding)
+                        )
+                    }
+                }
+            }
+        } else {
+            null
         }
-        if (currentValue != null) {
-            Text(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(start = 16.dp, end = 8.dp),
-                text = currentValue,
-                style = ElementTheme.typography.fontBodyXsMedium,
-                color = enabled.toSecondaryEnabledColor(),
-            )
-        } else if (loadingCurrentValue) {
-            CircularProgressIndicator(
-                modifier = Modifier
-                    .progressSemantics()
-                    .padding(start = 16.dp, end = 8.dp)
-                    .size(20.dp)
-                    .align(Alignment.CenterVertically),
-                strokeWidth = 2.dp
-            )
-        }
-        if (showEndBadge) {
-            val endBadgeStartPadding = if (currentValue != null || loadingCurrentValue) 8.dp else 16.dp
-            RedIndicatorAtom(
-                modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .padding(start = endBadgeStartPadding)
-            )
-        }
-    }
+    )
 }
 
 @Preview(group = PreviewGroup.Preferences)
@@ -162,6 +150,7 @@ internal fun PreferenceTextWithEndBadgeDarkPreview() = ElementPreviewDark {
     ContentToPreview(showEndBadge = true)
 }
 
+@ExcludeFromCoverage
 @Composable
 private fun ContentToPreview(showEndBadge: Boolean) {
     Column(

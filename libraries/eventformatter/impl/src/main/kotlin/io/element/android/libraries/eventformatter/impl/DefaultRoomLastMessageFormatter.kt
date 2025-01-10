@@ -1,37 +1,26 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.eventformatter.impl
 
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import com.squareup.anvil.annotations.ContributesBinding
 import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.eventformatter.api.RoomLastMessageFormatter
 import io.element.android.libraries.eventformatter.impl.mode.RenderingMode
+import io.element.android.libraries.matrix.api.permalink.PermalinkParser
 import io.element.android.libraries.matrix.api.timeline.item.event.AudioMessageType
+import io.element.android.libraries.matrix.api.timeline.item.event.CallNotifyContent
 import io.element.android.libraries.matrix.api.timeline.item.event.EmoteMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.EventTimelineItem
 import io.element.android.libraries.matrix.api.timeline.item.event.FailedToParseMessageLikeContent
 import io.element.android.libraries.matrix.api.timeline.item.event.FailedToParseStateContent
 import io.element.android.libraries.matrix.api.timeline.item.event.FileMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.ImageMessageType
+import io.element.android.libraries.matrix.api.timeline.item.event.LegacyCallInviteContent
 import io.element.android.libraries.matrix.api.timeline.item.event.LocationMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageType
@@ -39,7 +28,6 @@ import io.element.android.libraries.matrix.api.timeline.item.event.NoticeMessage
 import io.element.android.libraries.matrix.api.timeline.item.event.OtherMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.PollContent
 import io.element.android.libraries.matrix.api.timeline.item.event.ProfileChangeContent
-import io.element.android.libraries.matrix.api.timeline.item.event.ProfileTimelineDetails
 import io.element.android.libraries.matrix.api.timeline.item.event.RedactedContent
 import io.element.android.libraries.matrix.api.timeline.item.event.RoomMembershipContent
 import io.element.android.libraries.matrix.api.timeline.item.event.StateContent
@@ -50,6 +38,7 @@ import io.element.android.libraries.matrix.api.timeline.item.event.UnableToDecry
 import io.element.android.libraries.matrix.api.timeline.item.event.UnknownContent
 import io.element.android.libraries.matrix.api.timeline.item.event.VideoMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.VoiceMessageType
+import io.element.android.libraries.matrix.api.timeline.item.event.getDisambiguatedDisplayName
 import io.element.android.libraries.matrix.ui.messages.toPlainText
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.toolbox.api.strings.StringProvider
@@ -61,6 +50,7 @@ class DefaultRoomLastMessageFormatter @Inject constructor(
     private val roomMembershipContentFormatter: RoomMembershipContentFormatter,
     private val profileChangeContentFormatter: ProfileChangeContentFormatter,
     private val stateContentFormatter: StateContentFormatter,
+    private val permalinkParser: PermalinkParser
 ) : RoomLastMessageFormatter {
     companion object {
         // Max characters to display in the last message. This works around https://github.com/element-hq/element-x-android/issues/2105
@@ -69,78 +59,78 @@ class DefaultRoomLastMessageFormatter @Inject constructor(
 
     override fun format(event: EventTimelineItem, isDmRoom: Boolean): CharSequence? {
         val isOutgoing = event.isOwn
-        // Note: we do not use disambiguated display name here, see
-        // https://github.com/element-hq/element-x-ios/issues/1845#issuecomment-1888707428
-        val senderDisplayName = (event.senderProfile as? ProfileTimelineDetails.Ready)?.displayName ?: event.sender.value
+        val senderDisambiguatedDisplayName = event.senderProfile.getDisambiguatedDisplayName(event.sender)
         return when (val content = event.content) {
-            is MessageContent -> processMessageContents(content, senderDisplayName, isDmRoom)
+            is MessageContent -> content.process(senderDisambiguatedDisplayName, isDmRoom, isOutgoing)
             RedactedContent -> {
                 val message = sp.getString(CommonStrings.common_message_removed)
-                if (!isDmRoom) {
-                    prefix(message, senderDisplayName)
-                } else {
-                    message
-                }
+                message.prefixIfNeeded(senderDisambiguatedDisplayName, isDmRoom, isOutgoing)
             }
             is StickerContent -> {
-                content.body
+                val message = sp.getString(CommonStrings.common_sticker) + " (" + content.bestDescription + ")"
+                message.prefixIfNeeded(senderDisambiguatedDisplayName, isDmRoom, isOutgoing)
             }
             is UnableToDecryptContent -> {
                 val message = sp.getString(CommonStrings.common_waiting_for_decryption_key)
-                if (!isDmRoom) {
-                    prefix(message, senderDisplayName)
-                } else {
-                    message
-                }
+                message.prefixIfNeeded(senderDisambiguatedDisplayName, isDmRoom, isOutgoing)
             }
             is RoomMembershipContent -> {
-                roomMembershipContentFormatter.format(content, senderDisplayName, isOutgoing)
+                roomMembershipContentFormatter.format(content, senderDisambiguatedDisplayName, isOutgoing)
             }
             is ProfileChangeContent -> {
-                profileChangeContentFormatter.format(content, senderDisplayName, isOutgoing)
+                profileChangeContentFormatter.format(content, event.sender, senderDisambiguatedDisplayName, isOutgoing)
             }
             is StateContent -> {
-                stateContentFormatter.format(content, senderDisplayName, isOutgoing, RenderingMode.RoomList)
+                stateContentFormatter.format(content, senderDisambiguatedDisplayName, isOutgoing, RenderingMode.RoomList)
             }
             is PollContent -> {
                 val message = sp.getString(CommonStrings.common_poll_summary, content.question)
-                prefixIfNeeded(message, senderDisplayName, isDmRoom)
+                message.prefixIfNeeded(senderDisambiguatedDisplayName, isDmRoom, isOutgoing)
             }
             is FailedToParseMessageLikeContent, is FailedToParseStateContent, is UnknownContent -> {
-                prefixIfNeeded(sp.getString(CommonStrings.common_unsupported_event), senderDisplayName, isDmRoom)
+                val message = sp.getString(CommonStrings.common_unsupported_event)
+                message.prefixIfNeeded(senderDisambiguatedDisplayName, isDmRoom, isOutgoing)
             }
+            is LegacyCallInviteContent -> sp.getString(CommonStrings.common_unsupported_call)
+            is CallNotifyContent -> sp.getString(CommonStrings.common_call_started)
         }?.take(MAX_SAFE_LENGTH)
     }
 
-    private fun processMessageContents(messageContent: MessageContent, senderDisplayName: String, isDmRoom: Boolean): CharSequence? {
-        val internalMessage = when (val messageType: MessageType = messageContent.type) {
+    private fun MessageContent.process(
+        senderDisambiguatedDisplayName: String,
+        isDmRoom: Boolean,
+        isOutgoing: Boolean
+    ): CharSequence {
+        val message = when (val messageType: MessageType = type) {
             // Doesn't need a prefix
             is EmoteMessageType -> {
-                return "* $senderDisplayName ${messageType.body}"
+                return "* $senderDisambiguatedDisplayName ${messageType.body}"
             }
             is TextMessageType -> {
-                messageType.toPlainText()
+                messageType.toPlainText(permalinkParser)
             }
             is VideoMessageType -> {
-                sp.getString(CommonStrings.common_video)
+                messageType.bestDescription.prefixWith(sp.getString(CommonStrings.common_video))
             }
             is ImageMessageType -> {
-                sp.getString(CommonStrings.common_image)
+                messageType.bestDescription.prefixWith(sp.getString(CommonStrings.common_image))
             }
             is StickerMessageType -> {
-                sp.getString(CommonStrings.common_sticker)
+                messageType.bestDescription.prefixWith(sp.getString(CommonStrings.common_sticker))
             }
             is LocationMessageType -> {
                 sp.getString(CommonStrings.common_shared_location)
             }
             is FileMessageType -> {
-                sp.getString(CommonStrings.common_file)
+                messageType.bestDescription.prefixWith(sp.getString(CommonStrings.common_file))
             }
             is AudioMessageType -> {
-                sp.getString(CommonStrings.common_audio)
+                messageType.bestDescription.prefixWith(sp.getString(CommonStrings.common_audio))
             }
             is VoiceMessageType -> {
-                sp.getString(CommonStrings.common_voice_message)
+                // In this case, do not use bestDescription, because the filename is useless, only use the caption if available.
+                messageType.caption?.prefixWith(sp.getString(CommonStrings.common_voice_message))
+                    ?: sp.getString(CommonStrings.common_voice_message)
             }
             is OtherMessageType -> {
                 messageType.body
@@ -149,22 +139,22 @@ class DefaultRoomLastMessageFormatter @Inject constructor(
                 messageType.body
             }
         }
-        return prefixIfNeeded(internalMessage, senderDisplayName, isDmRoom)
+        return message.prefixIfNeeded(senderDisambiguatedDisplayName, isDmRoom, isOutgoing)
     }
 
-    private fun prefixIfNeeded(message: String, senderDisplayName: String, isDmRoom: Boolean): CharSequence = if (isDmRoom) {
-        message
+    private fun CharSequence.prefixIfNeeded(
+        senderDisambiguatedDisplayName: String,
+        isDmRoom: Boolean,
+        isOutgoing: Boolean,
+    ): CharSequence = if (isDmRoom) {
+        this
     } else {
-        prefix(message, senderDisplayName)
-    }
-
-    private fun prefix(message: String, senderDisplayName: String): AnnotatedString {
-        return buildAnnotatedString {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                append(senderDisplayName)
+        prefixWith(
+            if (isOutgoing) {
+                sp.getString(CommonStrings.common_you)
+            } else {
+                senderDisambiguatedDisplayName
             }
-            append(": ")
-            append(message)
-        }
+        )
     }
 }

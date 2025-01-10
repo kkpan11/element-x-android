@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.appnav.di
@@ -20,34 +11,34 @@ import com.bumble.appyx.core.state.MutableSavedStateMapImpl
 import com.google.common.truth.Truth.assertThat
 import io.element.android.libraries.matrix.test.A_SESSION_ID
 import io.element.android.libraries.matrix.test.FakeMatrixClient
-import io.element.android.libraries.matrix.test.auth.FakeAuthenticationService
+import io.element.android.libraries.matrix.test.auth.FakeMatrixAuthenticationService
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class MatrixClientsHolderTest {
     @Test
     fun `test getOrNull`() {
-        val fakeAuthenticationService = FakeAuthenticationService()
+        val fakeAuthenticationService = FakeMatrixAuthenticationService()
         val matrixClientsHolder = MatrixClientsHolder(fakeAuthenticationService)
         assertThat(matrixClientsHolder.getOrNull(A_SESSION_ID)).isNull()
     }
 
     @Test
     fun `test getOrRestore`() = runTest {
-        val fakeAuthenticationService = FakeAuthenticationService()
+        val fakeAuthenticationService = FakeMatrixAuthenticationService()
         val matrixClientsHolder = MatrixClientsHolder(fakeAuthenticationService)
         val fakeMatrixClient = FakeMatrixClient()
         fakeAuthenticationService.givenMatrixClient(fakeMatrixClient)
         assertThat(matrixClientsHolder.getOrNull(A_SESSION_ID)).isNull()
         assertThat(matrixClientsHolder.getOrRestore(A_SESSION_ID).getOrNull()).isEqualTo(fakeMatrixClient)
-        // Do it again to it the cache
+        // Do it again to hit the cache
         assertThat(matrixClientsHolder.getOrRestore(A_SESSION_ID).getOrNull()).isEqualTo(fakeMatrixClient)
         assertThat(matrixClientsHolder.getOrNull(A_SESSION_ID)).isEqualTo(fakeMatrixClient)
     }
 
     @Test
     fun `test remove`() = runTest {
-        val fakeAuthenticationService = FakeAuthenticationService()
+        val fakeAuthenticationService = FakeMatrixAuthenticationService()
         val matrixClientsHolder = MatrixClientsHolder(fakeAuthenticationService)
         val fakeMatrixClient = FakeMatrixClient()
         fakeAuthenticationService.givenMatrixClient(fakeMatrixClient)
@@ -60,7 +51,7 @@ class MatrixClientsHolderTest {
 
     @Test
     fun `test remove all`() = runTest {
-        val fakeAuthenticationService = FakeAuthenticationService()
+        val fakeAuthenticationService = FakeMatrixAuthenticationService()
         val matrixClientsHolder = MatrixClientsHolder(fakeAuthenticationService)
         val fakeMatrixClient = FakeMatrixClient()
         fakeAuthenticationService.givenMatrixClient(fakeMatrixClient)
@@ -73,7 +64,7 @@ class MatrixClientsHolderTest {
 
     @Test
     fun `test save and restore`() = runTest {
-        val fakeAuthenticationService = FakeAuthenticationService()
+        val fakeAuthenticationService = FakeMatrixAuthenticationService()
         val matrixClientsHolder = MatrixClientsHolder(fakeAuthenticationService)
         val fakeMatrixClient = FakeMatrixClient()
         fakeAuthenticationService.givenMatrixClient(fakeMatrixClient)
@@ -89,5 +80,18 @@ class MatrixClientsHolderTest {
         // Restore again
         matrixClientsHolder.restoreWithSavedState(savedStateMap)
         assertThat(matrixClientsHolder.getOrNull(A_SESSION_ID)).isEqualTo(fakeMatrixClient)
+    }
+
+    @Test
+    fun `test AuthenticationService listenToNewMatrixClients emits a Client value and we save it`() = runTest {
+        val fakeAuthenticationService = FakeMatrixAuthenticationService()
+        val matrixClientsHolder = MatrixClientsHolder(fakeAuthenticationService)
+        assertThat(matrixClientsHolder.getOrNull(A_SESSION_ID)).isNull()
+
+        fakeAuthenticationService.givenMatrixClient(FakeMatrixClient(sessionId = A_SESSION_ID))
+        val loginSucceeded = fakeAuthenticationService.login("user", "pass")
+
+        assertThat(loginSucceeded.isSuccess).isTrue()
+        assertThat(matrixClientsHolder.getOrNull(A_SESSION_ID)).isNotNull()
     }
 }

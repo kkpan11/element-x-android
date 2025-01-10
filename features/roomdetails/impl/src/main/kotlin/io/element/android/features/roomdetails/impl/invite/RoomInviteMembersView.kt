@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomdetails.impl.invite
@@ -57,22 +48,22 @@ import kotlinx.collections.immutable.ImmutableList
 @Composable
 fun RoomInviteMembersView(
     state: RoomInviteMembersState,
-    onBackPressed: () -> Unit,
-    onSubmitPressed: (List<MatrixUser>) -> Unit,
+    onBackClick: () -> Unit,
+    onSubmitClick: (List<MatrixUser>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
         modifier = modifier,
         topBar = {
             RoomInviteMembersTopBar(
-                onBackPressed = {
+                onBackClick = {
                     if (state.isSearchActive) {
                         state.eventSink(RoomInviteMembersEvents.OnSearchActiveChanged(false))
                     } else {
-                        onBackPressed()
+                        onBackClick()
                     }
                 },
-                onSubmitPressed = { onSubmitPressed(state.selectedUsers) },
+                onSubmitClick = { onSubmitClick(state.selectedUsers) },
                 canSend = state.canInvite,
             )
         }
@@ -91,9 +82,9 @@ fun RoomInviteMembersView(
                 selectedUsers = state.selectedUsers,
                 state = state.searchResults,
                 active = state.isSearchActive,
-                onActiveChanged = { state.eventSink(RoomInviteMembersEvents.OnSearchActiveChanged(it)) },
-                onTextChanged = { state.eventSink(RoomInviteMembersEvents.UpdateSearchQuery(it)) },
-                onUserToggled = { state.eventSink(RoomInviteMembersEvents.ToggleUser(it)) },
+                onActiveChange = { state.eventSink(RoomInviteMembersEvents.OnSearchActiveChanged(it)) },
+                onTextChange = { state.eventSink(RoomInviteMembersEvents.UpdateSearchQuery(it)) },
+                onToggleUser = { state.eventSink(RoomInviteMembersEvents.ToggleUser(it)) },
             )
 
             if (!state.isSearchActive) {
@@ -101,7 +92,7 @@ fun RoomInviteMembersView(
                     modifier = Modifier.fillMaxWidth(),
                     selectedUsers = state.selectedUsers,
                     autoScroll = true,
-                    onUserRemoved = { state.eventSink(RoomInviteMembersEvents.ToggleUser(it)) },
+                    onUserRemove = { state.eventSink(RoomInviteMembersEvents.ToggleUser(it)) },
                     contentPadding = PaddingValues(16.dp),
                 )
             }
@@ -113,8 +104,8 @@ fun RoomInviteMembersView(
 @Composable
 private fun RoomInviteMembersTopBar(
     canSend: Boolean,
-    onBackPressed: () -> Unit,
-    onSubmitPressed: () -> Unit,
+    onBackClick: () -> Unit,
+    onSubmitClick: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -123,11 +114,11 @@ private fun RoomInviteMembersTopBar(
                 style = ElementTheme.typography.aliasScreenTitle,
             )
         },
-        navigationIcon = { BackButton(onClick = onBackPressed) },
+        navigationIcon = { BackButton(onClick = onBackClick) },
         actions = {
             TextButton(
                 text = stringResource(CommonStrings.action_invite),
-                onClick = onSubmitPressed,
+                onClick = onSubmitClick,
                 enabled = canSend,
             )
         }
@@ -142,17 +133,17 @@ private fun RoomInviteMembersSearchBar(
     showLoader: Boolean,
     selectedUsers: ImmutableList<MatrixUser>,
     active: Boolean,
-    onActiveChanged: (Boolean) -> Unit,
-    onTextChanged: (String) -> Unit,
-    onUserToggled: (MatrixUser) -> Unit,
+    onActiveChange: (Boolean) -> Unit,
+    onTextChange: (String) -> Unit,
+    onToggleUser: (MatrixUser) -> Unit,
     modifier: Modifier = Modifier,
     placeHolderTitle: String = stringResource(CommonStrings.common_search_for_someone),
 ) {
     SearchBar(
         query = query,
-        onQueryChange = onTextChanged,
+        onQueryChange = onTextChange,
         active = active,
-        onActiveChange = onActiveChanged,
+        onActiveChange = onActiveChange,
         modifier = modifier,
         placeHolderTitle = placeHolderTitle,
         contentPrefix = {
@@ -161,7 +152,7 @@ private fun RoomInviteMembersSearchBar(
                     modifier = Modifier.fillMaxWidth(),
                     selectedUsers = selectedUsers,
                     autoScroll = true,
-                    onUserRemoved = onUserToggled,
+                    onUserRemove = onToggleUser,
                     contentPadding = PaddingValues(16.dp),
                 )
             }
@@ -210,7 +201,7 @@ private fun RoomInviteMembersSearchBar(
                         checked = invitableUser.isSelected,
                         enabled = enabled,
                         data = data,
-                        onCheckedChange = { onUserToggled(invitableUser.matrixUser) },
+                        onCheckedChange = { onToggleUser(invitableUser.matrixUser) },
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -225,10 +216,10 @@ private fun RoomInviteMembersSearchBar(
 
 @PreviewsDayNight
 @Composable
-internal fun RoomInviteMembersPreview(@PreviewParameter(RoomInviteMembersStateProvider::class) state: RoomInviteMembersState) = ElementPreview {
+internal fun RoomInviteMembersViewPreview(@PreviewParameter(RoomInviteMembersStateProvider::class) state: RoomInviteMembersState) = ElementPreview {
     RoomInviteMembersView(
         state = state,
-        onBackPressed = {},
-        onSubmitPressed = {},
+        onBackClick = {},
+        onSubmitClick = {},
     )
 }

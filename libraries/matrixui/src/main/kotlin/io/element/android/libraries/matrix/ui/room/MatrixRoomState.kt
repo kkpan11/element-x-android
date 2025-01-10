@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.ui.room
@@ -24,6 +15,11 @@ import androidx.compose.runtime.produceState
 import io.element.android.libraries.matrix.api.room.MatrixRoom
 import io.element.android.libraries.matrix.api.room.MessageEventType
 import io.element.android.libraries.matrix.api.room.RoomMember
+import io.element.android.libraries.matrix.api.room.isDm
+import io.element.android.libraries.matrix.api.room.powerlevels.canBan
+import io.element.android.libraries.matrix.api.room.powerlevels.canHandleKnockRequests
+import io.element.android.libraries.matrix.api.room.powerlevels.canInvite
+import io.element.android.libraries.matrix.api.room.powerlevels.canKick
 import io.element.android.libraries.matrix.api.room.powerlevels.canRedactOther
 import io.element.android.libraries.matrix.api.room.powerlevels.canRedactOwn
 import io.element.android.libraries.matrix.api.room.powerlevels.canSendMessage
@@ -32,6 +28,13 @@ import io.element.android.libraries.matrix.api.room.powerlevels.canSendMessage
 fun MatrixRoom.canSendMessageAsState(type: MessageEventType, updateKey: Long): State<Boolean> {
     return produceState(initialValue = true, key1 = updateKey) {
         value = canSendMessage(type).getOrElse { true }
+    }
+}
+
+@Composable
+fun MatrixRoom.canInviteAsState(updateKey: Long): State<Boolean> {
+    return produceState(initialValue = false, key1 = updateKey) {
+        value = canInvite().getOrElse { false }
     }
 }
 
@@ -50,8 +53,77 @@ fun MatrixRoom.canRedactOtherAsState(updateKey: Long): State<Boolean> {
 }
 
 @Composable
+fun MatrixRoom.canCall(updateKey: Long): State<Boolean> {
+    return produceState(initialValue = false, key1 = updateKey) {
+        value = canUserJoinCall(sessionId).getOrElse { false }
+    }
+}
+
+@Composable
+fun MatrixRoom.canPinUnpin(updateKey: Long): State<Boolean> {
+    return produceState(initialValue = false, key1 = updateKey) {
+        value = canUserPinUnpin(sessionId).getOrElse { false }
+    }
+}
+
+@Composable
+fun MatrixRoom.isDmAsState(updateKey: Long): State<Boolean> {
+    return produceState(initialValue = false, key1 = updateKey) {
+        value = isDm
+    }
+}
+
+@Composable
+fun MatrixRoom.canKickAsState(updateKey: Long): State<Boolean> {
+    return produceState(initialValue = false, key1 = updateKey) {
+        value = canKick().getOrElse { false }
+    }
+}
+
+@Composable
+fun MatrixRoom.canBanAsState(updateKey: Long): State<Boolean> {
+    return produceState(initialValue = false, key1 = updateKey) {
+        value = canBan().getOrElse { false }
+    }
+}
+
+@Composable
+fun MatrixRoom.canHandleKnockRequestsAsState(updateKey: Long): State<Boolean> {
+    return produceState(initialValue = false, key1 = updateKey) {
+        value = canHandleKnockRequests().getOrElse { false }
+    }
+}
+
+@Composable
+fun MatrixRoom.userPowerLevelAsState(updateKey: Long): State<Long> {
+    return produceState(initialValue = 0, key1 = updateKey) {
+        value = userRole(sessionId)
+            .getOrDefault(RoomMember.Role.USER)
+            .powerLevel
+    }
+}
+
+@Composable
 fun MatrixRoom.isOwnUserAdmin(): Boolean {
     val roomInfo by roomInfoFlow.collectAsState(initial = null)
     val powerLevel = roomInfo?.userPowerLevels?.get(sessionId) ?: 0L
     return RoomMember.Role.forPowerLevel(powerLevel) == RoomMember.Role.ADMIN
+}
+
+@Composable
+fun MatrixRoom.rawName(): String? {
+    val roomInfo by roomInfoFlow.collectAsState(initial = null)
+    return roomInfo?.rawName
+}
+
+@Composable
+fun MatrixRoom.topic(): String? {
+    val roomInfo by roomInfoFlow.collectAsState(initial = null)
+    return roomInfo?.topic
+}
+
+@Composable
+fun MatrixRoom.avatarUrl(): String? {
+    val roomInfo by roomInfoFlow.collectAsState(initial = null)
+    return roomInfo?.avatarUrl
 }

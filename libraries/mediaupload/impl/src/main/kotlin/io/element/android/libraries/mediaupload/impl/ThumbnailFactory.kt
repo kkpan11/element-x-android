@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.mediaupload.impl
@@ -20,6 +11,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
+import android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC
 import android.media.ThumbnailUtils
 import android.os.Build
 import android.os.CancellationSignal
@@ -27,6 +19,7 @@ import android.provider.MediaStore
 import android.util.Size
 import androidx.core.net.toUri
 import com.vanniktech.blurhash.BlurHash
+import io.element.android.libraries.androidutils.bitmap.resizeToMax
 import io.element.android.libraries.androidutils.file.createTmpFile
 import io.element.android.libraries.androidutils.media.runAndRelease
 import io.element.android.libraries.core.mimetype.MimeTypes
@@ -62,8 +55,11 @@ class ThumbnailFactory @Inject constructor(
     private val sdkIntProvider: BuildVersionSdkIntProvider
 ) {
     @SuppressLint("NewApi")
-    suspend fun createImageThumbnail(file: File): ThumbnailResult? {
-        return createThumbnail { cancellationSignal ->
+    suspend fun createImageThumbnail(
+        file: File,
+        mimeType: String,
+    ): ThumbnailResult? {
+        return createThumbnail(mimeType = mimeType) { cancellationSignal ->
             try {
                 // This API works correctly with GIF
                 if (sdkIntProvider.isAtLeast(Build.VERSION_CODES.Q)) {
@@ -92,15 +88,22 @@ class ThumbnailFactory @Inject constructor(
     }
 
     suspend fun createVideoThumbnail(file: File): ThumbnailResult? {
-        return createThumbnail {
+        return createThumbnail(mimeType = MimeTypes.Jpeg) {
             MediaMetadataRetriever().runAndRelease {
                 setDataSource(context, file.toUri())
-                getFrameAtTime(VIDEO_THUMB_FRAME)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    getScaledFrameAtTime(VIDEO_THUMB_FRAME, OPTION_CLOSEST_SYNC, THUMB_MAX_WIDTH, THUMB_MAX_HEIGHT)
+                } else {
+                    getFrameAtTime(VIDEO_THUMB_FRAME)?.resizeToMax(THUMB_MAX_WIDTH, THUMB_MAX_HEIGHT)
+                }
             }
         }
     }
 
-    private suspend fun createThumbnail(bitmapFactory: (CancellationSignal) -> Bitmap?): ThumbnailResult? = suspendCancellableCoroutine { continuation ->
+    private suspend fun createThumbnail(
+        mimeType: String,
+        bitmapFactory: (CancellationSignal) -> Bitmap?,
+    ): ThumbnailResult? = suspendCancellableCoroutine { continuation ->
         val cancellationSignal = CancellationSignal()
         continuation.invokeOnCancellation {
             cancellationSignal.cancel()
@@ -110,9 +113,11 @@ class ThumbnailFactory @Inject constructor(
             continuation.resume(null)
             return@suspendCancellableCoroutine
         }
-        val thumbnailFile = context.createTmpFile(extension = "jpeg")
+        val format = mimeTypeToCompressFormat(mimeType)
+        val extension = mimeTypeToCompressFileExtension(mimeType)
+        val thumbnailFile = context.createTmpFile(extension = extension)
         thumbnailFile.outputStream().use { outputStream ->
-            bitmapThumbnail.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
+            bitmapThumbnail.compress(format, 78, outputStream)
         }
         val blurhash = BlurHash.encode(bitmapThumbnail, 3, 3)
         val thumbnailResult = ThumbnailResult(
@@ -120,7 +125,7 @@ class ThumbnailFactory @Inject constructor(
             info = ThumbnailInfo(
                 height = bitmapThumbnail.height.toLong(),
                 width = bitmapThumbnail.width.toLong(),
-                mimetype = MimeTypes.Jpeg,
+                mimetype = mimeTypeToThumbnailMimeType(mimeType),
                 size = thumbnailFile.length()
             ),
             blurhash = blurhash

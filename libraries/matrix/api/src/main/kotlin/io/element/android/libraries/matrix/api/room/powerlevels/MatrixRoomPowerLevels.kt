@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.room.powerlevels
@@ -19,6 +10,17 @@ package io.element.android.libraries.matrix.api.room.powerlevels
 import io.element.android.libraries.matrix.api.room.MatrixRoom
 import io.element.android.libraries.matrix.api.room.MessageEventType
 import io.element.android.libraries.matrix.api.room.StateEventType
+
+data class MatrixRoomPowerLevels(
+    val ban: Long,
+    val invite: Long,
+    val kick: Long,
+    val sendEvents: Long,
+    val redactEvents: Long,
+    val roomName: Long,
+    val roomAvatar: Long,
+    val roomTopic: Long,
+)
 
 /**
  * Shortcut for calling [MatrixRoom.canUserInvite] with our own user.
@@ -31,7 +33,7 @@ suspend fun MatrixRoom.canInvite(): Result<Boolean> = canUserInvite(sessionId)
 suspend fun MatrixRoom.canKick(): Result<Boolean> = canUserKick(sessionId)
 
 /**
- * Shortcut for calling [MatrixRoom.canBanUser] with our own user.
+ * Shortcut for calling [MatrixRoom.canUserBan] with our own user.
  */
 suspend fun MatrixRoom.canBan(): Result<Boolean> = canUserBan(sessionId)
 
@@ -54,3 +56,15 @@ suspend fun MatrixRoom.canRedactOwn(): Result<Boolean> = canUserRedactOwn(sessio
  * Shortcut for calling [MatrixRoom.canRedactOther] with our own user.
  */
 suspend fun MatrixRoom.canRedactOther(): Result<Boolean> = canUserRedactOther(sessionId)
+
+/**
+ * Shortcut for checking if current user can handle knock requests.
+ */
+suspend fun MatrixRoom.canHandleKnockRequests(): Result<Boolean> = runCatching {
+    canInvite().getOrThrow() || canBan().getOrThrow() || canKick().getOrThrow()
+}
+
+/**
+ * Shortcut for calling [MatrixRoom.canUserPinUnpin] with our own user.
+ */
+suspend fun MatrixRoom.canPinUnpin(): Result<Boolean> = canUserPinUnpin(sessionId)

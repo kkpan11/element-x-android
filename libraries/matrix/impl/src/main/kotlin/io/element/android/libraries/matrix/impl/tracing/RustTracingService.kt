@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.impl.tracing
@@ -33,15 +24,7 @@ class RustTracingService @Inject constructor(private val buildMeta: BuildMeta) :
         val rustTracingConfiguration = org.matrix.rustcomponents.sdk.TracingConfiguration(
             filter = tracingConfiguration.filterConfiguration.filter,
             writeToStdoutOrSystem = tracingConfiguration.writesToLogcat,
-            writeToFiles = when (val writeToFilesConfiguration = tracingConfiguration.writesToFilesConfiguration) {
-                is WriteToFilesConfiguration.Disabled -> null
-                is WriteToFilesConfiguration.Enabled -> TracingFileConfiguration(
-                    path = writeToFilesConfiguration.directory,
-                    filePrefix = writeToFilesConfiguration.filenamePrefix,
-                    fileSuffix = null,
-                    maxFiles = null,
-                )
-            },
+            writeToFiles = tracingConfiguration.writesToFilesConfiguration.toTracingFileConfiguration(),
         )
         org.matrix.rustcomponents.sdk.setupTracing(rustTracingConfiguration)
         Timber.v("Tracing config filter = $filter: ${filter.filter}")
@@ -49,5 +32,17 @@ class RustTracingService @Inject constructor(private val buildMeta: BuildMeta) :
 
     override fun createTimberTree(): Timber.Tree {
         return RustTracingTree(retrieveFromStackTrace = buildMeta.isDebuggable)
+    }
+}
+
+private fun WriteToFilesConfiguration.toTracingFileConfiguration(): TracingFileConfiguration? {
+    return when (this) {
+        is WriteToFilesConfiguration.Disabled -> null
+        is WriteToFilesConfiguration.Enabled -> TracingFileConfiguration(
+            path = directory,
+            filePrefix = filenamePrefix,
+            fileSuffix = filenameSuffix,
+            maxFiles = numberOfFiles?.toULong(),
+        )
     }
 }

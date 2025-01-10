@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.ui.components
@@ -48,7 +39,7 @@ import kotlin.math.floor
 @Composable
 fun SelectedUsersRowList(
     selectedUsers: ImmutableList<MatrixUser>,
-    onUserRemoved: (MatrixUser) -> Unit,
+    onUserRemove: (MatrixUser) -> Unit,
     modifier: Modifier = Modifier,
     autoScroll: Boolean = false,
     canDeselect: (MatrixUser) -> Boolean = { true },
@@ -112,7 +103,7 @@ fun SelectedUsersRowList(
                     SelectedUser(
                         matrixUser = selectedUser,
                         canRemove = canDeselect(selectedUser),
-                        onUserRemoved = onUserRemoved,
+                        onUserRemove = onUserRemove,
                     )
                 },
                 measurePolicy = { measurables, constraints ->
@@ -132,12 +123,12 @@ fun SelectedUsersRowList(
 
 @PreviewsDayNight
 @Composable
-internal fun SelectedUsersListPreview() = ElementPreview {
+internal fun SelectedUsersRowListPreview() = ElementPreview {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         // Two users that will be visible with no scrolling
         SelectedUsersRowList(
             selectedUsers = aMatrixUserList().take(2).toImmutableList(),
-            onUserRemoved = {},
+            onUserRemove = {},
             modifier = Modifier
                 .width(200.dp)
                 .border(1.dp, Color.Red)
@@ -147,7 +138,7 @@ internal fun SelectedUsersListPreview() = ElementPreview {
         for (i in 0..5) {
             SelectedUsersRowList(
                 selectedUsers = aMatrixUserList().take(6).toImmutableList(),
-                onUserRemoved = {},
+                onUserRemove = {},
                 modifier = Modifier
                     .width((200 + i * 20).dp)
                     .border(1.dp, Color.Red)

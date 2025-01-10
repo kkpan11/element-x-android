@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.poll.impl.create
@@ -25,33 +16,44 @@ import im.vector.app.features.analytics.plan.Composer
 import im.vector.app.features.analytics.plan.PollCreation
 import io.element.android.features.messages.test.FakeMessageComposerContext
 import io.element.android.features.poll.api.create.CreatePollMode
-import io.element.android.features.poll.impl.aPollTimeline
+import io.element.android.features.poll.impl.aPollTimelineItems
 import io.element.android.features.poll.impl.anOngoingPollContent
 import io.element.android.features.poll.impl.data.PollRepository
+import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.poll.PollKind
 import io.element.android.libraries.matrix.api.room.MatrixRoom
+import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 import io.element.android.libraries.matrix.api.timeline.item.event.PollContent
+import io.element.android.libraries.matrix.api.timeline.item.event.toEventOrTransactionId
 import io.element.android.libraries.matrix.test.AN_EVENT_ID
 import io.element.android.libraries.matrix.test.room.FakeMatrixRoom
-import io.element.android.libraries.matrix.test.room.SavePollInvocation
+import io.element.android.libraries.matrix.test.timeline.FakeTimeline
+import io.element.android.libraries.matrix.test.timeline.LiveTimelineProvider
 import io.element.android.services.analytics.test.FakeAnalyticsService
 import io.element.android.tests.testutils.WarmUpRule
+import io.element.android.tests.testutils.lambda.any
+import io.element.android.tests.testutils.lambda.assert
+import io.element.android.tests.testutils.lambda.lambdaRecorder
+import io.element.android.tests.testutils.lambda.value
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class CreatePollPresenterTest {
-    @get:Rule
-    val warmUpRule = WarmUpRule()
+    @get:Rule val warmUpRule = WarmUpRule()
 
     private val pollEventId = AN_EVENT_ID
     private var navUpInvocationsCount = 0
     private val existingPoll = anOngoingPollContent()
+    private val timeline = FakeTimeline(
+        timelineItems = aPollTimelineItems(mapOf(pollEventId to existingPoll))
+    )
     private val fakeMatrixRoom = FakeMatrixRoom(
-        matrixTimeline = aPollTimeline(
-            mapOf(pollEventId to existingPoll)
-        )
+        liveTimeline = timeline
     )
     private val fakeAnalyticsService = FakeAnalyticsService()
     private val fakeMessageComposerContext = FakeMessageComposerContext()
@@ -80,7 +82,7 @@ class CreatePollPresenterTest {
     @Test
     fun `in edit mode, if poll doesn't exist, error is tracked and screen is closed`() = runTest {
         val room = FakeMatrixRoom(
-            matrixTimeline = aPollTimeline()
+            liveTimeline = FakeTimeline()
         )
         val presenter = createCreatePollPresenter(mode = CreatePollMode.EditPoll(AN_EVENT_ID), room = room)
         moleculeFlow(RecompositionMode.Immediate) {
@@ -117,7 +119,13 @@ class CreatePollPresenterTest {
 
     @Test
     fun `create poll sends a poll start event`() = runTest {
-        val presenter = createCreatePollPresenter(mode = CreatePollMode.NewPoll)
+        val createPollResult = lambdaRecorder<String, List<String>, Int, PollKind, Result<Unit>> { _, _, _, _ -> Result.success(Unit) }
+        val presenter = createCreatePollPresenter(
+            room = FakeMatrixRoom(
+                createPollResult = createPollResult
+            ),
+            mode = CreatePollMode.NewPoll,
+        )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
@@ -128,15 +136,13 @@ class CreatePollPresenterTest {
             skipItems(3)
             initial.eventSink(CreatePollEvents.Save)
             delay(1) // Wait for the coroutine to finish
-            assertThat(fakeMatrixRoom.createPollInvocations.size).isEqualTo(1)
-            assertThat(fakeMatrixRoom.createPollInvocations.last()).isEqualTo(
-                SavePollInvocation(
-                    question = "A question?",
-                    answers = listOf("Answer 1", "Answer 2"),
-                    maxSelections = 1,
-                    pollKind = PollKind.Disclosed
+            createPollResult.assertions().isCalledOnce()
+                .with(
+                    value("A question?"),
+                    value(listOf("Answer 1", "Answer 2")),
+                    value(1),
+                    value(PollKind.Disclosed),
                 )
-            )
             assertThat(fakeAnalyticsService.capturedEvents.size).isEqualTo(2)
             assertThat(fakeAnalyticsService.capturedEvents[0]).isEqualTo(
                 Composer(
@@ -159,8 +165,15 @@ class CreatePollPresenterTest {
     @Test
     fun `when poll creation fails, error is tracked`() = runTest {
         val error = Exception("cause")
-        fakeMatrixRoom.givenCreatePollResult(Result.failure(error))
-        val presenter = createCreatePollPresenter(mode = CreatePollMode.NewPoll)
+        val createPollResult = lambdaRecorder<String, List<String>, Int, PollKind, Result<Unit>> { _, _, _, _ ->
+            Result.failure(error)
+        }
+        val presenter = createCreatePollPresenter(
+            room = FakeMatrixRoom(
+                createPollResult = createPollResult
+            ),
+            mode = CreatePollMode.NewPoll,
+        )
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
@@ -169,7 +182,7 @@ class CreatePollPresenterTest {
             awaitItem().eventSink(CreatePollEvents.SetAnswer(1, "Answer 2"))
             awaitItem().eventSink(CreatePollEvents.Save)
             delay(1) // Wait for the coroutine to finish
-            assertThat(fakeMatrixRoom.createPollInvocations).hasSize(1)
+            createPollResult.assertions().isCalledOnce()
             assertThat(fakeAnalyticsService.capturedEvents).isEmpty()
             assertThat(fakeAnalyticsService.trackedErrors).hasSize(1)
             assertThat(fakeAnalyticsService.trackedErrors).containsExactly(
@@ -180,6 +193,12 @@ class CreatePollPresenterTest {
 
     @Test
     fun `edit poll sends a poll edit event`() = runTest {
+        val editPollLambda = lambdaRecorder { _: EventId, _: String, _: List<String>, _: Int, _: PollKind ->
+            Result.success(Unit)
+        }
+        timeline.apply {
+            this.editPollLambda = editPollLambda
+        }
         val presenter = createCreatePollPresenter(mode = CreatePollMode.EditPoll(pollEventId))
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
@@ -201,16 +220,18 @@ class CreatePollPresenterTest {
             ).apply {
                 eventSink(CreatePollEvents.Save)
             }
-            delay(1) // Wait for the coroutine to finish
-            assertThat(fakeMatrixRoom.editPollInvocations.size).isEqualTo(1)
-            assertThat(fakeMatrixRoom.editPollInvocations.last()).isEqualTo(
-                SavePollInvocation(
-                    question = "Changed question",
-                    answers = listOf("Changed answer 1", "Changed answer 2", "Maybe"),
-                    maxSelections = 1,
-                    pollKind = PollKind.Disclosed
+            advanceUntilIdle() // Wait for the coroutine to finish
+
+            assert(editPollLambda)
+                .isCalledOnce()
+                .with(
+                    value(pollEventId),
+                    value("Changed question"),
+                    value(listOf("Changed answer 1", "Changed answer 2", "Maybe")),
+                    value(1),
+                    value(PollKind.Disclosed)
                 )
-            )
+
             assertThat(fakeAnalyticsService.capturedEvents.size).isEqualTo(2)
             assertThat(fakeAnalyticsService.capturedEvents[0]).isEqualTo(
                 Composer(
@@ -233,16 +254,30 @@ class CreatePollPresenterTest {
     @Test
     fun `when edit poll fails, error is tracked`() = runTest {
         val error = Exception("cause")
-        fakeMatrixRoom.givenEditPollResult(Result.failure(error))
-        val presenter = createCreatePollPresenter(mode = CreatePollMode.EditPoll(pollEventId))
+        val editPollResult = lambdaRecorder { _: EventId, _: String, _: List<String>, _: Int, _: PollKind ->
+            Result.failure<Unit>(error)
+        }
+        val presenter = createCreatePollPresenter(
+            room = FakeMatrixRoom(
+                editPollResult = editPollResult,
+                liveTimeline = timeline,
+            ),
+            mode = CreatePollMode.EditPoll(pollEventId),
+        )
+        val editPollLambda = lambdaRecorder { _: EventId, _: String, _: List<String>, _: Int, _: PollKind ->
+            Result.failure<Unit>(error)
+        }
+        timeline.apply {
+            this.editPollLambda = editPollLambda
+        }
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
             awaitDefaultItem()
             awaitPollLoaded().eventSink(CreatePollEvents.SetAnswer(0, "A"))
             awaitPollLoaded(newAnswer1 = "A").eventSink(CreatePollEvents.Save)
-            delay(1) // Wait for the coroutine to finish
-            assertThat(fakeMatrixRoom.editPollInvocations).hasSize(1)
+            advanceUntilIdle() // Wait for the coroutine to finish
+            assert(editPollLambda).isCalledOnce()
             assertThat(fakeAnalyticsService.capturedEvents).isEmpty()
             assertThat(fakeAnalyticsService.trackedErrors).hasSize(1)
             assertThat(fakeAnalyticsService.trackedErrors).containsExactly(
@@ -432,47 +467,53 @@ class CreatePollPresenterTest {
     @Test
     fun `delete confirms`() = runTest {
         val presenter = createCreatePollPresenter(mode = CreatePollMode.EditPoll(pollEventId))
+        val redactEventLambda = lambdaRecorder { _: EventOrTransactionId, _: String? -> Result.success(Unit) }
+        timeline.redactEventLambda = redactEventLambda
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
             awaitDefaultItem()
             awaitPollLoaded().eventSink(CreatePollEvents.Delete(confirmed = false))
             awaitDeleteConfirmation()
-            assertThat(fakeMatrixRoom.redactEventEventIdParam).isNull()
+            assert(redactEventLambda).isNeverCalled()
         }
     }
 
     @Test
     fun `delete can be cancelled`() = runTest {
         val presenter = createCreatePollPresenter(mode = CreatePollMode.EditPoll(pollEventId))
+        val redactEventLambda = lambdaRecorder { _: EventOrTransactionId, _: String? -> Result.success(Unit) }
+        timeline.redactEventLambda = redactEventLambda
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
             awaitDefaultItem()
             awaitPollLoaded().eventSink(CreatePollEvents.Delete(confirmed = false))
-            assertThat(fakeMatrixRoom.redactEventEventIdParam).isNull()
             awaitDeleteConfirmation().eventSink(CreatePollEvents.HideConfirmation)
             awaitPollLoaded().apply {
                 assertThat(showDeleteConfirmation).isFalse()
             }
-            assertThat(fakeMatrixRoom.redactEventEventIdParam).isNull()
+            assert(redactEventLambda).isNeverCalled()
         }
     }
 
     @Test
     fun `delete can be confirmed`() = runTest {
         val presenter = createCreatePollPresenter(mode = CreatePollMode.EditPoll(pollEventId))
+        val redactEventLambda = lambdaRecorder { _: EventOrTransactionId, _: String? -> Result.success(Unit) }
+        timeline.redactEventLambda = redactEventLambda
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
             awaitDefaultItem()
             awaitPollLoaded().eventSink(CreatePollEvents.Delete(confirmed = false))
-            assertThat(fakeMatrixRoom.redactEventEventIdParam).isNull()
             awaitDeleteConfirmation().eventSink(CreatePollEvents.Delete(confirmed = true))
             awaitPollLoaded().apply {
                 assertThat(showDeleteConfirmation).isFalse()
             }
-            assertThat(fakeMatrixRoom.redactEventEventIdParam).isEqualTo(pollEventId)
+            assert(redactEventLambda)
+                .isCalledOnce()
+                .with(value(pollEventId.toEventOrTransactionId()), any())
         }
     }
 
@@ -497,22 +538,22 @@ class CreatePollPresenterTest {
         newAnswer1: String? = null,
         newAnswer2: String? = null,
     ) =
-        awaitItem().apply {
-            assertThat(canSave).isTrue()
-            assertThat(canAddAnswer).isTrue()
-            assertThat(question).isEqualTo(newQuestion ?: existingPoll.question)
-            assertThat(answers).isEqualTo(existingPoll.expectedAnswersState().toMutableList().apply {
+        awaitItem().also { state ->
+            assertThat(state.canSave).isTrue()
+            assertThat(state.canAddAnswer).isTrue()
+            assertThat(state.question).isEqualTo(newQuestion ?: existingPoll.question)
+            assertThat(state.answers).isEqualTo(existingPoll.expectedAnswersState().toMutableList().apply {
                 newAnswer1?.let { this[0] = Answer(it, true) }
                 newAnswer2?.let { this[1] = Answer(it, true) }
             })
-            assertThat(pollKind).isEqualTo(existingPoll.kind)
+            assertThat(state.pollKind).isEqualTo(existingPoll.kind)
         }
 
     private fun createCreatePollPresenter(
         mode: CreatePollMode = CreatePollMode.NewPoll,
         room: MatrixRoom = fakeMatrixRoom,
     ): CreatePollPresenter = CreatePollPresenter(
-        repository = PollRepository(room),
+        repository = PollRepository(room, LiveTimelineProvider(room)),
         analyticsService = fakeAnalyticsService,
         messageComposerContext = fakeMessageComposerContext,
         navigateUp = { navUpInvocationsCount++ },

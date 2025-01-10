@@ -1,22 +1,14 @@
+import extension.setupAnvil
+
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 plugins {
     id("io.element.android-library")
-    alias(libs.plugins.anvil)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -24,9 +16,7 @@ android {
     namespace = "io.element.android.libraries.matrix.impl"
 }
 
-anvil {
-    generateDaggerFactories.set(true)
-}
+setupAnvil()
 
 dependencies {
     releaseImplementation(libs.matrix.sdk)
@@ -36,22 +26,33 @@ dependencies {
     } else {
         debugImplementation(libs.matrix.sdk)
     }
-    implementation(projects.libraries.di)
+    implementation(projects.appconfig)
     implementation(projects.libraries.androidutils)
-    implementation(projects.libraries.network)
-    implementation(projects.services.toolbox.api)
+    implementation(projects.libraries.di)
     implementation(projects.libraries.featureflag.api)
+    implementation(projects.libraries.network)
+    implementation(projects.libraries.preferences.api)
+    implementation(projects.services.analytics.api)
+    implementation(projects.services.toolbox.api)
     api(projects.libraries.matrix.api)
     implementation(libs.dagger)
     implementation(projects.libraries.core)
-    implementation("net.java.dev.jna:jna:5.14.0@aar")
+    implementation("net.java.dev.jna:jna:5.16.0@aar")
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.serialization.json)
     implementation(libs.kotlinx.collections.immutable)
 
     testImplementation(libs.test.junit)
     testImplementation(libs.test.truth)
+    testImplementation(libs.test.robolectric)
+    testImplementation(projects.libraries.featureflag.test)
     testImplementation(projects.libraries.matrix.test)
+    testImplementation(projects.libraries.preferences.test)
+    testImplementation(projects.libraries.sessionStorage.implMemory)
+    testImplementation(projects.libraries.sessionStorage.test)
+    testImplementation(projects.services.analytics.test)
+    testImplementation(projects.services.toolbox.test)
+    testImplementation(projects.tests.testutils)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.test.turbine)
 }

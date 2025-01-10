@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.dialogs
@@ -41,7 +32,7 @@ import kotlinx.collections.immutable.persistentListOf
 @Composable
 fun SingleSelectionDialog(
     options: ImmutableList<ListOption>,
-    onOptionSelected: (Int) -> Unit,
+    onSelectOption: (Int) -> Unit,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     title: String? = null,
@@ -65,7 +56,7 @@ fun SingleSelectionDialog(
             title = title,
             subtitle = decoratedSubtitle,
             options = options,
-            onOptionSelected = onOptionSelected,
+            onOptionClick = onSelectOption,
             dismissButtonTitle = dismissButtonTitle,
             onDismissRequest = onDismissRequest,
             initialSelection = initialSelection,
@@ -76,7 +67,7 @@ fun SingleSelectionDialog(
 @Composable
 private fun SingleSelectionDialogContent(
     options: ImmutableList<ListOption>,
-    onOptionSelected: (Int) -> Unit,
+    onOptionClick: (Int) -> Unit,
     dismissButtonTitle: String,
     onDismissRequest: () -> Unit,
     title: String? = null,
@@ -87,7 +78,7 @@ private fun SingleSelectionDialogContent(
         title = title,
         subtitle = subtitle,
         submitText = dismissButtonTitle,
-        onSubmitClicked = onDismissRequest,
+        onSubmitClick = onDismissRequest,
         applyPaddingToContents = false,
     ) {
         LazyColumn {
@@ -96,7 +87,7 @@ private fun SingleSelectionDialogContent(
                     headline = option.title,
                     supportingText = option.subtitle,
                     selected = index == initialSelection,
-                    onSelected = { onOptionSelected(index) },
+                    onSelect = { onOptionClick(index) },
                     compactLayout = true,
                     modifier = Modifier.padding(start = 8.dp)
                 )
@@ -118,7 +109,7 @@ internal fun SingleSelectionDialogContentPreview() {
             SingleSelectionDialogContent(
                 title = "Dialog title",
                 options = options,
-                onOptionSelected = {},
+                onOptionClick = {},
                 onDismissRequest = {},
                 dismissButtonTitle = "Cancel",
                 initialSelection = 0
@@ -138,7 +129,7 @@ internal fun SingleSelectionDialogPreview() = ElementPreview {
     SingleSelectionDialog(
         title = "Dialog title",
         options = options,
-        onOptionSelected = {},
+        onSelectOption = {},
         onDismissRequest = {},
         dismissButtonTitle = "Cancel",
         initialSelection = 0

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.preferences.impl.store
@@ -22,16 +13,14 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStoreFile
-import io.element.android.features.preferences.api.store.SessionPreferencesStore
 import io.element.android.libraries.androidutils.file.safeDelete
 import io.element.android.libraries.androidutils.hash.hash
 import io.element.android.libraries.di.annotations.SessionCoroutineScope
 import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.preferences.api.store.SessionPreferencesStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.io.File
 
 class DefaultSessionPreferencesStore(
@@ -51,9 +40,19 @@ class DefaultSessionPreferencesStore(
     private val renderReadReceiptsKey = booleanPreferencesKey("renderReadReceipts")
     private val sendTypingNotificationsKey = booleanPreferencesKey("sendTypingNotifications")
     private val renderTypingNotificationsKey = booleanPreferencesKey("renderTypingNotifications")
+    private val skipSessionVerification = booleanPreferencesKey("skipSessionVerification")
+    private val compressMedia = booleanPreferencesKey("compressMedia")
 
     private val dataStoreFile = storeFile(context, sessionId)
-    private val store = PreferenceDataStoreFactory.create(scope = sessionCoroutineScope) { dataStoreFile }
+    private val store = PreferenceDataStoreFactory.create(
+        scope = sessionCoroutineScope,
+        migrations = listOf(
+            SessionPreferencesStoreMigration(
+                sharePresenceKey,
+                sendPublicReadReceiptsKey,
+            )
+        ),
+    ) { dataStoreFile }
 
     override suspend fun setSharePresence(enabled: Boolean) {
         update(sharePresenceKey, enabled)
@@ -65,8 +64,7 @@ class DefaultSessionPreferencesStore(
     }
 
     override fun isSharePresenceEnabled(): Flow<Boolean> {
-        // Migration, if sendPublicReadReceiptsKey was false, consider that sharing presence is false.
-        return get(sharePresenceKey) { runBlocking { isSendPublicReadReceiptsEnabled().first() } }
+        return get(sharePresenceKey) { true }
     }
 
     override suspend fun setSendPublicReadReceipts(enabled: Boolean) = update(sendPublicReadReceiptsKey, enabled)
@@ -80,6 +78,12 @@ class DefaultSessionPreferencesStore(
 
     override suspend fun setRenderTypingNotifications(enabled: Boolean) = update(renderTypingNotificationsKey, enabled)
     override fun isRenderTypingNotificationsEnabled(): Flow<Boolean> = get(renderTypingNotificationsKey) { true }
+
+    override suspend fun setSkipSessionVerification(skip: Boolean) = update(skipSessionVerification, skip)
+    override fun isSessionVerificationSkipped(): Flow<Boolean> = get(skipSessionVerification) { false }
+
+    override suspend fun setCompressMedia(compress: Boolean) = update(compressMedia, compress)
+    override fun doesCompressMedia(): Flow<Boolean> = get(compressMedia) { true }
 
     override suspend fun clear() {
         dataStoreFile.safeDelete()

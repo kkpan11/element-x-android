@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.securebackup.impl.enter
@@ -28,6 +19,7 @@ import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.securebackup.impl.R
 import io.element.android.features.securebackup.impl.setup.views.RecoveryKeyView
 import io.element.android.libraries.designsystem.atomic.pages.FlowStepPage
+import io.element.android.libraries.designsystem.components.BigIcon
 import io.element.android.libraries.designsystem.components.async.AsyncActionView
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -37,13 +29,13 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun SecureBackupEnterRecoveryKeyView(
     state: SecureBackupEnterRecoveryKeyState,
-    onDone: () -> Unit,
-    onBackClicked: () -> Unit,
+    onSuccess: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     AsyncActionView(
         async = state.submitAction,
-        onSuccess = { onDone() },
+        onSuccess = { onSuccess() },
         progressDialog = { },
         errorTitle = { stringResource(id = R.string.screen_recovery_key_confirm_error_title) },
         errorMessage = { stringResource(id = R.string.screen_recovery_key_confirm_error_content) },
@@ -52,13 +44,15 @@ fun SecureBackupEnterRecoveryKeyView(
 
     FlowStepPage(
         modifier = modifier,
-        onBackClicked = onBackClicked,
-        iconVector = CompoundIcons.KeySolid(),
+        isScrollable = true,
+        onBackClick = onBackClick,
+        iconStyle = BigIcon.Style.Default(CompoundIcons.KeySolid()),
         title = stringResource(id = R.string.screen_recovery_key_confirm_title),
         subTitle = stringResource(id = R.string.screen_recovery_key_confirm_description),
-        content = { Content(state = state) },
         buttons = { Buttons(state = state) }
-    )
+    ) {
+        Content(state = state)
+    }
 }
 
 @Composable
@@ -66,7 +60,7 @@ private fun Content(
     state: SecureBackupEnterRecoveryKeyState,
 ) {
     RecoveryKeyView(
-        modifier = Modifier.padding(top = 52.dp),
+        modifier = Modifier.padding(top = 52.dp, bottom = 32.dp),
         state = state.recoveryKeyViewState,
         onClick = null,
         onChange = {
@@ -83,7 +77,7 @@ private fun ColumnScope.Buttons(
     state: SecureBackupEnterRecoveryKeyState,
 ) {
     Button(
-        text = stringResource(id = CommonStrings.action_confirm),
+        text = stringResource(id = CommonStrings.action_continue),
         enabled = state.isSubmitEnabled,
         showProgress = state.submitAction.isLoading(),
         modifier = Modifier.fillMaxWidth(),
@@ -100,7 +94,7 @@ internal fun SecureBackupEnterRecoveryKeyViewPreview(
 ) = ElementPreview {
     SecureBackupEnterRecoveryKeyView(
         state = state,
-        onDone = {},
-        onBackClicked = {},
+        onSuccess = {},
+        onBackClick = {},
     )
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.developer
@@ -26,6 +17,7 @@ import io.element.android.features.preferences.impl.R
 import io.element.android.features.rageshake.api.preferences.RageshakePreferencesView
 import io.element.android.libraries.designsystem.components.preferences.PreferenceCategory
 import io.element.android.libraries.designsystem.components.preferences.PreferencePage
+import io.element.android.libraries.designsystem.components.preferences.PreferenceSwitch
 import io.element.android.libraries.designsystem.components.preferences.PreferenceText
 import io.element.android.libraries.designsystem.components.preferences.PreferenceTextField
 import io.element.android.libraries.designsystem.preview.ElementPreview
@@ -39,16 +31,20 @@ fun DeveloperSettingsView(
     state: DeveloperSettingsState,
     onOpenShowkase: () -> Unit,
     onOpenConfigureTracing: () -> Unit,
-    onBackPressed: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PreferencePage(
         modifier = modifier,
-        onBackPressed = onBackPressed,
+        onBackClick = onBackClick,
         title = stringResource(id = CommonStrings.common_developer_options)
     ) {
         // Note: this is OK to hardcode strings in this debug screen.
-        PreferenceCategory(title = "Feature flags") {
+        SettingsCategory(state)
+        PreferenceCategory(
+            title = "Feature flags",
+            showTopDivider = true,
+        ) {
             FeatureListContent(state)
         }
         ElementCallCategory(state = state)
@@ -56,6 +52,14 @@ fun DeveloperSettingsView(
             PreferenceText(
                 title = "Configure tracing",
                 onClick = onOpenConfigureTracing,
+            )
+            PreferenceSwitch(
+                title = "Enable Simplified Sliding Sync",
+                subtitle = "When toggled you'll be logged out of the app and will need to log in again.",
+                isChecked = state.isSimpleSlidingSyncEnabled,
+                onCheckedChange = {
+                    state.eventSink(DeveloperSettingsEvents.SetSimplifiedSlidingSyncEnabled(it))
+                }
             )
         }
         PreferenceCategory(title = "Showkase") {
@@ -67,14 +71,14 @@ fun DeveloperSettingsView(
         RageshakePreferencesView(
             state = state.rageshakeState,
         )
-        PreferenceCategory(title = "Crash", showDivider = false) {
+        PreferenceCategory(title = "Crash", showTopDivider = false) {
             PreferenceText(
                 title = "Crash the app 💥",
                 onClick = { error("This crash is a test.") }
             )
         }
         val cache = state.cacheSize
-        PreferenceCategory(title = "Cache", showDivider = false) {
+        PreferenceCategory(title = "Cache", showTopDivider = false) {
             PreferenceText(
                 title = "Clear cache",
                 currentValue = cache.dataOrNull(),
@@ -90,14 +94,31 @@ fun DeveloperSettingsView(
 }
 
 @Composable
+private fun SettingsCategory(
+    state: DeveloperSettingsState,
+) {
+    PreferenceCategory(title = "Preferences", showTopDivider = false) {
+        PreferenceSwitch(
+            title = "Hide image & video previews",
+            subtitle = "When toggled image & video will not render in the timeline by default.",
+            isChecked = state.hideImagesAndVideos,
+            onCheckedChange = {
+                state.eventSink(DeveloperSettingsEvents.SetHideImagesAndVideos(it))
+            }
+        )
+    }
+}
+
+@Composable
 private fun ElementCallCategory(
     state: DeveloperSettingsState,
 ) {
-    PreferenceCategory(title = "Element Call", showDivider = true) {
+    PreferenceCategory(title = "Element Call", showTopDivider = true) {
         val callUrlState = state.customElementCallBaseUrlState
         fun isUsingDefaultUrl(value: String?): Boolean {
             return value.isNullOrEmpty() || value == callUrlState.defaultUrl
         }
+
         val supportingText = if (isUsingDefaultUrl(callUrlState.baseUrl)) {
             stringResource(R.string.screen_advanced_settings_element_call_base_url_description)
         } else {
@@ -110,7 +131,7 @@ private fun ElementCallCategory(
             validation = callUrlState.validator,
             onValidationErrorMessage = stringResource(R.string.screen_advanced_settings_element_call_base_url_validation_error),
             displayValue = { value -> !isUsingDefaultUrl(value) },
-            keyboardOptions = KeyboardOptions.Default.copy(autoCorrect = false, keyboardType = KeyboardType.Uri),
+            keyboardOptions = KeyboardOptions.Default.copy(autoCorrectEnabled = false, keyboardType = KeyboardType.Uri),
             onChange = { state.eventSink(DeveloperSettingsEvents.SetCustomElementCallBaseUrl(it)) }
         )
     }
@@ -137,6 +158,6 @@ internal fun DeveloperSettingsViewPreview(@PreviewParameter(DeveloperSettingsSta
         state = state,
         onOpenShowkase = {},
         onOpenConfigureTracing = {},
-        onBackPressed = {}
+        onBackClick = {}
     )
 }

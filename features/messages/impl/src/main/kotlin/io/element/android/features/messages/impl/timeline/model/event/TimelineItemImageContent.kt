@@ -1,41 +1,56 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.model.event
 
-import io.element.android.libraries.core.mimetype.MimeTypes
+import io.element.android.libraries.core.mimetype.MimeTypes.isMimeTypeAnimatedImage
 import io.element.android.libraries.matrix.api.media.MediaSource
+import io.element.android.libraries.matrix.ui.media.MAX_THUMBNAIL_HEIGHT
+import io.element.android.libraries.matrix.ui.media.MAX_THUMBNAIL_WIDTH
+import io.element.android.libraries.matrix.ui.media.MediaRequestData
 
 data class TimelineItemImageContent(
-    val body: String,
-    val mediaSource: MediaSource,
+    override val filename: String,
+    override val caption: String?,
+    override val formattedCaption: CharSequence?,
+    override val isEdited: Boolean,
+    override val mediaSource: MediaSource,
     val thumbnailSource: MediaSource?,
-    val formattedFileSize: String,
-    val fileExtension: String,
-    val mimeType: String,
+    override val formattedFileSize: String,
+    override val fileExtension: String,
+    override val mimeType: String,
     val blurhash: String?,
     val width: Int?,
     val height: Int?,
+    val thumbnailWidth: Int?,
+    val thumbnailHeight: Int?,
     val aspectRatio: Float?
-) : TimelineItemEventContent {
+) : TimelineItemEventContentWithAttachment {
     override val type: String = "TimelineItemImageContent"
 
-    val preferredMediaSource = if (mimeType == MimeTypes.Gif) {
-        mediaSource
-    } else {
-        thumbnailSource ?: mediaSource
+    val showCaption = caption != null
+
+    val thumbnailMediaRequestData: MediaRequestData by lazy {
+        if (mimeType.isMimeTypeAnimatedImage()) {
+            MediaRequestData(
+                source = mediaSource,
+                kind = MediaRequestData.Kind.File(
+                    fileName = filename,
+                    mimeType = mimeType
+                )
+            )
+        } else {
+            MediaRequestData(
+                source = thumbnailSource ?: mediaSource,
+                kind = MediaRequestData.Kind.Thumbnail(
+                    width = thumbnailWidth?.toLong() ?: MAX_THUMBNAIL_WIDTH,
+                    height = thumbnailHeight?.toLong() ?: MAX_THUMBNAIL_HEIGHT
+                ),
+            )
+        }
     }
 }

@@ -1,23 +1,17 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.actionlist
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import io.element.android.features.messages.impl.actionlist.model.TimelineItemAction
+import io.element.android.features.messages.impl.actionlist.model.TimelineItemActionComparator
+import io.element.android.features.messages.impl.crypto.sendfailure.VerifiedUserSendFailure
+import io.element.android.features.messages.impl.crypto.sendfailure.resolve.anUnsignedDeviceSendFailure
 import io.element.android.features.messages.impl.timeline.aTimelineItemEvent
 import io.element.android.features.messages.impl.timeline.aTimelineItemReactions
 import io.element.android.features.messages.impl.timeline.model.event.aTimelineItemAudioContent
@@ -27,8 +21,9 @@ import io.element.android.features.messages.impl.timeline.model.event.aTimelineI
 import io.element.android.features.messages.impl.timeline.model.event.aTimelineItemPollContent
 import io.element.android.features.messages.impl.timeline.model.event.aTimelineItemVideoContent
 import io.element.android.features.messages.impl.timeline.model.event.aTimelineItemVoiceContent
+import io.element.android.libraries.matrix.api.timeline.item.event.MessageShield
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 
 open class ActionListStateProvider : PreviewParameterProvider<ActionListState> {
     override val values: Sequence<ActionListState>
@@ -37,86 +32,144 @@ open class ActionListStateProvider : PreviewParameterProvider<ActionListState> {
             return sequenceOf(
                 anActionListState(),
                 anActionListState().copy(target = ActionListState.Target.Loading(aTimelineItemEvent())),
-                anActionListState().copy(
+                anActionListState(
                     target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent().copy(
-                            reactionsState = reactionsState
+                        event = aTimelineItemEvent(
+                            timelineItemReactions = reactionsState
                         ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
                         displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
                         actions = aTimelineItemActionList(),
                     )
                 ),
-                anActionListState().copy(
+                anActionListState(
                     target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemImageContent()).copy(
-                            reactionsState = reactionsState
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemImageContent(),
+                            displayNameAmbiguous = true,
+                            timelineItemReactions = reactionsState,
                         ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
                         displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
+                        actions = aTimelineItemActionList(
+                            copyAction = TimelineItemAction.CopyCaption,
+                        ),
+                    )
+                ),
+                anActionListState(
+                    target = ActionListState.Target.Success(
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemVideoContent(),
+                            timelineItemReactions = reactionsState
+                        ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
+                        displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
+                        actions = aTimelineItemActionList(
+                            copyAction = TimelineItemAction.CopyCaption,
+                        ),
+                    )
+                ),
+                anActionListState(
+                    target = ActionListState.Target.Success(
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemFileContent(),
+                            timelineItemReactions = reactionsState
+                        ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
+                        displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
+                        actions = aTimelineItemActionList(
+                            copyAction = null,
+                        ),
+                    )
+                ),
+                anActionListState(
+                    target = ActionListState.Target.Success(
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemAudioContent(),
+                            timelineItemReactions = reactionsState
+                        ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
+                        displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
+                        actions = aTimelineItemActionList(
+                            copyAction = TimelineItemAction.CopyCaption,
+                        ),
+                    )
+                ),
+                anActionListState(
+                    target = ActionListState.Target.Success(
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemVoiceContent(caption = null),
+                            timelineItemReactions = reactionsState
+                        ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
+                        displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
+                        actions = aTimelineItemActionList(
+                            copyAction = null,
+                        ),
+                    )
+                ),
+                anActionListState(
+                    target = ActionListState.Target.Success(
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemLocationContent(),
+                            timelineItemReactions = reactionsState
+                        ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
+                        displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
                         actions = aTimelineItemActionList(),
                     )
                 ),
-                anActionListState().copy(
+                anActionListState(
                     target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemVideoContent()).copy(
-                            reactionsState = reactionsState
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemLocationContent(),
+                            timelineItemReactions = reactionsState
                         ),
-                        displayEmojiReactions = true,
-                        actions = aTimelineItemActionList(),
-                    )
-                ),
-                anActionListState().copy(
-                    target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemFileContent()).copy(
-                            reactionsState = reactionsState
-                        ),
-                        displayEmojiReactions = true,
-                        actions = aTimelineItemActionList(),
-                    )
-                ),
-                anActionListState().copy(
-                    target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemAudioContent()).copy(
-                            reactionsState = reactionsState
-                        ),
-                        displayEmojiReactions = true,
-                        actions = aTimelineItemActionList(),
-                    )
-                ),
-                anActionListState().copy(
-                    target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemVoiceContent()).copy(
-                            reactionsState = reactionsState
-                        ),
-                        displayEmojiReactions = true,
-                        actions = aTimelineItemActionList(),
-                    )
-                ),
-                anActionListState().copy(
-                    target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemLocationContent()).copy(
-                            reactionsState = reactionsState
-                        ),
-                        displayEmojiReactions = true,
-                        actions = aTimelineItemActionList(),
-                    )
-                ),
-                anActionListState().copy(
-                    target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemLocationContent()).copy(
-                            reactionsState = reactionsState
-                        ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
                         displayEmojiReactions = false,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
                         actions = aTimelineItemActionList(),
                     ),
                 ),
-                anActionListState().copy(
+                anActionListState(
                     target = ActionListState.Target.Success(
-                        event = aTimelineItemEvent(content = aTimelineItemPollContent()).copy(
-                            reactionsState = reactionsState
+                        event = aTimelineItemEvent(
+                            content = aTimelineItemPollContent(),
+                            timelineItemReactions = reactionsState
                         ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
                         displayEmojiReactions = false,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
                         actions = aTimelineItemPollActionList(),
                     ),
+                ),
+                anActionListState(
+                    target = ActionListState.Target.Success(
+                        event = aTimelineItemEvent(
+                            timelineItemReactions = reactionsState,
+                            messageShield = MessageShield.UnknownDevice(isCritical = true)
+                        ),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
+                        displayEmojiReactions = true,
+                        verifiedUserSendFailure = VerifiedUserSendFailure.None,
+                        actions = aTimelineItemActionList(),
+                    )
+                ),
+                anActionListState(
+                    target = ActionListState.Target.Success(
+                        event = aTimelineItemEvent(),
+                        sentTimeFull = "January 1, 1970 at 12:00 AM",
+                        displayEmojiReactions = true,
+                        verifiedUserSendFailure = anUnsignedDeviceSendFailure(),
+                        actions = aTimelineItemActionList(),
+                    )
                 ),
             )
         }
@@ -130,24 +183,32 @@ fun anActionListState(
     eventSink = eventSink
 )
 
-fun aTimelineItemActionList(): ImmutableList<TimelineItemAction> {
-    return persistentListOf(
+fun aTimelineItemActionList(
+    copyAction: TimelineItemAction? = TimelineItemAction.CopyText
+): ImmutableList<TimelineItemAction> {
+    return setOfNotNull(
         TimelineItemAction.Reply,
         TimelineItemAction.Forward,
-        TimelineItemAction.Copy,
+        copyAction,
+        TimelineItemAction.CopyLink,
         TimelineItemAction.Edit,
         TimelineItemAction.Redact,
         TimelineItemAction.ReportContent,
         TimelineItemAction.ViewSource,
     )
+        .sortedWith(TimelineItemActionComparator())
+        .toPersistentList()
 }
+
 fun aTimelineItemPollActionList(): ImmutableList<TimelineItemAction> {
-    return persistentListOf(
+    return setOf(
         TimelineItemAction.EndPoll,
+        TimelineItemAction.EditPoll,
         TimelineItemAction.Reply,
-        TimelineItemAction.Copy,
-        TimelineItemAction.ViewSource,
-        TimelineItemAction.ReportContent,
+        TimelineItemAction.Pin,
+        TimelineItemAction.CopyLink,
         TimelineItemAction.Redact,
     )
+        .sortedWith(TimelineItemActionComparator())
+        .toPersistentList()
 }

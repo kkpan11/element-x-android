@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.impl.sync
@@ -19,21 +10,30 @@ package io.element.android.libraries.matrix.impl.sync
 import io.element.android.libraries.matrix.api.sync.SyncService
 import io.element.android.libraries.matrix.api.sync.SyncState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
-import org.matrix.rustcomponents.sdk.SyncServiceInterface
+import kotlinx.coroutines.withContext
 import org.matrix.rustcomponents.sdk.SyncServiceState
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
+import org.matrix.rustcomponents.sdk.SyncService as InnerSyncService
 
 class RustSyncService(
-    private val innerSyncService: SyncServiceInterface,
+    private val innerSyncService: InnerSyncService,
     sessionCoroutineScope: CoroutineScope
 ) : SyncService {
+    private val isServiceReady = AtomicBoolean(true)
+
     override suspend fun startSync() = runCatching {
+        if (!isServiceReady.get()) {
+            Timber.d("Can't start sync: service is not ready")
+            return@runCatching
+        }
         Timber.i("Start sync")
         innerSyncService.start()
     }.onFailure {
@@ -41,10 +41,21 @@ class RustSyncService(
     }
 
     override suspend fun stopSync() = runCatching {
+        if (!isServiceReady.get()) {
+            Timber.d("Can't stop sync: service is not ready")
+            return@runCatching
+        }
         Timber.i("Stop sync")
         innerSyncService.stop()
     }.onFailure {
         Timber.d("Stop sync failed: $it")
+    }
+
+    suspend fun destroy() = withContext(NonCancellable) {
+        // If the service was still running, stop it
+        stopSync()
+        Timber.d("Destroying sync service")
+        isServiceReady.set(false)
     }
 
     override val syncState: StateFlow<SyncState> =

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.model.event
@@ -26,20 +17,29 @@ open class TimelineItemVideoContentProvider : PreviewParameterProvider<TimelineI
     override val values: Sequence<TimelineItemVideoContent>
         get() = sequenceOf(
             aTimelineItemVideoContent(),
-            aTimelineItemVideoContent().copy(aspectRatio = 1.0f),
-            aTimelineItemVideoContent().copy(aspectRatio = 1.5f),
+            aTimelineItemVideoContent(aspectRatio = 1.0f),
+            aTimelineItemVideoContent(aspectRatio = 1.5f),
+            aTimelineItemVideoContent(blurhash = null),
         )
 }
 
-fun aTimelineItemVideoContent() = TimelineItemVideoContent(
-    body = "Video.mp4",
+fun aTimelineItemVideoContent(
+    aspectRatio: Float = 0.5f,
+    blurhash: String? = A_BLUR_HASH,
+) = TimelineItemVideoContent(
+    filename = "Video.mp4",
+    caption = null,
+    formattedCaption = null,
+    isEdited = false,
     thumbnailSource = null,
-    blurHash = A_BLUR_HASH,
-    aspectRatio = 0.5f,
+    blurHash = blurhash,
+    aspectRatio = aspectRatio,
     duration = 100.milliseconds,
-    videoSource = MediaSource(""),
-    height = 300,
+    mediaSource = MediaSource(""),
     width = 150,
+    height = 300,
+    thumbnailWidth = 150,
+    thumbnailHeight = 300,
     mimeType = MimeTypes.Mp4,
     formattedFileSize = "14MB",
     fileExtension = "mp4"

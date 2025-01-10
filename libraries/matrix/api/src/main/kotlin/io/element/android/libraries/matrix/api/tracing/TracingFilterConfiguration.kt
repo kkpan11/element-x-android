@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.tracing
@@ -27,10 +18,12 @@ data class TracingFilterConfiguration(
         Target.MATRIX_SDK_CRYPTO to LogLevel.DEBUG,
         Target.MATRIX_SDK_CRYPTO_ACCOUNT to LogLevel.TRACE,
         Target.MATRIX_SDK_HTTP_CLIENT to LogLevel.DEBUG,
-        Target.MATRIX_SDK_SLIDING_SYNC to LogLevel.TRACE,
-        Target.MATRIX_SDK_BASE_SLIDING_SYNC to LogLevel.TRACE,
-        Target.MATRIX_SDK_UI_TIMELINE to LogLevel.TRACE,
-        Target.MATRIX_SDK_BASE_READ_RECEIPTS to LogLevel.TRACE,
+        Target.MATRIX_SDK_SLIDING_SYNC to LogLevel.INFO,
+        Target.MATRIX_SDK_BASE_SLIDING_SYNC to LogLevel.INFO,
+        Target.MATRIX_SDK_UI_TIMELINE to LogLevel.INFO,
+        Target.MATRIX_SDK_BASE_CLIENT to LogLevel.TRACE,
+        // To debug OIDC logouts
+        Target.MATRIX_SDK_OIDC to LogLevel.TRACE,
     )
 
     fun getLogLevel(target: Target): LogLevel {
@@ -53,7 +46,7 @@ data class TracingFilterConfiguration(
 }
 
 enum class Target(open val filter: String) {
-    COMMON(""),
+    // COMMON(""),
     ELEMENT("elementx"),
     HYPER("hyper"),
     MATRIX_SDK_FFI("matrix_sdk_ffi"),
@@ -64,10 +57,12 @@ enum class Target(open val filter: String) {
     MATRIX_SDK_HTTP_CLIENT("matrix_sdk::http_client"),
     MATRIX_SDK_CLIENT("matrix_sdk::client"),
     MATRIX_SDK_OIDC("matrix_sdk::oidc"),
+    MATRIX_SDK_SEND_QUEUE("matrix_sdk::send_queue"),
     MATRIX_SDK_SLIDING_SYNC("matrix_sdk::sliding_sync"),
     MATRIX_SDK_BASE_SLIDING_SYNC("matrix_sdk_base::sliding_sync"),
     MATRIX_SDK_UI_TIMELINE("matrix_sdk_ui::timeline"),
     MATRIX_SDK_BASE_READ_RECEIPTS("matrix_sdk_base::read_receipts"),
+    MATRIX_SDK_BASE_CLIENT("matrix_sdk_base"),
 }
 
 enum class LogLevel(open val filter: String) {
@@ -87,7 +82,6 @@ object TracingFilterConfigurations {
     val nightly = TracingFilterConfiguration(
         overrides = mapOf(
             Target.ELEMENT to LogLevel.TRACE,
-            Target.MATRIX_SDK_BASE_READ_RECEIPTS to LogLevel.TRACE,
         ),
     )
     val debug = TracingFilterConfiguration(
