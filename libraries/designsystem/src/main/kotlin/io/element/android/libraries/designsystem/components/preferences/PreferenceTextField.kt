@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.preferences
@@ -98,11 +89,11 @@ private fun TextFieldDialog(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
 ) {
     val focusRequester = remember { FocusRequester() }
-
     var textFieldContents by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(value.orEmpty(), selection = TextRange(value.orEmpty().length)))
     }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var canRequestFocus by rememberSaveable { mutableStateOf(false) }
     val canSubmit by remember { derivedStateOf { validation(textFieldContents.text) } }
     ListDialog(
         title = title,
@@ -114,7 +105,7 @@ private fun TextFieldDialog(
             TextFieldListItem(
                 placeholder = placeholder.orEmpty(),
                 text = textFieldContents,
-                onTextChanged = {
+                onTextChange = {
                     error = if (!validation(it.text)) onValidationErrorMessage else null
                     textFieldContents = it
                 },
@@ -128,10 +119,11 @@ private fun TextFieldDialog(
                 maxLines = maxLines,
                 modifier = Modifier.focusRequester(focusRequester),
             )
+            canRequestFocus = true
         }
     }
 
-    if (autoSelectOnDisplay) {
+    if (autoSelectOnDisplay && canRequestFocus) {
         LaunchedEffect(Unit) {
             focusRequester.requestFocus()
         }

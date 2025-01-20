@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.notification
@@ -27,19 +18,20 @@ data class NotificationData(
     val roomId: RoomId,
     // mxc url
     val senderAvatarUrl: String?,
-    // private, must use `getSenderName`
+    // private, must use `getDisambiguatedDisplayName`
     private val senderDisplayName: String?,
     private val senderIsNameAmbiguous: Boolean,
     val roomAvatarUrl: String?,
     val roomDisplayName: String?,
     val isDirect: Boolean,
+    val isDm: Boolean,
     val isEncrypted: Boolean,
     val isNoisy: Boolean,
     val timestamp: Long,
     val content: NotificationContent,
     val hasMention: Boolean,
 ) {
-    fun getSenderName(userId: UserId): String = when {
+    fun getDisambiguatedDisplayName(userId: UserId): String = when {
         senderDisplayName.isNullOrBlank() -> userId.value
         senderIsNameAmbiguous -> "$senderDisplayName ($userId)"
         else -> senderDisplayName
@@ -49,7 +41,15 @@ data class NotificationData(
 sealed interface NotificationContent {
     sealed interface MessageLike : NotificationContent {
         data object CallAnswer : MessageLike
-        data object CallInvite : MessageLike
+        data class CallInvite(
+            val senderId: UserId,
+        ) : MessageLike
+
+        data class CallNotify(
+            val senderId: UserId,
+            val type: CallNotifyType,
+        ) : MessageLike
+
         data object CallHangup : MessageLike
         data object CallCandidates : MessageLike
         data object KeyVerificationReady : MessageLike
@@ -69,7 +69,11 @@ sealed interface NotificationContent {
             val messageType: MessageType
         ) : MessageLike
 
-        data object RoomRedaction : MessageLike
+        data class RoomRedaction(
+            val redactedEventId: EventId?,
+            val reason: String?,
+        ) : MessageLike
+
         data object Sticker : MessageLike
         data class Poll(
             val senderId: UserId,
@@ -90,7 +94,7 @@ sealed interface NotificationContent {
         data object RoomHistoryVisibility : StateEvent
         data object RoomJoinRules : StateEvent
         data class RoomMemberContent(
-            val userId: String,
+            val userId: UserId,
             val membershipState: RoomMembershipState
         ) : StateEvent
 
@@ -104,4 +108,13 @@ sealed interface NotificationContent {
         data object SpaceChild : StateEvent
         data object SpaceParent : StateEvent
     }
+
+    data class Invite(
+        val senderId: UserId,
+    ) : NotificationContent
+}
+
+enum class CallNotifyType {
+    RING,
+    NOTIFY
 }

@@ -3,7 +3,7 @@
 style:
   AlsoCouldBeApply:
     active: true
-  OptionalWhenBraces:
+  BracesOnWhenStatements:
     active: false
   CascadingCallWrapping:
     active: true
@@ -197,9 +197,7 @@ performance:
 # Note: all rules for `comments` are disabled by default, but I put them here to be aware of their existence
 comments:
   AbsentOrWrongFileLicense:
-    active: true
-    licenseTemplateFile: 'license.template'
-    licenseTemplateIsRegex: true
+    active: false
   CommentOverPrivateFunction:
     active: false
   CommentOverPrivateProperty:
@@ -222,7 +220,15 @@ Compose:
   CompositionLocalAllowlist:
     active: true
     # You can optionally define a list of CompositionLocals that are allowed here
-    allowedCompositionLocals: LocalCompoundColors, LocalSnackbarDispatcher, LocalCameraPositionState, LocalTimelineItemPresenterFactories
+    allowedCompositionLocals:
+      - LocalCompoundColors
+      - LocalSnackbarDispatcher
+      - LocalCameraPositionState
+      - LocalMediaItemPresenterFactories
+      - LocalTimelineItemPresenterFactories
+      - LocalRoomMemberProfilesCache
+      - LocalMentionSpanTheme
+      - LocalAnalyticsService
   CompositionLocalNaming:
     active: true
   ContentEmitterReturningValues:

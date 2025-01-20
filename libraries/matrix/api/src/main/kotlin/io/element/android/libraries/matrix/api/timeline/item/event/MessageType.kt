@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.timeline.item.event
@@ -27,22 +18,37 @@ import io.element.android.libraries.matrix.api.media.VideoInfo
 @Immutable
 sealed interface MessageType
 
+@Immutable
+sealed interface MessageTypeWithAttachment : MessageType {
+    val filename: String
+    val caption: String?
+    val formattedCaption: FormattedBody?
+
+    val bestDescription: String
+        get() = caption ?: filename
+}
+
 data class EmoteMessageType(
     val body: String,
     val formatted: FormattedBody?
 ) : MessageType
 
 data class ImageMessageType(
-    val body: String,
+    override val filename: String,
+    override val caption: String?,
+    override val formattedCaption: FormattedBody?,
     val source: MediaSource,
     val info: ImageInfo?
-) : MessageType
+) : MessageTypeWithAttachment
 
+// FIXME This is never used in production code.
 data class StickerMessageType(
-    val body: String,
+    override val filename: String,
+    override val caption: String?,
+    override val formattedCaption: FormattedBody?,
     val source: MediaSource,
     val info: ImageInfo?
-) : MessageType
+) : MessageTypeWithAttachment
 
 data class LocationMessageType(
     val body: String,
@@ -51,29 +57,37 @@ data class LocationMessageType(
 ) : MessageType
 
 data class AudioMessageType(
-    val body: String,
+    override val filename: String,
+    override val caption: String?,
+    override val formattedCaption: FormattedBody?,
     val source: MediaSource,
     val info: AudioInfo?,
-) : MessageType
+) : MessageTypeWithAttachment
 
 data class VoiceMessageType(
-    val body: String,
+    override val filename: String,
+    override val caption: String?,
+    override val formattedCaption: FormattedBody?,
     val source: MediaSource,
     val info: AudioInfo?,
     val details: AudioDetails?,
-) : MessageType
+) : MessageTypeWithAttachment
 
 data class VideoMessageType(
-    val body: String,
+    override val filename: String,
+    override val caption: String?,
+    override val formattedCaption: FormattedBody?,
     val source: MediaSource,
     val info: VideoInfo?
-) : MessageType
+) : MessageTypeWithAttachment
 
 data class FileMessageType(
-    val body: String,
+    override val filename: String,
+    override val caption: String?,
+    override val formattedCaption: FormattedBody?,
     val source: MediaSource,
     val info: FileInfo?
-) : MessageType
+) : MessageTypeWithAttachment
 
 data class NoticeMessageType(
     val body: String,

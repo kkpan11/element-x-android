@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomdetails.impl
@@ -26,15 +17,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.lifecycle.Lifecycle
+import androidx.compose.runtime.setValue
 import im.vector.app.features.analytics.plan.Interaction
 import io.element.android.features.leaveroom.api.LeaveRoomEvent
-import io.element.android.features.leaveroom.api.LeaveRoomPresenter
+import io.element.android.features.leaveroom.api.LeaveRoomState
+import io.element.android.features.messages.api.pinned.IsPinnedMessagesFeatureEnabled
+import io.element.android.features.roomcall.api.RoomCallState
 import io.element.android.features.roomdetails.impl.members.details.RoomMemberDetailsPresenter
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.core.bool.orFalse
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
-import io.element.android.libraries.designsystem.utils.OnLifecycleEvent
 import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.featureflag.api.FeatureFlags
 import io.element.android.libraries.matrix.api.MatrixClient
@@ -43,13 +35,18 @@ import io.element.android.libraries.matrix.api.room.MatrixRoom
 import io.element.android.libraries.matrix.api.room.MatrixRoomMembersState
 import io.element.android.libraries.matrix.api.room.RoomMember
 import io.element.android.libraries.matrix.api.room.StateEventType
+import io.element.android.libraries.matrix.api.room.isDm
+import io.element.android.libraries.matrix.api.room.join.JoinRule
 import io.element.android.libraries.matrix.api.room.powerlevels.canInvite
 import io.element.android.libraries.matrix.api.room.powerlevels.canSendState
 import io.element.android.libraries.matrix.api.room.roomNotificationSettings
+import io.element.android.libraries.matrix.ui.room.canHandleKnockRequestsAsState
+import io.element.android.libraries.matrix.ui.room.getCurrentRoomMember
 import io.element.android.libraries.matrix.ui.room.getDirectRoomMember
 import io.element.android.libraries.matrix.ui.room.isOwnUserAdmin
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analyticsproviders.api.trackers.captureInteraction
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -62,9 +59,11 @@ class RoomDetailsPresenter @Inject constructor(
     private val featureFlagService: FeatureFlagService,
     private val notificationSettingsService: NotificationSettingsService,
     private val roomMembersDetailsPresenterFactory: RoomMemberDetailsPresenter.Factory,
-    private val leaveRoomPresenter: LeaveRoomPresenter,
+    private val leaveRoomPresenter: Presenter<LeaveRoomState>,
+    private val roomCallStatePresenter: Presenter<RoomCallState>,
     private val dispatchers: CoroutineDispatchers,
     private val analyticsService: AnalyticsService,
+    private val isPinnedMessagesFeatureEnabled: IsPinnedMessagesFeatureEnabled,
 ) : Presenter<RoomDetailsState> {
     @Composable
     override fun present(): RoomDetailsState {
@@ -73,16 +72,20 @@ class RoomDetailsPresenter @Inject constructor(
         val canShowNotificationSettings = remember { mutableStateOf(false) }
         val roomInfo by room.roomInfoFlow.collectAsState(initial = null)
         val isUserAdmin = room.isOwnUserAdmin()
-
+        val syncUpdateFlow = room.syncUpdateFlow.collectAsState()
         val roomAvatar by remember { derivedStateOf { roomInfo?.avatarUrl ?: room.avatarUrl } }
 
-        val roomName by remember { derivedStateOf { (roomInfo?.name ?: room.name ?: room.displayName).trim() } }
+        val roomName by remember { derivedStateOf { (roomInfo?.name ?: room.displayName).trim() } }
         val roomTopic by remember { derivedStateOf { roomInfo?.topic ?: room.topic } }
         val isFavorite by remember { derivedStateOf { roomInfo?.isFavorite.orFalse() } }
+        val joinRule by remember { derivedStateOf { roomInfo?.joinRule } }
 
-        val isRoomModerationEnabled by produceState(initialValue = false) {
-            value = featureFlagService.isFeatureEnabled(FeatureFlags.RoomModeration)
+        val canShowPinnedMessages = isPinnedMessagesFeatureEnabled()
+        var canShowMediaGallery by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            canShowMediaGallery = featureFlagService.isFeatureEnabled(FeatureFlags.MediaGallery)
         }
+        val pinnedMessagesCount by remember { derivedStateOf { roomInfo?.pinnedEventIds?.size } }
 
         LaunchedEffect(Unit) {
             canShowNotificationSettings.value = featureFlagService.isFeatureEnabled(FeatureFlags.NotificationSettings)
@@ -92,30 +95,34 @@ class RoomDetailsPresenter @Inject constructor(
             }
         }
 
-        // Update room members only when first presenting the node
-        OnLifecycleEvent { _, event ->
-            if (event == Lifecycle.Event.ON_CREATE) {
-                scope.launch { room.updateMembers() }
-            }
-        }
-
         val membersState by room.membersStateFlow.collectAsState()
         val canInvite by getCanInvite(membersState)
+
         val canEditName by getCanSendState(membersState, StateEventType.ROOM_NAME)
         val canEditAvatar by getCanSendState(membersState, StateEventType.ROOM_AVATAR)
         val canEditTopic by getCanSendState(membersState, StateEventType.ROOM_TOPIC)
         val dmMember by room.getDirectRoomMember(membersState)
+        val currentMember by room.getCurrentRoomMember(membersState)
         val roomMemberDetailsPresenter = roomMemberDetailsPresenter(dmMember)
-        val roomType by getRoomType(dmMember)
+        val roomType by getRoomType(dmMember, currentMember)
+        val roomCallState = roomCallStatePresenter.present()
 
         val topicState = remember(canEditTopic, roomTopic, roomType) {
             val topic = roomTopic
-
             when {
                 !topic.isNullOrBlank() -> RoomTopicState.ExistingTopic(topic)
                 canEditTopic && roomType is RoomDetailsType.Room -> RoomTopicState.CanAddTopic
                 else -> RoomTopicState.Hidden
             }
+        }
+
+        val canHandleKnockRequests by room.canHandleKnockRequestsAsState(syncUpdateFlow.value)
+        val isKnockRequestsEnabled by featureFlagService.isFeatureEnabledFlow(FeatureFlags.Knock).collectAsState(false)
+        val knockRequestsCount by produceState<Int?>(null) {
+            room.knockRequestsFlow.collect { value = it.size }
+        }
+        val canShowKnockRequests by remember {
+            derivedStateOf { isKnockRequestsEnabled && canHandleKnockRequests && joinRule == JoinRule.Knock }
         }
 
         val roomNotificationSettingsState by room.roomNotificationSettingsStateFlow.collectAsState()
@@ -141,7 +148,7 @@ class RoomDetailsPresenter @Inject constructor(
         val roomMemberDetailsState = roomMemberDetailsPresenter?.present()
 
         return RoomDetailsState(
-            roomId = room.roomId.value,
+            roomId = room.roomId,
             roomName = roomName,
             roomAlias = room.alias,
             roomAvatarUrl = roomAvatar,
@@ -151,12 +158,20 @@ class RoomDetailsPresenter @Inject constructor(
             canInvite = canInvite,
             canEdit = (canEditAvatar || canEditName || canEditTopic) && roomType == RoomDetailsType.Room,
             canShowNotificationSettings = canShowNotificationSettings.value,
+            roomCallState = roomCallState,
             roomType = roomType,
             roomMemberDetailsState = roomMemberDetailsState,
             leaveRoomState = leaveRoomState,
             roomNotificationSettings = roomNotificationSettingsState.roomNotificationSettings(),
             isFavorite = isFavorite,
-            displayRolesAndPermissionsSettings = isRoomModerationEnabled && !room.isDm && isUserAdmin,
+            displayRolesAndPermissionsSettings = !room.isDm && isUserAdmin,
+            isPublic = joinRule == JoinRule.Public,
+            heroes = roomInfo?.heroes.orEmpty().toPersistentList(),
+            canShowPinnedMessages = canShowPinnedMessages,
+            canShowMediaGallery = canShowMediaGallery,
+            pinnedMessagesCount = pinnedMessagesCount,
+            canShowKnockRequests = canShowKnockRequests,
+            knockRequestsCount = knockRequestsCount,
             eventSink = ::handleEvents,
         )
     }
@@ -169,10 +184,16 @@ class RoomDetailsPresenter @Inject constructor(
     }
 
     @Composable
-    private fun getRoomType(dmMember: RoomMember?): State<RoomDetailsType> = remember(dmMember) {
+    private fun getRoomType(
+        dmMember: RoomMember?,
+        currentMember: RoomMember?,
+    ): State<RoomDetailsType> = remember(dmMember, currentMember) {
         derivedStateOf {
-            if (dmMember != null) {
-                RoomDetailsType.Dm(dmMember)
+            if (dmMember != null && currentMember != null) {
+                RoomDetailsType.Dm(
+                    me = currentMember,
+                    otherMember = dmMember,
+                )
             } else {
                 RoomDetailsType.Room
             }

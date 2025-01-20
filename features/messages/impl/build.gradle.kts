@@ -1,23 +1,14 @@
+import extension.setupAnvil
+
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 plugins {
     id("io.element.android-compose-library")
-    alias(libs.plugins.anvil)
-    alias(libs.plugins.ksp)
     id("kotlin-parcelize")
 }
 
@@ -30,18 +21,15 @@ android {
     }
 }
 
-anvil {
-    generateDaggerFactories.set(true)
-}
+setupAnvil()
 
 dependencies {
-    implementation(projects.anvilannotations)
-    anvil(projects.anvilcodegen)
     api(projects.features.messages.api)
     implementation(projects.appconfig)
-    implementation(projects.features.call)
+    implementation(projects.features.call.api)
     implementation(projects.features.location.api)
     implementation(projects.features.poll.api)
+    implementation(projects.features.roomcall.api)
     implementation(projects.libraries.androidutils)
     implementation(projects.libraries.core)
     implementation(projects.libraries.architecture)
@@ -59,12 +47,14 @@ dependencies {
     implementation(projects.libraries.permissions.api)
     implementation(projects.libraries.preferences.api)
     implementation(projects.libraries.roomselect.api)
+    implementation(projects.libraries.voiceplayer.api)
     implementation(projects.libraries.voicerecorder.api)
     implementation(projects.libraries.mediaplayer.api)
     implementation(projects.libraries.uiUtils)
     implementation(projects.libraries.testtags)
     implementation(projects.features.networkmonitor.api)
-    implementation(projects.services.analytics.api)
+    implementation(projects.services.analytics.compose)
+    implementation(projects.services.toolbox.api)
     implementation(libs.coil.compose)
     implementation(libs.datetime)
     implementation(libs.jsoup)
@@ -72,9 +62,11 @@ dependencies {
     implementation(libs.androidx.constraintlayout.compose)
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
+    implementation(libs.sigpwned.emoji4j)
     implementation(libs.vanniktech.blurhash)
     implementation(libs.telephoto.zoomableimage)
     implementation(libs.matrix.emojibase.bindings)
+    implementation(projects.features.knockrequests.api)
 
     testImplementation(libs.test.junit)
     testImplementation(libs.coroutines.test)
@@ -86,6 +78,7 @@ dependencies {
     testImplementation(projects.features.networkmonitor.test)
     testImplementation(projects.features.messages.test)
     testImplementation(projects.services.analytics.test)
+    testImplementation(projects.services.toolbox.test)
     testImplementation(projects.tests.testutils)
     testImplementation(projects.libraries.featureflag.test)
     testImplementation(projects.libraries.mediaupload.test)
@@ -97,12 +90,10 @@ dependencies {
     testImplementation(projects.libraries.mediaviewer.test)
     testImplementation(projects.libraries.testtags)
     testImplementation(libs.test.mockk)
-    testImplementation(libs.test.junitext)
     testImplementation(libs.test.robolectric)
     testImplementation(projects.features.poll.test)
     testImplementation(projects.features.poll.impl)
     testImplementation(libs.androidx.compose.ui.test.junit)
+    testImplementation(projects.libraries.eventformatter.test)
     testReleaseImplementation(libs.androidx.compose.ui.test.manifest)
-
-    ksp(libs.showkase.processor)
 }

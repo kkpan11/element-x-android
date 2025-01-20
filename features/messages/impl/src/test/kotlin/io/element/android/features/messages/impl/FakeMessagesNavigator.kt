@@ -1,51 +1,43 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl
 
+import io.element.android.features.messages.impl.attachments.Attachment
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.timeline.item.TimelineItemDebugInfo
+import io.element.android.tests.testutils.lambda.lambdaError
+import kotlinx.collections.immutable.ImmutableList
 
-class FakeMessagesNavigator : MessagesNavigator {
-    var onShowEventDebugInfoClickedCount = 0
-        private set
-
-    var onForwardEventClickedCount = 0
-        private set
-
-    var onReportContentClickedCount = 0
-        private set
-
-    var onEditPollClickedCount = 0
-        private set
-
-    override fun onShowEventDebugInfoClicked(eventId: EventId?, debugInfo: TimelineItemDebugInfo) {
-        onShowEventDebugInfoClickedCount++
+class FakeMessagesNavigator(
+    private val onShowEventDebugInfoClickLambda: (eventId: EventId?, debugInfo: TimelineItemDebugInfo) -> Unit = { _, _ -> lambdaError() },
+    private val onForwardEventClickLambda: (eventId: EventId) -> Unit = { _ -> lambdaError() },
+    private val onReportContentClickLambda: (eventId: EventId, senderId: UserId) -> Unit = { _, _ -> lambdaError() },
+    private val onEditPollClickLambda: (eventId: EventId) -> Unit = { _ -> lambdaError() },
+    private val onPreviewAttachmentLambda: (attachments: ImmutableList<Attachment>) -> Unit = { _ -> lambdaError() },
+) : MessagesNavigator {
+    override fun onShowEventDebugInfoClick(eventId: EventId?, debugInfo: TimelineItemDebugInfo) {
+        onShowEventDebugInfoClickLambda(eventId, debugInfo)
     }
 
-    override fun onForwardEventClicked(eventId: EventId) {
-        onForwardEventClickedCount++
+    override fun onForwardEventClick(eventId: EventId) {
+        onForwardEventClickLambda(eventId)
     }
 
-    override fun onReportContentClicked(eventId: EventId, senderId: UserId) {
-        onReportContentClickedCount++
+    override fun onReportContentClick(eventId: EventId, senderId: UserId) {
+        onReportContentClickLambda(eventId, senderId)
     }
 
-    override fun onEditPollClicked(eventId: EventId) {
-        onEditPollClickedCount++
+    override fun onEditPollClick(eventId: EventId) {
+        onEditPollClickLambda(eventId)
+    }
+
+    override fun onPreviewAttachment(attachments: ImmutableList<Attachment>) {
+        onPreviewAttachmentLambda(attachments)
     }
 }

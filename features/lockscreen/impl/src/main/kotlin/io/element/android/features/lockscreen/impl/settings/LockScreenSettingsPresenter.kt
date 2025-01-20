@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.lockscreen.impl.settings
@@ -23,8 +14,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import io.element.android.appconfig.LockScreenConfig
-import io.element.android.features.lockscreen.impl.biometric.BiometricUnlockManager
+import io.element.android.features.lockscreen.impl.LockScreenConfig
+import io.element.android.features.lockscreen.impl.biometric.BiometricAuthenticator
+import io.element.android.features.lockscreen.impl.biometric.BiometricAuthenticatorManager
 import io.element.android.features.lockscreen.impl.pin.PinCodeManager
 import io.element.android.features.lockscreen.impl.storage.LockScreenStore
 import io.element.android.libraries.architecture.Presenter
@@ -36,7 +28,7 @@ class LockScreenSettingsPresenter @Inject constructor(
     private val lockScreenConfig: LockScreenConfig,
     private val pinCodeManager: PinCodeManager,
     private val lockScreenStore: LockScreenStore,
-    private val biometricUnlockManager: BiometricUnlockManager,
+    private val biometricAuthenticatorManager: BiometricAuthenticatorManager,
     private val coroutineScope: CoroutineScope,
 ) : Presenter<LockScreenSettingsState> {
     @Composable
@@ -50,6 +42,8 @@ class LockScreenSettingsPresenter @Inject constructor(
         var showRemovePinConfirmation by remember {
             mutableStateOf(false)
         }
+
+        val biometricUnlock = biometricAuthenticatorManager.rememberConfirmBiometricAuthenticator()
 
         fun handleEvents(event: LockScreenSettingsEvents) {
             when (event) {
@@ -65,7 +59,14 @@ class LockScreenSettingsPresenter @Inject constructor(
                 LockScreenSettingsEvents.OnRemovePin -> showRemovePinConfirmation = true
                 LockScreenSettingsEvents.ToggleBiometricAllowed -> {
                     coroutineScope.launch {
-                        lockScreenStore.setIsBiometricUnlockAllowed(!isBiometricEnabled)
+                        if (!isBiometricEnabled) {
+                            biometricUnlock.setup()
+                            if (biometricUnlock.authenticate() == BiometricAuthenticator.AuthenticationResult.Success) {
+                                lockScreenStore.setIsBiometricUnlockAllowed(true)
+                            }
+                        } else {
+                            lockScreenStore.setIsBiometricUnlockAllowed(false)
+                        }
                     }
                 }
             }
@@ -75,7 +76,7 @@ class LockScreenSettingsPresenter @Inject constructor(
             showRemovePinOption = showRemovePinOption,
             isBiometricEnabled = isBiometricEnabled,
             showRemovePinConfirmation = showRemovePinConfirmation,
-            showToggleBiometric = biometricUnlockManager.isDeviceSecured,
+            showToggleBiometric = biometricAuthenticatorManager.isDeviceSecured,
             eventSink = ::handleEvents
         )
     }

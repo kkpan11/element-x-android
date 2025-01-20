@@ -1,26 +1,18 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.roomselect.impl
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import io.element.android.libraries.designsystem.theme.components.SearchBarResultState
+import io.element.android.libraries.matrix.api.core.RoomAlias
 import io.element.android.libraries.matrix.api.core.RoomId
-import io.element.android.libraries.matrix.api.roomlist.RoomSummaryDetails
-import io.element.android.libraries.matrix.ui.components.aRoomSummaryDetails
+import io.element.android.libraries.matrix.ui.components.aSelectRoomInfo
+import io.element.android.libraries.matrix.ui.model.SelectRoomInfo
 import io.element.android.libraries.roomselect.api.RoomSelectMode
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -30,29 +22,33 @@ open class RoomSelectStateProvider : PreviewParameterProvider<RoomSelectState> {
         get() = sequenceOf(
             aRoomSelectState(),
             aRoomSelectState(query = "Test", isSearchActive = true),
-            aRoomSelectState(resultState = SearchBarResultState.Results(aForwardMessagesRoomList())),
+            aRoomSelectState(resultState = SearchBarResultState.Results(aRoomSelectRoomList())),
             aRoomSelectState(
-                resultState = SearchBarResultState.Results(aForwardMessagesRoomList()),
+                resultState = SearchBarResultState.Results(aRoomSelectRoomList()),
                 query = "Test",
                 isSearchActive = true,
             ),
             aRoomSelectState(
-                resultState = SearchBarResultState.Results(aForwardMessagesRoomList()),
+                resultState = SearchBarResultState.Results(aRoomSelectRoomList()),
                 query = "Test",
                 isSearchActive = true,
-                selectedRooms = persistentListOf(aRoomSummaryDetails(roomId = RoomId("!room2:domain")))
+                selectedRooms = aRoomSelectRoomList().subList(0, 1),
             ),
-            // Add other states here
+            aRoomSelectState(
+                mode = RoomSelectMode.Share,
+                resultState = SearchBarResultState.Results(aRoomSelectRoomList()),
+            ),
         )
 }
 
 private fun aRoomSelectState(
-    resultState: SearchBarResultState<ImmutableList<RoomSummaryDetails>> = SearchBarResultState.Initial(),
+    mode: RoomSelectMode = RoomSelectMode.Forward,
+    resultState: SearchBarResultState<ImmutableList<SelectRoomInfo>> = SearchBarResultState.Initial(),
     query: String = "",
     isSearchActive: Boolean = false,
-    selectedRooms: ImmutableList<RoomSummaryDetails> = persistentListOf(),
+    selectedRooms: ImmutableList<SelectRoomInfo> = persistentListOf(),
 ) = RoomSelectState(
-    mode = RoomSelectMode.Forward,
+    mode = mode,
     resultState = resultState,
     query = query,
     isSearchActive = isSearchActive,
@@ -60,11 +56,17 @@ private fun aRoomSelectState(
     eventSink = {}
 )
 
-private fun aForwardMessagesRoomList() = persistentListOf(
-    aRoomSummaryDetails(),
-    aRoomSummaryDetails(
+private fun aRoomSelectRoomList() = persistentListOf(
+    aSelectRoomInfo(
+        roomId = RoomId("!room1:domain"),
+        name = "Room with name",
+    ),
+    aSelectRoomInfo(
         roomId = RoomId("!room2:domain"),
         name = "Room with alias",
-        canonicalAlias = "#alias:example.org",
+        canonicalAlias = RoomAlias("#alias:example.org"),
+    ),
+    aSelectRoomInfo(
+        roomId = RoomId("!room3:domain"),
     ),
 )

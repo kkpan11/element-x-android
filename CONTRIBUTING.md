@@ -9,6 +9,7 @@
 * [Strings](#strings)
   * [I want to add new strings to the project](#i-want-to-add-new-strings-to-the-project)
   * [I want to help translating Element](#i-want-to-help-translating-element)
+  * [Element X Android Gallery](#element-x-android-gallery)
 * [I want to submit a PR to fix an issue](#i-want-to-submit-a-pr-to-fix-an-issue)
   * [Kotlin](#kotlin)
   * [Changelog](#changelog)
@@ -48,8 +49,6 @@ Please ensure that you're using the project formatting rules (which are in the p
 
 This project should compile without any special action. Just clone it and open it with Android Studio, or compile from command line using `gradlew`.
 
-Note: please make sure that the configuration is `app` and not `samples.minimal`.
-
 ## Strings
 
 The strings of the project are managed externally using [https://localazy.com](https://localazy.com) and shared with Element X iOS.
@@ -69,6 +68,14 @@ To help translating, please go to [https://localazy.com/p/element](https://local
 
 More information can be found [in this README.md](./tools/localazy/README.md).
 
+Once a language is sufficiently translated, it will be added to the app. The core team will decide when a language is sufficiently translated.
+
+### Element X Android Gallery
+
+Once added to Localazy, translations can be checked screen per screen using our tool Element X Android Gallery, available at https://element-hq.github.io/element-x-android/.
+
+Localazy syncs occur every Monday and the screenshots on this page are generated every Tuesday, so you'll have to wait to see your change appearing on Element X Android Gallery.
+
 ## I want to submit a PR to fix an issue
 
 Please have a look in the [dedicated documentation](./docs/pull_request.md) about pull request.
@@ -82,19 +89,9 @@ This project is full Kotlin. Please do not write Java classes.
 
 ### Changelog
 
-Please create at least one file under ./changelog.d containing details about your change. Towncrier will be used when preparing the release.
+The release notes are generated from the pull request titles and labels. If possible, the title must describe best what will be the user facing change.
 
-Towncrier says to use the PR number for the filename, but the issue number is also fine.
-
-Supported filename extensions are:
-
-- ``.feature``: Signifying a new feature in Element Android or in the Matrix SDK.
-- ``.bugfix``: Signifying a bug fix.
-- ``.wip``: Signifying a work in progress change, typically a component of a larger feature which will be enabled once all tasks are complete.
-- ``.doc``: Signifying a documentation improvement.
-- ``.misc``: Any other changes.
-
-See https://github.com/twisted/towncrier#news-fragments if you need more details.
+You will also need to add a label starting by `PR-` to you Pull Request to help categorize the release note. The label should be added by the PR author, but can be added by the reviewer if the submitter does not have right to add label. Also note that the label can be added after the PR has been merged, as soon as the release is not done yet.
 
 ### Code quality
 

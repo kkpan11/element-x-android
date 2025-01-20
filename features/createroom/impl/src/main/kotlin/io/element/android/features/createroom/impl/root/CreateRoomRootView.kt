@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.createroom.impl.root
@@ -26,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -46,26 +38,29 @@ import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.aliasScreenTitle
 import io.element.android.libraries.designsystem.theme.components.Icon
+import io.element.android.libraries.designsystem.theme.components.ListSectionHeader
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.ui.components.MatrixUserRow
 import io.element.android.libraries.ui.strings.CommonStrings
+import kotlinx.collections.immutable.persistentListOf
 
 @Composable
 fun CreateRoomRootView(
     state: CreateRoomRootState,
-    onClosePressed: () -> Unit,
-    onNewRoomClicked: () -> Unit,
+    onCloseClick: () -> Unit,
+    onNewRoomClick: () -> Unit,
     onOpenDM: (RoomId) -> Unit,
-    onInviteFriendsClicked: () -> Unit,
+    onInviteFriendsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
         modifier = modifier.fillMaxWidth(),
         topBar = {
             if (!state.userListState.isSearchActive) {
-                CreateRoomRootViewTopBar(onClosePressed = onClosePressed)
+                CreateRoomRootViewTopBar(onCloseClick = onCloseClick)
             }
         }
     ) { paddingValues ->
@@ -77,18 +72,23 @@ fun CreateRoomRootView(
         ) {
             UserListView(
                 modifier = Modifier.fillMaxWidth(),
-                state = state.userListState,
-                onUserSelected = {
+                // Do not render suggestions in this case, the suggestion will be rendered
+                // by CreateRoomActionButtonsList
+                state = state.userListState.copy(
+                    recentDirectRooms = persistentListOf(),
+                ),
+                onSelectUser = {
                     state.eventSink(CreateRoomRootEvents.StartDM(it))
                 },
-                onUserDeselected = { },
+                onDeselectUser = { },
             )
 
             if (!state.userListState.isSearchActive) {
                 CreateRoomActionButtonsList(
                     state = state,
-                    onNewRoomClicked = onNewRoomClicked,
-                    onInvitePeopleClicked = onInviteFriendsClicked,
+                    onNewRoomClick = onNewRoomClick,
+                    onInvitePeopleClick = onInviteFriendsClick,
+                    onDmClick = onOpenDM,
                 )
             }
         }
@@ -106,7 +106,7 @@ fun CreateRoomRootView(
         onRetry = {
             state.userListState.selectedUsers.firstOrNull()
                 ?.let { state.eventSink(CreateRoomRootEvents.StartDM(it)) }
-                // Cancel start DM if there is no more selected user (should not happen)
+            // Cancel start DM if there is no more selected user (should not happen)
                 ?: state.eventSink(CreateRoomRootEvents.CancelStartDM)
         },
         onErrorDismiss = { state.eventSink(CreateRoomRootEvents.CancelStartDM) },
@@ -116,7 +116,7 @@ fun CreateRoomRootView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CreateRoomRootViewTopBar(
-    onClosePressed: () -> Unit,
+    onCloseClick: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -128,7 +128,7 @@ private fun CreateRoomRootViewTopBar(
         navigationIcon = {
             BackButton(
                 imageVector = CompoundIcons.Close(),
-                onClick = onClosePressed,
+                onClick = onCloseClick,
             )
         }
     )
@@ -137,20 +137,45 @@ private fun CreateRoomRootViewTopBar(
 @Composable
 private fun CreateRoomActionButtonsList(
     state: CreateRoomRootState,
-    onNewRoomClicked: () -> Unit,
-    onInvitePeopleClicked: () -> Unit,
+    onNewRoomClick: () -> Unit,
+    onInvitePeopleClick: () -> Unit,
+    onDmClick: (RoomId) -> Unit,
 ) {
-    Column {
-        CreateRoomActionButton(
-            iconRes = CompoundDrawables.ic_compound_plus,
-            text = stringResource(id = R.string.screen_create_room_action_create_room),
-            onClick = onNewRoomClicked,
-        )
-        CreateRoomActionButton(
-            iconRes = CompoundDrawables.ic_compound_share_android,
-            text = stringResource(id = CommonStrings.action_invite_friends_to_app, state.applicationName),
-            onClick = onInvitePeopleClicked,
-        )
+    LazyColumn {
+        item {
+            CreateRoomActionButton(
+                iconRes = CompoundDrawables.ic_compound_plus,
+                text = stringResource(id = R.string.screen_create_room_action_create_room),
+                onClick = onNewRoomClick,
+            )
+        }
+        item {
+            CreateRoomActionButton(
+                iconRes = CompoundDrawables.ic_compound_share_android,
+                text = stringResource(id = CommonStrings.action_invite_friends_to_app, state.applicationName),
+                onClick = onInvitePeopleClick,
+            )
+        }
+        if (state.userListState.recentDirectRooms.isNotEmpty()) {
+            item {
+                ListSectionHeader(
+                    title = stringResource(id = CommonStrings.common_suggestions),
+                    hasDivider = false,
+                )
+            }
+            state.userListState.recentDirectRooms.forEach { recentDirectRoom ->
+                item {
+                    MatrixUserRow(
+                        modifier = Modifier.clickable(
+                            onClick = {
+                                onDmClick(recentDirectRoom.roomId)
+                            }
+                        ),
+                        matrixUser = recentDirectRoom.matrixUser,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -188,9 +213,9 @@ internal fun CreateRoomRootViewPreview(@PreviewParameter(CreateRoomRootStateProv
     ElementPreview {
         CreateRoomRootView(
             state = state,
-            onClosePressed = {},
-            onNewRoomClicked = {},
+            onCloseClick = {},
+            onNewRoomClick = {},
             onOpenDM = {},
-            onInviteFriendsClicked = {},
+            onInviteFriendsClick = {},
         )
     }

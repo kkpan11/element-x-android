@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline
@@ -29,7 +20,8 @@ import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.di.SingleIn
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.textcomposer.ElementRichTextEditorStyle
-import io.element.android.libraries.textcomposer.mentions.rememberMentionSpanProvider
+import io.element.android.libraries.textcomposer.mentions.LocalMentionSpanTheme
+import io.element.android.libraries.textcomposer.mentions.MentionSpanProvider
 import io.element.android.wysiwyg.compose.StyledHtmlConverter
 import io.element.android.wysiwyg.display.MentionDisplayHandler
 import io.element.android.wysiwyg.display.TextDisplay
@@ -39,7 +31,9 @@ import javax.inject.Inject
 
 @ContributesBinding(SessionScope::class)
 @SingleIn(SessionScope::class)
-class DefaultHtmlConverterProvider @Inject constructor() : HtmlConverterProvider {
+class DefaultHtmlConverterProvider @Inject constructor(
+    private val mentionSpanProvider: MentionSpanProvider,
+) : HtmlConverterProvider {
     private val htmlConverter: MutableState<HtmlConverter?> = mutableStateOf(null)
 
     @Composable
@@ -50,22 +44,26 @@ class DefaultHtmlConverterProvider @Inject constructor() : HtmlConverterProvider
         }
 
         val editorStyle = ElementRichTextEditorStyle.textStyle()
-        val mentionSpanProvider = rememberMentionSpanProvider(currentUserId = currentUserId)
-
+        val mentionSpanTheme = LocalMentionSpanTheme.current
         val context = LocalContext.current
 
-        htmlConverter.value = remember(editorStyle, mentionSpanProvider) {
+        htmlConverter.value = remember(editorStyle, mentionSpanTheme) {
             StyledHtmlConverter(
                 context = context,
                 mentionDisplayHandler = object : MentionDisplayHandler {
                     override fun resolveAtRoomMentionDisplay(): TextDisplay {
-                        return TextDisplay.Custom(mentionSpanProvider.getMentionSpanFor(text = "@room", url = "#"))
+                        val mentionSpan = mentionSpanProvider.getMentionSpanFor(text = "@room", url = "#")
+                        mentionSpan.update(mentionSpanTheme)
+                        return TextDisplay.Custom(mentionSpan)
                     }
 
                     override fun resolveMentionDisplay(text: String, url: String): TextDisplay {
-                        return TextDisplay.Custom(mentionSpanProvider.getMentionSpanFor(text, url))
+                        val mentionSpan = mentionSpanProvider.getMentionSpanFor(text, url)
+                        mentionSpan.update(mentionSpanTheme)
+                        return TextDisplay.Custom(mentionSpan)
                     }
                 },
+                isEditor = false,
                 isMention = { _, url -> mentionDetector?.isMention(url).orFalse() }
             ).apply {
                 configureWith(editorStyle)

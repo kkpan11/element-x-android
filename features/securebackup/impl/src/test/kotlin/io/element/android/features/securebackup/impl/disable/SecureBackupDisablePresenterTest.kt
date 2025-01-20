@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.securebackup.impl.disable
@@ -48,22 +39,6 @@ class SecureBackupDisablePresenterTest {
     }
 
     @Test
-    fun `present - user delete backup and cancel`() = runTest {
-        val presenter = createSecureBackupDisablePresenter()
-        moleculeFlow(RecompositionMode.Immediate) {
-            presenter.present()
-        }.test {
-            val initialState = awaitItem()
-            initialState.eventSink(SecureBackupDisableEvents.DisableBackup)
-            val state = awaitItem()
-            assertThat(state.disableAction).isEqualTo(AsyncAction.Confirming)
-            initialState.eventSink(SecureBackupDisableEvents.DismissDialogs)
-            val finalState = awaitItem()
-            assertThat(finalState.disableAction).isEqualTo(AsyncAction.Uninitialized)
-        }
-    }
-
-    @Test
     fun `present - user delete backup success`() = runTest {
         val presenter = createSecureBackupDisablePresenter()
         moleculeFlow(RecompositionMode.Immediate) {
@@ -71,9 +46,6 @@ class SecureBackupDisablePresenterTest {
         }.test {
             val initialState = awaitItem()
             assertThat(initialState.disableAction).isEqualTo(AsyncAction.Uninitialized)
-            initialState.eventSink(SecureBackupDisableEvents.DisableBackup)
-            val state = awaitItem()
-            assertThat(state.disableAction).isEqualTo(AsyncAction.Confirming)
             initialState.eventSink(SecureBackupDisableEvents.DisableBackup)
             val loadingState = awaitItem()
             assertThat(loadingState.disableAction).isInstanceOf(AsyncAction.Loading::class.java)
@@ -95,9 +67,6 @@ class SecureBackupDisablePresenterTest {
         }.test {
             val initialState = awaitItem()
             assertThat(initialState.disableAction).isEqualTo(AsyncAction.Uninitialized)
-            initialState.eventSink(SecureBackupDisableEvents.DisableBackup)
-            val state = awaitItem()
-            assertThat(state.disableAction).isEqualTo(AsyncAction.Confirming)
             initialState.eventSink(SecureBackupDisableEvents.DisableBackup)
             val loadingState = awaitItem()
             assertThat(loadingState.disableAction).isInstanceOf(AsyncAction.Loading::class.java)

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.push.impl.notifications.factories.action
@@ -20,12 +11,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import io.element.android.appconfig.NotificationConfig
 import io.element.android.libraries.androidutils.uri.createIgnoredUri
 import io.element.android.libraries.di.ApplicationContext
 import io.element.android.libraries.push.impl.R
 import io.element.android.libraries.push.impl.notifications.NotificationActionIds
 import io.element.android.libraries.push.impl.notifications.NotificationBroadcastReceiver
 import io.element.android.libraries.push.impl.notifications.model.InviteNotifiableEvent
+import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.toolbox.api.strings.StringProvider
 import io.element.android.services.toolbox.api.systemclock.SystemClock
 import javax.inject.Inject
@@ -36,8 +29,8 @@ class AcceptInvitationActionFactory @Inject constructor(
     private val stringProvider: StringProvider,
     private val clock: SystemClock,
 ) {
-    // offer to type a quick accept button
-    fun create(inviteNotifiableEvent: InviteNotifiableEvent): NotificationCompat.Action {
+    fun create(inviteNotifiableEvent: InviteNotifiableEvent): NotificationCompat.Action? {
+        if (!NotificationConfig.SHOW_ACCEPT_AND_DECLINE_INVITE_ACTIONS) return null
         val sessionId = inviteNotifiableEvent.sessionId.value
         val roomId = inviteNotifiableEvent.roomId.value
         val intent = Intent(context, NotificationBroadcastReceiver::class.java)
@@ -53,7 +46,7 @@ class AcceptInvitationActionFactory @Inject constructor(
         )
         return NotificationCompat.Action.Builder(
             R.drawable.vector_notification_accept_invitation,
-            stringProvider.getString(R.string.notification_invitation_action_join),
+            stringProvider.getString(CommonStrings.action_accept),
             pendingIntent
         ).build()
     }

@@ -1,26 +1,19 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.groups
 
 import io.element.android.features.messages.impl.timeline.model.TimelineItem
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemAudioContent
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemCallNotifyContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemEncryptedContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemFileContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemImageContent
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLegacyCallInviteContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLocationContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemPollContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemProfileChangeContent
@@ -33,8 +26,10 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVideoContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVoiceContent
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
+import io.element.android.libraries.matrix.api.timeline.item.event.CallNotifyContent
 import io.element.android.libraries.matrix.api.timeline.item.event.FailedToParseMessageLikeContent
 import io.element.android.libraries.matrix.api.timeline.item.event.FailedToParseStateContent
+import io.element.android.libraries.matrix.api.timeline.item.event.LegacyCallInviteContent
 import io.element.android.libraries.matrix.api.timeline.item.event.MessageContent
 import io.element.android.libraries.matrix.api.timeline.item.event.PollContent
 import io.element.android.libraries.matrix.api.timeline.item.event.ProfileChangeContent
@@ -63,7 +58,9 @@ internal fun TimelineItem.Event.canBeGrouped(): Boolean {
         is TimelineItemPollContent,
         is TimelineItemVoiceContent,
         TimelineItemRedactedContent,
-        TimelineItemUnknownContent -> false
+        TimelineItemUnknownContent,
+        is TimelineItemLegacyCallInviteContent,
+        is TimelineItemCallNotifyContent -> false
         is TimelineItemProfileChangeContent,
         is TimelineItemRoomMembershipContent,
         is TimelineItemStateEventContent -> true
@@ -77,16 +74,20 @@ internal fun TimelineItem.Event.canBeGrouped(): Boolean {
  */
 internal fun MatrixTimelineItem.Event.canBeDisplayedInBubbleBlock(): Boolean {
     return when (event.content) {
+        // Can be grouped
         is FailedToParseMessageLikeContent,
         is MessageContent,
         RedactedContent,
         is StickerContent,
         is PollContent,
         is UnableToDecryptContent -> true
+        // Can't be grouped
         is FailedToParseStateContent,
         is ProfileChangeContent,
         is RoomMembershipContent,
         UnknownContent,
+        is LegacyCallInviteContent,
+        CallNotifyContent,
         is StateContent -> false
     }
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2021 New Vector Ltd
+ * Copyright 2021-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.push.impl.notifications.fixtures
@@ -21,11 +12,20 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.core.ThreadId
 import io.element.android.libraries.matrix.api.core.UserId
+import io.element.android.libraries.matrix.api.notification.CallNotifyType
+import io.element.android.libraries.matrix.api.timeline.item.event.EventType
+import io.element.android.libraries.matrix.test.AN_AVATAR_URL
 import io.element.android.libraries.matrix.test.AN_EVENT_ID
+import io.element.android.libraries.matrix.test.A_MESSAGE
 import io.element.android.libraries.matrix.test.A_ROOM_ID
+import io.element.android.libraries.matrix.test.A_ROOM_NAME
 import io.element.android.libraries.matrix.test.A_SESSION_ID
+import io.element.android.libraries.matrix.test.A_TIMESTAMP
+import io.element.android.libraries.matrix.test.A_USER_ID_2
+import io.element.android.libraries.matrix.test.A_USER_NAME_2
 import io.element.android.libraries.push.impl.notifications.model.InviteNotifiableEvent
 import io.element.android.libraries.push.impl.notifications.model.NotifiableMessageEvent
+import io.element.android.libraries.push.impl.notifications.model.NotifiableRingingCallEvent
 import io.element.android.libraries.push.impl.notifications.model.SimpleNotifiableEvent
 
 fun aSimpleNotifiableEvent(
@@ -60,7 +60,7 @@ fun anInviteNotifiableEvent(
     sessionId = sessionId,
     eventId = eventId,
     roomId = roomId,
-    roomName = "a room name",
+    roomName = A_ROOM_NAME,
     editedEventId = null,
     noisy = false,
     title = "title",
@@ -73,26 +73,68 @@ fun anInviteNotifiableEvent(
 )
 
 fun aNotifiableMessageEvent(
+    body: String = A_MESSAGE,
     sessionId: SessionId = A_SESSION_ID,
     roomId: RoomId = A_ROOM_ID,
     eventId: EventId = AN_EVENT_ID,
     threadId: ThreadId? = null,
     isRedacted: Boolean = false,
-    timestamp: Long = 0,
+    hasMentionOrReply: Boolean = false,
+    timestamp: Long = A_TIMESTAMP,
+    type: String = EventType.MESSAGE,
+    senderId: UserId = A_USER_ID_2,
+    senderDisambiguatedDisplayName: String = A_USER_NAME_2,
+    roomName: String? = A_ROOM_NAME,
 ) = NotifiableMessageEvent(
     sessionId = sessionId,
     eventId = eventId,
     editedEventId = null,
     noisy = false,
     timestamp = timestamp,
-    senderName = "sender-name",
-    senderId = UserId("@sending-id:domain.com"),
-    body = "message-body",
+    senderDisambiguatedDisplayName = senderDisambiguatedDisplayName,
+    senderId = senderId,
+    body = body,
     roomId = roomId,
     threadId = threadId,
-    roomName = "room-name",
-    roomIsDirect = false,
+    roomName = roomName,
     canBeReplaced = false,
     isRedacted = isRedacted,
-    imageUriString = null
+    imageUriString = null,
+    imageMimeType = null,
+    roomAvatarPath = null,
+    senderAvatarPath = null,
+    soundName = null,
+    outGoingMessage = false,
+    outGoingMessageFailed = false,
+    isUpdated = false,
+    hasMentionOrReply = hasMentionOrReply,
+    type = type,
+)
+
+fun aNotifiableCallEvent(
+    sessionId: SessionId = A_SESSION_ID,
+    roomId: RoomId = A_ROOM_ID,
+    eventId: EventId = AN_EVENT_ID,
+    senderId: UserId = A_USER_ID_2,
+    senderName: String? = null,
+    roomAvatarUrl: String? = AN_AVATAR_URL,
+    senderAvatarUrl: String? = AN_AVATAR_URL,
+    callNotifyType: CallNotifyType = CallNotifyType.NOTIFY,
+    timestamp: Long = 0L,
+) = NotifiableRingingCallEvent(
+    sessionId = sessionId,
+    eventId = eventId,
+    roomId = roomId,
+    roomName = A_ROOM_NAME,
+    editedEventId = null,
+    description = "description",
+    timestamp = timestamp,
+    canBeReplaced = false,
+    isRedacted = false,
+    isUpdated = false,
+    senderDisambiguatedDisplayName = senderName,
+    senderId = senderId,
+    roomAvatarUrl = roomAvatarUrl,
+    senderAvatarUrl = senderAvatarUrl,
+    callNotifyType = callNotifyType,
 )

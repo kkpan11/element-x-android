@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.appnav
@@ -34,6 +25,7 @@ import com.bumble.appyx.navmodel.backstack.operation.pop
 import com.bumble.appyx.navmodel.backstack.operation.push
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import im.vector.app.features.analytics.plan.JoinedRoom
 import io.element.android.anvilannotations.ContributesNode
 import io.element.android.appnav.di.MatrixClientsHolder
 import io.element.android.appnav.intent.IntentResolver
@@ -41,8 +33,6 @@ import io.element.android.appnav.intent.ResolvedIntent
 import io.element.android.appnav.root.RootNavStateFlowFactory
 import io.element.android.appnav.root.RootPresenter
 import io.element.android.appnav.root.RootView
-import io.element.android.features.login.api.oidc.OidcAction
-import io.element.android.features.login.api.oidc.OidcActionFlow
 import io.element.android.features.rageshake.api.bugreport.BugReportEntryPoint
 import io.element.android.features.signedout.api.SignedOutEntryPoint
 import io.element.android.features.viewfolder.api.ViewFolderEntryPoint
@@ -55,6 +45,10 @@ import io.element.android.libraries.designsystem.theme.components.CircularProgre
 import io.element.android.libraries.di.AppScope
 import io.element.android.libraries.matrix.api.auth.MatrixAuthenticationService
 import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.matrix.api.core.toRoomIdOrAlias
+import io.element.android.libraries.matrix.api.permalink.PermalinkData
+import io.element.android.libraries.oidc.api.OidcAction
+import io.element.android.libraries.oidc.api.OidcActionFlow
 import io.element.android.libraries.sessionstorage.api.LoggedInState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
@@ -279,18 +273,53 @@ class RootFlowNode @AssistedInject constructor(
         when (resolvedIntent) {
             is ResolvedIntent.Navigation -> navigateTo(resolvedIntent.deeplinkData)
             is ResolvedIntent.Oidc -> onOidcAction(resolvedIntent.oidcAction)
+            is ResolvedIntent.Permalink -> navigateTo(resolvedIntent.permalinkData)
+            is ResolvedIntent.IncomingShare -> onIncomingShare(resolvedIntent.intent)
         }
+    }
+
+    private suspend fun onIncomingShare(intent: Intent) {
+        // Is there a session already?
+        val latestSessionId = authenticationService.getLatestSessionId()
+        if (latestSessionId == null) {
+            // No session, open login
+            switchToNotLoggedInFlow()
+        } else {
+            attachSession(latestSessionId)
+                .attachIncomingShare(intent)
+        }
+    }
+
+    private suspend fun navigateTo(permalinkData: PermalinkData) {
+        Timber.d("Navigating to $permalinkData")
+        attachSession(null)
+            .apply {
+                when (permalinkData) {
+                    is PermalinkData.FallbackLink -> Unit
+                    is PermalinkData.RoomEmailInviteLink -> Unit
+                    is PermalinkData.RoomLink -> {
+                        attachRoom(
+                            roomIdOrAlias = permalinkData.roomIdOrAlias,
+                            trigger = JoinedRoom.Trigger.MobilePermalink,
+                            serverNames = permalinkData.viaParameters,
+                            eventId = permalinkData.eventId,
+                            clearBackstack = true
+                        )
+                    }
+                    is PermalinkData.UserLink -> {
+                        attachUser(permalinkData.userId)
+                    }
+                }
+            }
     }
 
     private suspend fun navigateTo(deeplinkData: DeeplinkData) {
         Timber.d("Navigating to $deeplinkData")
         attachSession(deeplinkData.sessionId)
-            .attachSession()
             .apply {
                 when (deeplinkData) {
-                    is DeeplinkData.Root -> attachRoot()
-                    is DeeplinkData.Room -> attachRoom(deeplinkData.roomId)
-                    is DeeplinkData.InviteList -> attachInviteList(deeplinkData)
+                    is DeeplinkData.Root -> Unit // The room list will always be shown, observing FtueState
+                    is DeeplinkData.Room -> attachRoom(deeplinkData.roomId.toRoomIdOrAlias(), clearBackstack = true)
                 }
             }
     }
@@ -299,10 +328,12 @@ class RootFlowNode @AssistedInject constructor(
         oidcActionFlow.post(oidcAction)
     }
 
-    private suspend fun attachSession(sessionId: SessionId): LoggedInAppScopeFlowNode {
+    // [sessionId] will be null for permalink.
+    private suspend fun attachSession(sessionId: SessionId?): LoggedInFlowNode {
         // TODO handle multi-session
-        return waitForChildAttached { navTarget ->
-            navTarget is NavTarget.LoggedInFlow && navTarget.sessionId == sessionId
+        return waitForChildAttached<LoggedInAppScopeFlowNode, NavTarget> { navTarget ->
+            navTarget is NavTarget.LoggedInFlow && (sessionId == null || navTarget.sessionId == sessionId)
         }
+            .attachSession()
     }
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.attachments.preview
@@ -19,29 +10,60 @@ package io.element.android.features.messages.impl.attachments.preview
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.core.net.toUri
 import io.element.android.features.messages.impl.attachments.Attachment
+import io.element.android.libraries.core.mimetype.MimeTypes
+import io.element.android.libraries.matrix.api.media.ImageInfo
+import io.element.android.libraries.mediaupload.api.MediaUploadInfo
+import io.element.android.libraries.mediaviewer.api.MediaInfo
+import io.element.android.libraries.mediaviewer.api.anImageMediaInfo
 import io.element.android.libraries.mediaviewer.api.local.LocalMedia
-import io.element.android.libraries.mediaviewer.api.local.MediaInfo
-import io.element.android.libraries.mediaviewer.api.local.anApkMediaInfo
-import io.element.android.libraries.mediaviewer.api.local.anImageMediaInfo
+import io.element.android.libraries.textcomposer.model.TextEditorState
+import io.element.android.libraries.textcomposer.model.aTextEditorStateMarkdown
+import java.io.File
 
 open class AttachmentsPreviewStateProvider : PreviewParameterProvider<AttachmentsPreviewState> {
     override val values: Sequence<AttachmentsPreviewState>
         get() = sequenceOf(
             anAttachmentsPreviewState(),
-            anAttachmentsPreviewState(mediaInfo = anApkMediaInfo()),
-            anAttachmentsPreviewState(sendActionState = SendActionState.Sending.Uploading(0.5f)),
-            anAttachmentsPreviewState(sendActionState = SendActionState.Failure(RuntimeException("error"))),
+            anAttachmentsPreviewState(sendActionState = SendActionState.Sending.Processing(displayProgress = false)),
+            anAttachmentsPreviewState(sendActionState = SendActionState.Sending.Processing(displayProgress = true)),
+            anAttachmentsPreviewState(sendActionState = SendActionState.Sending.ReadyToUpload(aMediaUploadInfo())),
+            anAttachmentsPreviewState(sendActionState = SendActionState.Sending.Uploading(0.5f, aMediaUploadInfo())),
+            anAttachmentsPreviewState(sendActionState = SendActionState.Failure(RuntimeException("error"), aMediaUploadInfo())),
+            anAttachmentsPreviewState(allowCaption = false),
+            anAttachmentsPreviewState(showCaptionCompatibilityWarning = true),
         )
 }
 
 fun anAttachmentsPreviewState(
     mediaInfo: MediaInfo = anImageMediaInfo(),
-    sendActionState: SendActionState = SendActionState.Idle
+    textEditorState: TextEditorState = aTextEditorStateMarkdown(),
+    sendActionState: SendActionState = SendActionState.Idle,
+    allowCaption: Boolean = true,
+    showCaptionCompatibilityWarning: Boolean = true,
 ) = AttachmentsPreviewState(
     attachment = Attachment.Media(
         localMedia = LocalMedia("file://path".toUri(), mediaInfo),
-        compressIfPossible = true
     ),
     sendActionState = sendActionState,
+    textEditorState = textEditorState,
+    allowCaption = allowCaption,
+    showCaptionCompatibilityWarning = showCaptionCompatibilityWarning,
     eventSink = {}
 )
+
+fun aMediaUploadInfo(
+    filePath: String = "file://path",
+    thumbnailFilePath: String? = null,
+) = MediaUploadInfo.Image(
+        file = File(filePath),
+        imageInfo = ImageInfo(
+            height = 100,
+            width = 100,
+            mimetype = MimeTypes.Jpeg,
+            size = 1000,
+            thumbnailInfo = null,
+            thumbnailSource = null,
+            blurhash = null,
+        ),
+        thumbnailFile = thumbnailFilePath?.let { File(it) },
+    )
