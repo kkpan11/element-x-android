@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.mediaviewer.impl.local
@@ -20,10 +11,12 @@ import com.google.common.truth.Truth.assertThat
 import io.element.android.libraries.androidutils.filesize.FakeFileSizeFormatter
 import io.element.android.libraries.core.mimetype.MimeTypes
 import io.element.android.libraries.matrix.api.media.MediaFile
+import io.element.android.libraries.matrix.test.A_USER_ID
+import io.element.android.libraries.matrix.test.A_USER_NAME
 import io.element.android.libraries.matrix.test.media.FakeMediaFile
-import io.element.android.libraries.mediaviewer.api.local.MediaInfo
-import io.element.android.libraries.mediaviewer.api.local.anImageMediaInfo
-import io.element.android.libraries.mediaviewer.api.util.FileExtensionExtractorWithoutValidation
+import io.element.android.libraries.mediaviewer.api.MediaInfo
+import io.element.android.libraries.mediaviewer.api.anImageMediaInfo
+import io.element.android.libraries.mediaviewer.test.util.FileExtensionExtractorWithoutValidation
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -34,14 +27,30 @@ class AndroidLocalMediaFactoryTest {
     @Test
     fun `test AndroidLocalMediaFactory`() {
         val sut = createAndroidLocalMediaFactory()
-        val result = sut.createFromMediaFile(aMediaFile(), anImageMediaInfo())
+        val result = sut.createFromMediaFile(
+            mediaFile = aMediaFile(),
+            mediaInfo = anImageMediaInfo(
+                senderId = A_USER_ID,
+                senderName = A_USER_NAME,
+                dateSent = "12:34",
+                dateSentFull = "full",
+            )
+        )
         assertThat(result.uri.toString()).endsWith("aPath")
         assertThat(result.info).isEqualTo(
             MediaInfo(
-                name = "an image file.jpg",
+                filename = "an image file.jpg",
+                caption = null,
                 mimeType = MimeTypes.Jpeg,
                 formattedFileSize = "4MB",
                 fileExtension = "jpg",
+                senderId = A_USER_ID,
+                senderName = A_USER_NAME,
+                senderAvatar = null,
+                dateSent = "12:34",
+                dateSentFull = "full",
+                waveform = null,
+                duration = null,
             )
         )
     }

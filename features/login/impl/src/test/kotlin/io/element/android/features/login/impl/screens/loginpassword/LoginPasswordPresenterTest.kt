@@ -1,28 +1,16 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.login.impl.screens.loginpassword
 
-import app.cash.molecule.RecompositionMode
-import app.cash.molecule.moleculeFlow
-import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import io.element.android.features.enterprise.test.FakeEnterpriseService
 import io.element.android.features.login.impl.DefaultLoginUserStory
 import io.element.android.features.login.impl.accountprovider.AccountProviderDataSource
-import io.element.android.features.login.impl.util.defaultAccountProvider
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.test.A_HOMESERVER
@@ -30,8 +18,9 @@ import io.element.android.libraries.matrix.test.A_PASSWORD
 import io.element.android.libraries.matrix.test.A_SESSION_ID
 import io.element.android.libraries.matrix.test.A_THROWABLE
 import io.element.android.libraries.matrix.test.A_USER_NAME
-import io.element.android.libraries.matrix.test.auth.FakeAuthenticationService
+import io.element.android.libraries.matrix.test.auth.FakeMatrixAuthenticationService
 import io.element.android.tests.testutils.WarmUpRule
+import io.element.android.tests.testutils.test
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -42,19 +31,9 @@ class LoginPasswordPresenterTest {
 
     @Test
     fun `present - initial state`() = runTest {
-        val authenticationService = FakeAuthenticationService()
-        val accountProviderDataSource = AccountProviderDataSource()
-        val loginUserStory = DefaultLoginUserStory()
-        val presenter = LoginPasswordPresenter(
-            authenticationService,
-            accountProviderDataSource,
-            loginUserStory,
-        )
-        moleculeFlow(RecompositionMode.Immediate) {
-            presenter.present()
-        }.test {
+        createLoginPasswordPresenter().test {
             val initialState = awaitItem()
-            assertThat(initialState.accountProvider).isEqualTo(defaultAccountProvider)
+            assertThat(initialState.accountProvider.url).isEqualTo(FakeEnterpriseService.A_FAKE_HOMESERVER)
             assertThat(initialState.formState).isEqualTo(LoginFormState.Default)
             assertThat(initialState.loginAction).isEqualTo(AsyncData.Uninitialized)
             assertThat(initialState.submitEnabled).isFalse()
@@ -63,18 +42,11 @@ class LoginPasswordPresenterTest {
 
     @Test
     fun `present - enter login and password`() = runTest {
-        val authenticationService = FakeAuthenticationService()
-        val accountProviderDataSource = AccountProviderDataSource()
-        val loginUserStory = DefaultLoginUserStory()
-        val presenter = LoginPasswordPresenter(
-            authenticationService,
-            accountProviderDataSource,
-            loginUserStory,
-        )
+        val authenticationService = FakeMatrixAuthenticationService()
         authenticationService.givenHomeserver(A_HOMESERVER)
-        moleculeFlow(RecompositionMode.Immediate) {
-            presenter.present()
-        }.test {
+        createLoginPasswordPresenter(
+            authenticationService = authenticationService,
+        ).test {
             val initialState = awaitItem()
             initialState.eventSink.invoke(LoginPasswordEvents.SetLogin(A_USER_NAME))
             val loginState = awaitItem()
@@ -89,18 +61,13 @@ class LoginPasswordPresenterTest {
 
     @Test
     fun `present - submit`() = runTest {
-        val authenticationService = FakeAuthenticationService()
-        val accountProviderDataSource = AccountProviderDataSource()
-        val loginUserStory = DefaultLoginUserStory().apply { setLoginFlowIsDone(false) }
-        val presenter = LoginPasswordPresenter(
-            authenticationService,
-            accountProviderDataSource,
-            loginUserStory,
-        )
+        val authenticationService = FakeMatrixAuthenticationService()
         authenticationService.givenHomeserver(A_HOMESERVER)
-        moleculeFlow(RecompositionMode.Immediate) {
-            presenter.present()
-        }.test {
+        val loginUserStory = DefaultLoginUserStory().apply { setLoginFlowIsDone(false) }
+        createLoginPasswordPresenter(
+            authenticationService = authenticationService,
+            defaultLoginUserStory = loginUserStory,
+        ).test {
             assertThat(loginUserStory.loginFlowIsDone.value).isFalse()
             val initialState = awaitItem()
             initialState.eventSink.invoke(LoginPasswordEvents.SetLogin(A_USER_NAME))
@@ -118,18 +85,11 @@ class LoginPasswordPresenterTest {
 
     @Test
     fun `present - submit with error`() = runTest {
-        val authenticationService = FakeAuthenticationService()
-        val accountProviderDataSource = AccountProviderDataSource()
-        val loginUserStory = DefaultLoginUserStory()
-        val presenter = LoginPasswordPresenter(
-            authenticationService,
-            accountProviderDataSource,
-            loginUserStory,
-        )
+        val authenticationService = FakeMatrixAuthenticationService()
         authenticationService.givenHomeserver(A_HOMESERVER)
-        moleculeFlow(RecompositionMode.Immediate) {
-            presenter.present()
-        }.test {
+        createLoginPasswordPresenter(
+            authenticationService = authenticationService,
+        ).test {
             val initialState = awaitItem()
             initialState.eventSink.invoke(LoginPasswordEvents.SetLogin(A_USER_NAME))
             initialState.eventSink.invoke(LoginPasswordEvents.SetPassword(A_PASSWORD))
@@ -146,18 +106,11 @@ class LoginPasswordPresenterTest {
 
     @Test
     fun `present - clear error`() = runTest {
-        val authenticationService = FakeAuthenticationService()
-        val accountProviderDataSource = AccountProviderDataSource()
-        val loginUserStory = DefaultLoginUserStory()
-        val presenter = LoginPasswordPresenter(
-            authenticationService,
-            accountProviderDataSource,
-            loginUserStory,
-        )
+        val authenticationService = FakeMatrixAuthenticationService()
         authenticationService.givenHomeserver(A_HOMESERVER)
-        moleculeFlow(RecompositionMode.Immediate) {
-            presenter.present()
-        }.test {
+        createLoginPasswordPresenter(
+            authenticationService = authenticationService,
+        ).test {
             val initialState = awaitItem()
             initialState.eventSink.invoke(LoginPasswordEvents.SetLogin(A_USER_NAME))
             initialState.eventSink.invoke(LoginPasswordEvents.SetPassword(A_PASSWORD))
@@ -176,4 +129,14 @@ class LoginPasswordPresenterTest {
             assertThat(clearedState.loginAction).isEqualTo(AsyncData.Uninitialized)
         }
     }
+
+    private fun createLoginPasswordPresenter(
+        authenticationService: FakeMatrixAuthenticationService = FakeMatrixAuthenticationService(),
+        accountProviderDataSource: AccountProviderDataSource = AccountProviderDataSource(FakeEnterpriseService()),
+        defaultLoginUserStory: DefaultLoginUserStory = DefaultLoginUserStory()
+    ): LoginPasswordPresenter = LoginPasswordPresenter(
+        authenticationService = authenticationService,
+        accountProviderDataSource = accountProviderDataSource,
+        defaultLoginUserStory = defaultLoginUserStory,
+    )
 }

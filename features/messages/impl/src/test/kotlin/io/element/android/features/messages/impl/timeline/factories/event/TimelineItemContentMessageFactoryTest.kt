@@ -1,26 +1,21 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.factories.event
 
+import android.net.Uri
 import android.text.SpannableString
+import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.SpannedString
 import android.text.style.URLSpan
 import androidx.core.text.buildSpannedString
 import androidx.core.text.inSpans
+import androidx.core.text.toSpannable
 import com.google.common.truth.Truth.assertThat
 import io.element.android.features.location.api.Location
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemAudioContent
@@ -33,6 +28,7 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemTextContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVideoContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVoiceContent
+import io.element.android.features.messages.impl.utils.FakeTextPillificationHelper
 import io.element.android.features.messages.test.timeline.FakeHtmlConverterProvider
 import io.element.android.libraries.androidutils.filesize.FakeFileSizeFormatter
 import io.element.android.libraries.core.mimetype.MimeTypes
@@ -46,6 +42,7 @@ import io.element.android.libraries.matrix.api.media.ImageInfo
 import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.api.media.ThumbnailInfo
 import io.element.android.libraries.matrix.api.media.VideoInfo
+import io.element.android.libraries.matrix.api.permalink.PermalinkData
 import io.element.android.libraries.matrix.api.timeline.item.event.AudioMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.EmoteMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.FileMessageType
@@ -63,17 +60,22 @@ import io.element.android.libraries.matrix.api.timeline.item.event.TextMessageTy
 import io.element.android.libraries.matrix.api.timeline.item.event.VideoMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.VoiceMessageType
 import io.element.android.libraries.matrix.test.AN_EVENT_ID
+import io.element.android.libraries.matrix.test.media.aMediaSource
+import io.element.android.libraries.matrix.test.permalink.FakePermalinkParser
+import io.element.android.libraries.matrix.test.timeline.aStickerContent
 import io.element.android.libraries.matrix.ui.components.A_BLUR_HASH
-import io.element.android.libraries.mediaviewer.api.util.FileExtensionExtractorWithoutValidation
+import io.element.android.libraries.mediaviewer.test.util.FileExtensionExtractorWithoutValidation
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
+@Suppress("LargeClass")
 @RunWith(RobolectricTestRunner::class)
 class TimelineItemContentMessageFactoryTest {
     @Test
@@ -81,7 +83,7 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
             content = createMessageContent(type = OtherMessageType(msgType = "a_type", body = "body")),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemTextContent(
@@ -99,7 +101,7 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
             content = createMessageContent(type = LocationMessageType("body", "geo:1,2", "description")),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemLocationContent(
@@ -115,7 +117,7 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
             content = createMessageContent(type = LocationMessageType("body", "", null)),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemTextContent(
@@ -133,7 +135,7 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
             content = createMessageContent(type = TextMessageType("body", null)),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemTextContent(
@@ -142,6 +144,7 @@ class TimelineItemContentMessageFactoryTest {
             plainText = "body",
             isEdited = false,
             formattedBody = null,
+            pillifiedBody = SpannableString("body"),
         )
         assertThat(result).isEqualTo(expected)
     }
@@ -151,7 +154,7 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
             content = createMessageContent(type = TextMessageType("https://www.example.org", null)),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         ) as TimelineItemTextContent
         val expected = TimelineItemTextContent(
@@ -188,7 +191,7 @@ class TimelineItemContentMessageFactoryTest {
             inSpans(URLSpan("https://matrix.org")) {
                 append("and manually added link")
             }
-        }
+        }.toSpannable()
         val sut = createTimelineItemContentMessageFactory(
             htmlConverterTransform = { expected }
         )
@@ -199,7 +202,7 @@ class TimelineItemContentMessageFactoryTest {
                     formatted = FormattedBody(MessageFormat.HTML, expected.toString())
                 )
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         assertThat((result as TimelineItemTextContent).formattedBody).isEqualTo(expected)
@@ -217,7 +220,7 @@ class TimelineItemContentMessageFactoryTest {
                     formatted = FormattedBody(MessageFormat.UNKNOWN, "formatted")
                 )
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         assertThat((result as TimelineItemTextContent).formattedBody).isNull()
@@ -227,14 +230,17 @@ class TimelineItemContentMessageFactoryTest {
     fun `test create VideoMessageType`() = runTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
-            content = createMessageContent(type = VideoMessageType("body", MediaSource("url"), null)),
-            senderDisplayName = "Bob",
+            content = createMessageContent(type = VideoMessageType("filename", null, null, MediaSource("url"), null)),
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemVideoContent(
-            body = "body",
+            filename = "filename",
+            caption = null,
+            formattedCaption = null,
+            isEdited = false,
             duration = Duration.ZERO,
-            videoSource = MediaSource(url = "url", json = null),
+            mediaSource = MediaSource(url = "url", json = null),
             thumbnailSource = null,
             aspectRatio = null,
             blurHash = null,
@@ -242,6 +248,8 @@ class TimelineItemContentMessageFactoryTest {
             width = null,
             mimeType = MimeTypes.OctetStream,
             formattedFileSize = "0 Bytes",
+            thumbnailWidth = null,
+            thumbnailHeight = null,
             fileExtension = "",
         )
         assertThat(result).isEqualTo(expected)
@@ -253,7 +261,9 @@ class TimelineItemContentMessageFactoryTest {
         val result = sut.create(
             content = createMessageContent(
                 type = VideoMessageType(
-                    body = "body.mp4",
+                    filename = "body.mp4",
+                    caption = "body.mp4 caption",
+                    formattedCaption = FormattedBody(MessageFormat.HTML, "formatted"),
                     source = MediaSource("url"),
                     info = VideoInfo(
                         duration = 1.minutes,
@@ -270,15 +280,19 @@ class TimelineItemContentMessageFactoryTest {
                         thumbnailSource = MediaSource("url_thumbnail"),
                         blurhash = A_BLUR_HASH,
                     ),
-                )
+                ),
+                isEdited = true,
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemVideoContent(
-            body = "body.mp4",
+            filename = "body.mp4",
+            caption = "body.mp4 caption",
+            formattedCaption = SpannedString("formatted"),
+            isEdited = true,
             duration = 1.minutes,
-            videoSource = MediaSource(url = "url", json = null),
+            mediaSource = MediaSource(url = "url", json = null),
             thumbnailSource = MediaSource("url_thumbnail"),
             aspectRatio = 3f,
             blurHash = A_BLUR_HASH,
@@ -286,6 +300,8 @@ class TimelineItemContentMessageFactoryTest {
             width = 300,
             mimeType = MimeTypes.Mp4,
             formattedFileSize = "555 Bytes",
+            thumbnailWidth = 5,
+            thumbnailHeight = 10,
             fileExtension = "mp4",
         )
         assertThat(result).isEqualTo(expected)
@@ -295,12 +311,15 @@ class TimelineItemContentMessageFactoryTest {
     fun `test create AudioMessageType`() = runTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
-            content = createMessageContent(type = AudioMessageType("body", MediaSource("url"), null)),
-            senderDisplayName = "Bob",
+            content = createMessageContent(type = AudioMessageType("filename", null, null, MediaSource("url"), null)),
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemAudioContent(
-            body = "body",
+            filename = "filename",
+            caption = null,
+            formattedCaption = null,
+            isEdited = false,
             duration = Duration.ZERO,
             mediaSource = MediaSource(url = "url", json = null),
             mimeType = MimeTypes.OctetStream,
@@ -316,20 +335,26 @@ class TimelineItemContentMessageFactoryTest {
         val result = sut.create(
             content = createMessageContent(
                 type = AudioMessageType(
-                    body = "body.mp3",
+                    filename = "body.mp3",
+                    caption = null,
+                    formattedCaption = null,
                     source = MediaSource("url"),
                     info = AudioInfo(
                         duration = 1.minutes,
                         size = 123L,
                         mimetype = MimeTypes.Mp3,
                     )
-                )
+                ),
+                isEdited = true,
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemAudioContent(
-            body = "body.mp3",
+            filename = "body.mp3",
+            caption = null,
+            formattedCaption = null,
+            isEdited = true,
             duration = 1.minutes,
             mediaSource = MediaSource(url = "url", json = null),
             mimeType = MimeTypes.Mp3,
@@ -343,17 +368,22 @@ class TimelineItemContentMessageFactoryTest {
     fun `test create VoiceMessageType`() = runTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
-            content = createMessageContent(type = VoiceMessageType("body", MediaSource("url"), null, null)),
-            senderDisplayName = "Bob",
+            content = createMessageContent(type = VoiceMessageType("filename", null, null, MediaSource("url"), null, null)),
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemVoiceContent(
+            filename = "filename",
             eventId = AN_EVENT_ID,
-            body = "body",
+            caption = null,
+            formattedCaption = null,
+            isEdited = false,
             duration = Duration.ZERO,
             mediaSource = MediaSource(url = "url", json = null),
             mimeType = MimeTypes.OctetStream,
-            waveform = emptyList<Float>().toImmutableList()
+            waveform = emptyList<Float>().toImmutableList(),
+            fileExtension = "",
+            formattedFileSize = "0 Bytes",
         )
         assertThat(result).isEqualTo(expected)
     }
@@ -364,7 +394,9 @@ class TimelineItemContentMessageFactoryTest {
         val result = sut.create(
             content = createMessageContent(
                 type = VoiceMessageType(
-                    body = "body.ogg",
+                    filename = "body.ogg",
+                    caption = null,
+                    formattedCaption = null,
                     source = MediaSource("url"),
                     info = AudioInfo(
                         duration = 1.minutes,
@@ -375,18 +407,24 @@ class TimelineItemContentMessageFactoryTest {
                         duration = 1.minutes,
                         waveform = persistentListOf(1f, 2f),
                     ),
-                )
+                ),
+                isEdited = true,
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemVoiceContent(
             eventId = AN_EVENT_ID,
-            body = "body.ogg",
+            filename = "body.ogg",
+            caption = null,
+            formattedCaption = null,
+            isEdited = true,
             duration = 1.minutes,
             mediaSource = MediaSource(url = "url", json = null),
             mimeType = MimeTypes.Ogg,
-            waveform = persistentListOf(1f, 2f)
+            waveform = persistentListOf(1f, 2f),
+            fileExtension = "ogg",
+            formattedFileSize = "123 Bytes",
         )
         assertThat(result).isEqualTo(expected)
     }
@@ -401,12 +439,15 @@ class TimelineItemContentMessageFactoryTest {
             )
         )
         val result = sut.create(
-            content = createMessageContent(type = VoiceMessageType("body", MediaSource("url"), null, null)),
-            senderDisplayName = "Bob",
+            content = createMessageContent(type = VoiceMessageType("filename", null, null, MediaSource("url"), null, null)),
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemAudioContent(
-            body = "body",
+            filename = "filename",
+            caption = null,
+            formattedCaption = null,
+            isEdited = false,
             duration = Duration.ZERO,
             mediaSource = MediaSource(url = "url", json = null),
             mimeType = MimeTypes.OctetStream,
@@ -420,12 +461,15 @@ class TimelineItemContentMessageFactoryTest {
     fun `test create ImageMessageType`() = runTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
-            content = createMessageContent(type = ImageMessageType("body", MediaSource("url"), null)),
-            senderDisplayName = "Bob",
+            content = createMessageContent(type = ImageMessageType("filename", "body", null, MediaSource("url"), null)),
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemImageContent(
-            body = "body",
+            filename = "filename",
+            caption = "body",
+            formattedCaption = null,
+            isEdited = false,
             mediaSource = MediaSource(url = "url", json = null),
             thumbnailSource = null,
             formattedFileSize = "0 Bytes",
@@ -434,6 +478,8 @@ class TimelineItemContentMessageFactoryTest {
             blurhash = null,
             width = null,
             height = null,
+            thumbnailWidth = null,
+            thumbnailHeight = null,
             aspectRatio = null
         )
         assertThat(result).isEqualTo(expected)
@@ -444,13 +490,16 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentStickerFactory()
         val result = sut.create(
             content = createStickerContent(
-                "body",
-                ImageInfo(32, 32, "image/webp", 8192, null, MediaSource("thumbnail://url"), null),
-                "url"
+                filename = "filename",
+                inImageInfo = ImageInfo(32, 32, "image/webp", 8192, null, MediaSource("thumbnail://url"), null),
+                inUrl = "url"
             )
         )
         val expected = TimelineItemStickerContent(
-            body = "body",
+            filename = "filename",
+            caption = null,
+            formattedCaption = null,
+            isEdited = false,
             mediaSource = MediaSource(url = "url", json = null),
             thumbnailSource = MediaSource(url = "thumbnail://url", json = null),
             formattedFileSize = "8192 Bytes",
@@ -470,7 +519,9 @@ class TimelineItemContentMessageFactoryTest {
         val result = sut.create(
             content = createMessageContent(
                 type = ImageMessageType(
-                    body = "body.jpg",
+                    filename = "body.jpg",
+                    caption = "body.jpg caption",
+                    formattedCaption = FormattedBody(MessageFormat.HTML, "formatted"),
                     source = MediaSource("url"),
                     info = ImageInfo(
                         height = 10L,
@@ -486,13 +537,17 @@ class TimelineItemContentMessageFactoryTest {
                         thumbnailSource = MediaSource("url_thumbnail"),
                         blurhash = A_BLUR_HASH,
                     )
-                )
+                ),
+                isEdited = true,
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemImageContent(
-            body = "body.jpg",
+            filename = "body.jpg",
+            caption = "body.jpg caption",
+            formattedCaption = SpannedString("formatted"),
+            isEdited = true,
             mediaSource = MediaSource(url = "url", json = null),
             thumbnailSource = MediaSource("url_thumbnail"),
             formattedFileSize = "888 Bytes",
@@ -501,6 +556,8 @@ class TimelineItemContentMessageFactoryTest {
             blurhash = A_BLUR_HASH,
             width = 5,
             height = 10,
+            thumbnailWidth = 5,
+            thumbnailHeight = 10,
             aspectRatio = 0.5f,
         )
         assertThat(result).isEqualTo(expected)
@@ -510,13 +567,16 @@ class TimelineItemContentMessageFactoryTest {
     fun `test create FileMessageType`() = runTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
-            content = createMessageContent(type = FileMessageType("body", MediaSource("url"), null)),
-            senderDisplayName = "Bob",
+            content = createMessageContent(type = FileMessageType("filename", null, null, MediaSource("url"), null)),
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemFileContent(
-            body = "body",
-            fileSource = MediaSource(url = "url", json = null),
+            filename = "filename",
+            caption = null,
+            formattedCaption = null,
+            isEdited = false,
+            mediaSource = MediaSource(url = "url", json = null),
             thumbnailSource = null,
             formattedFileSize = "0 Bytes",
             fileExtension = "",
@@ -531,7 +591,9 @@ class TimelineItemContentMessageFactoryTest {
         val result = sut.create(
             content = createMessageContent(
                 type = FileMessageType(
-                    body = "body.pdf",
+                    filename = "body.pdf",
+                    caption = null,
+                    formattedCaption = null,
                     source = MediaSource("url"),
                     info = FileInfo(
                         mimetype = MimeTypes.Pdf,
@@ -544,14 +606,18 @@ class TimelineItemContentMessageFactoryTest {
                         ),
                         thumbnailSource = MediaSource("url_thumbnail"),
                     )
-                )
+                ),
+                isEdited = true,
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemFileContent(
-            body = "body.pdf",
-            fileSource = MediaSource(url = "url", json = null),
+            filename = "body.pdf",
+            caption = null,
+            formattedCaption = null,
+            isEdited = true,
+            mediaSource = MediaSource(url = "url", json = null),
             thumbnailSource = MediaSource("url_thumbnail"),
             formattedFileSize = "123 Bytes",
             fileExtension = "pdf",
@@ -565,7 +631,7 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
             content = createMessageContent(type = NoticeMessageType("body", null)),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemNoticeContent(
@@ -588,10 +654,10 @@ class TimelineItemContentMessageFactoryTest {
                     formatted = FormattedBody(MessageFormat.HTML, "formatted")
                 )
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
-        assertThat((result as TimelineItemNoticeContent).formattedBody).isEqualTo("formatted")
+        (result as TimelineItemNoticeContent).formattedBody.assertSpannedEquals(SpannedString("formatted"))
     }
 
     @Test
@@ -599,7 +665,7 @@ class TimelineItemContentMessageFactoryTest {
         val sut = createTimelineItemContentMessageFactory()
         val result = sut.create(
             content = createMessageContent(type = EmoteMessageType("body", null)),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
         val expected = TimelineItemEmoteContent(
@@ -622,10 +688,88 @@ class TimelineItemContentMessageFactoryTest {
                     formatted = FormattedBody(MessageFormat.HTML, "formatted")
                 )
             ),
-            senderDisplayName = "Bob",
+            senderDisambiguatedDisplayName = "Bob",
             eventId = AN_EVENT_ID,
         )
-        assertThat((result as TimelineItemEmoteContent).formattedBody).isEqualTo(SpannableString("* Bob formatted"))
+
+        (result as TimelineItemEmoteContent).formattedBody.assertSpannedEquals(SpannableString("* Bob formatted"))
+    }
+
+    @Test
+    fun `a message with existing URLSpans keeps it after linkification`() = runTest {
+        val expectedSpanned = SpannableStringBuilder().apply {
+            append("Test ")
+            inSpans(URLSpan("https://www.example.org")) {
+                append("me@matrix.org")
+            }
+        }.toSpannable()
+        val sut = createTimelineItemContentMessageFactory(
+            htmlConverterTransform = { expectedSpanned },
+            permalinkParser = FakePermalinkParser { PermalinkData.FallbackLink(Uri.EMPTY) }
+        )
+        val result = sut.create(
+            content = createMessageContent(
+                type = TextMessageType(
+                    body = "Test [me@matrix.org](https://www.example.org)",
+                    formatted = FormattedBody(MessageFormat.HTML, "Test <a href=\"https://www.example.org\">me@matrix.org</a>")
+                )
+            ),
+            senderDisambiguatedDisplayName = "Bob",
+            eventId = AN_EVENT_ID,
+        )
+        (result as TimelineItemTextContent).formattedBody.assertSpannedEquals(expectedSpanned)
+    }
+
+    @Test
+    fun `a message with plain URL in a formatted body Spanned format gets linkified too`() = runTest {
+        val expectedSpanned = buildSpannedString {
+            append("Test ")
+            inSpansWithFlags(URLSpan("https://www.example.org"), flags = Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) {
+                append("https://www.example.org")
+            }
+        }
+        val sut = createTimelineItemContentMessageFactory(
+            htmlConverterTransform = { expectedSpanned },
+            permalinkParser = FakePermalinkParser { PermalinkData.FallbackLink(Uri.EMPTY) }
+        )
+        val result = sut.create(
+            content = createMessageContent(
+                type = TextMessageType(
+                    body = "Test [me@matrix.org](https://www.example.org)",
+                    formatted = FormattedBody(MessageFormat.HTML, "Test https://www.example.org")
+                )
+            ),
+            senderDisambiguatedDisplayName = "Bob",
+            eventId = AN_EVENT_ID,
+        )
+        (result as TimelineItemTextContent).formattedBody.assertSpannedEquals(expectedSpanned)
+    }
+
+    @Test
+    fun `a message with plain URL in a formatted body with plain text format gets linkified too`() = runTest {
+        val resultString = "Test https://www.example.org"
+        val expectedSpanned = buildSpannedString {
+            append("Test ")
+            inSpansWithFlags(URLSpan("https://www.example.org"), flags = Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) {
+                append("https://www.example.org")
+            }
+        }.toSpannable()
+        val sut = createTimelineItemContentMessageFactory(
+            htmlConverterTransform = { resultString },
+            permalinkParser = FakePermalinkParser { PermalinkData.FallbackLink(Uri.EMPTY) }
+        )
+        val result = sut.create(
+            content = createMessageContent(
+                type = TextMessageType(
+                    body = "Test [me@matrix.org](https://www.example.org)",
+                    formatted = FormattedBody(MessageFormat.HTML, "Test https://www.example.org")
+                )
+            ),
+            senderDisambiguatedDisplayName = "Bob",
+            eventId = AN_EVENT_ID,
+        )
+
+        (result as TimelineItemTextContent).formattedBody.assertSpannedEquals(expectedSpanned)
     }
 
     private fun createMessageContent(
@@ -647,26 +791,69 @@ class TimelineItemContentMessageFactoryTest {
     private fun createTimelineItemContentMessageFactory(
         featureFlagService: FeatureFlagService = FakeFeatureFlagService(),
         htmlConverterTransform: (String) -> CharSequence = { it },
+        permalinkParser: FakePermalinkParser = FakePermalinkParser(),
     ) = TimelineItemContentMessageFactory(
         fileSizeFormatter = FakeFileSizeFormatter(),
         fileExtensionExtractor = FileExtensionExtractorWithoutValidation(),
         featureFlagService = featureFlagService,
         htmlConverterProvider = FakeHtmlConverterProvider(htmlConverterTransform),
+        permalinkParser = permalinkParser,
+        textPillificationHelper = FakeTextPillificationHelper(),
     )
 
     private fun createStickerContent(
-        body: String = "Body",
+        filename: String = "filename",
         inImageInfo: ImageInfo,
-        inUrl: String
+        inUrl: String,
+        body: String? = null,
     ): StickerContent {
-        return StickerContent(
+        return aStickerContent(
+            filename = filename,
             body = body,
             info = inImageInfo,
-            url = inUrl
+            mediaSource = aMediaSource(url = inUrl),
         )
     }
+
     private fun createTimelineItemContentStickerFactory() = TimelineItemContentStickerFactory(
         fileSizeFormatter = FakeFileSizeFormatter(),
         fileExtensionExtractor = FileExtensionExtractorWithoutValidation()
     )
+}
+
+private inline fun SpannableStringBuilder.inSpansWithFlags(span: Any, flags: Int, action: SpannableStringBuilder.() -> Unit) {
+    val start = this.length
+    action()
+    val end = this.length
+    setSpan(span, start, end, flags)
+}
+
+fun CharSequence?.assertSpannedEquals(other: CharSequence?) {
+    if (this == null && other == null) {
+        return
+    } else if (this is Spanned && other is Spanned) {
+        assertThat(this.toString()).isEqualTo(other.toString())
+        assertThat(this.length).isEqualTo(other.length)
+        val thisSpans = this.getSpans(0, this.length, Any::class.java)
+        val otherSpans = other.getSpans(0, other.length, Any::class.java)
+        if (thisSpans.size != otherSpans.size) {
+            fail("Expected ${thisSpans.size} spans, got ${otherSpans.size}")
+        }
+        thisSpans.forEachIndexed { index, span ->
+            val otherSpan = otherSpans[index]
+            // URLSpans don't have a proper `equals` implementation, so we compare the URL instead
+            if (span is URLSpan && otherSpan is URLSpan) {
+                assertThat(span.url).isEqualTo(otherSpan.url)
+            } else {
+                assertThat(span).isEqualTo(otherSpan)
+            }
+            assertThat(this.getSpanStart(span)).isEqualTo(other.getSpanStart(otherSpan))
+            assertThat(this.getSpanEnd(span)).isEqualTo(other.getSpanEnd(otherSpan))
+            assertThat(this.getSpanFlags(span)).isEqualTo(other.getSpanFlags(otherSpan))
+        }
+    } else {
+        val thisString = this?.toString() ?: "null"
+        val otherString = other?.toString() ?: "null"
+        fail("Expected Spanned, got $thisString and $otherString")
+    }
 }

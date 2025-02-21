@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.media
@@ -198,7 +189,7 @@ internal fun WaveformPlaybackViewPreview() = ElementPreview {
             showCursor = false,
             playbackProgress = 0.5f,
             onSeek = {},
-            waveform = persistentListOf(0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 8f, 7f, 6f, 5f, 4f, 3f, 2f, 1f, 0f),
+            waveform = aWaveForm().toPersistentList(),
         )
         WaveformPlaybackView(
             modifier = Modifier.height(34.dp),
@@ -227,4 +218,46 @@ private fun ImmutableList<Float>.normalisedData(maxSamplesCount: Int): Immutable
     }
 
     return result.toPersistentList()
+}
+
+fun aWaveForm(): List<Float> {
+    return listOf(
+        0.000f,
+        0.000f,
+        0.000f,
+        0.003f,
+        0.354f,
+        0.353f,
+        0.365f,
+        0.790f,
+        0.787f,
+        0.167f,
+        0.333f,
+        0.975f,
+        0.000f,
+        0.102f,
+        0.003f,
+        0.531f,
+        0.584f,
+        0.317f,
+        0.140f,
+        0.475f,
+        0.496f,
+        0.561f,
+        0.042f,
+        0.263f,
+        0.169f,
+        0.829f,
+        0.349f,
+        0.010f,
+        0.000f,
+        0.000f,
+        1.000f,
+        0.334f,
+        0.321f,
+        0.011f,
+        0.000f,
+        0.000f,
+        0.003f,
+    )
 }

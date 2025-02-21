@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.factories.event
@@ -20,7 +11,6 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemStickerContent
 import io.element.android.libraries.androidutils.filesize.FileSizeFormatter
 import io.element.android.libraries.core.mimetype.MimeTypes
-import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.api.timeline.item.event.StickerContent
 import io.element.android.libraries.mediaviewer.api.util.FileExtensionExtractor
 import javax.inject.Inject
@@ -43,16 +33,19 @@ class TimelineItemContentStickerFactory @Inject constructor(
         val aspectRatio = aspectRatioOf(content.info.width, content.info.height)
 
         return TimelineItemStickerContent(
-            body = content.body,
-            mediaSource = MediaSource(content.url),
+            filename = content.filename,
+            caption = content.body,
+            formattedCaption = null,
+            isEdited = false,
+            mediaSource = content.source,
             thumbnailSource = content.info.thumbnailSource,
-            mimeType = content.info.mimetype ?: MimeTypes.OctetStream,
+            mimeType = content.info.mimetype ?: MimeTypes.Images,
             blurhash = content.info.blurhash,
             width = content.info.width?.toInt(),
             height = content.info.height?.toInt(),
             aspectRatio = aspectRatio,
             formattedFileSize = fileSizeFormatter.format(content.info.size ?: 0),
-            fileExtension = fileExtensionExtractor.extractFromName(content.body)
+            fileExtension = fileExtensionExtractor.extractFromName(content.filename)
         )
     }
 }

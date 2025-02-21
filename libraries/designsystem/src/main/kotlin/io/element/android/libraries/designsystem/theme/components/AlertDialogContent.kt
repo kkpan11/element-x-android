@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.theme.components
@@ -37,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -54,14 +46,14 @@ import kotlin.math.max
 internal fun SimpleAlertDialogContent(
     content: String,
     submitText: String,
-    onSubmitClicked: () -> Unit,
+    onSubmitClick: () -> Unit,
     title: String? = null,
     subtitle: @Composable (() -> Unit)? = null,
     destructiveSubmit: Boolean = false,
     cancelText: String? = null,
-    onCancelClicked: () -> Unit = {},
+    onCancelClick: () -> Unit = {},
     thirdButtonText: String? = null,
-    onThirdButtonClicked: () -> Unit = {},
+    onThirdButtonClick: () -> Unit = {},
     applyPaddingToContents: Boolean = true,
     icon: @Composable (() -> Unit)? = null,
 ) {
@@ -77,11 +69,11 @@ internal fun SimpleAlertDialogContent(
         },
         submitText = submitText,
         destructiveSubmit = destructiveSubmit,
-        onSubmitClicked = onSubmitClicked,
+        onSubmitClick = onSubmitClick,
         cancelText = cancelText,
-        onCancelClicked = onCancelClicked,
+        onCancelClick = onCancelClick,
         thirdButtonText = thirdButtonText,
-        onThirdButtonClicked = onThirdButtonClicked,
+        onThirdButtonClick = onThirdButtonClick,
         applyPaddingToContents = applyPaddingToContents,
     )
 }
@@ -89,14 +81,14 @@ internal fun SimpleAlertDialogContent(
 @Composable
 internal fun SimpleAlertDialogContent(
     submitText: String,
-    onSubmitClicked: () -> Unit,
+    onSubmitClick: () -> Unit,
     title: String? = null,
     subtitle: @Composable (() -> Unit)? = null,
     destructiveSubmit: Boolean = false,
     cancelText: String? = null,
-    onCancelClicked: () -> Unit = {},
+    onCancelClick: () -> Unit = {},
     thirdButtonText: String? = null,
-    onThirdButtonClicked: () -> Unit = {},
+    onThirdButtonClick: () -> Unit = {},
     applyPaddingToContents: Boolean = true,
     enabled: Boolean = true,
     icon: @Composable (() -> Unit)? = null,
@@ -115,7 +107,7 @@ internal fun SimpleAlertDialogContent(
                         modifier = Modifier.testTag(TestTags.dialogNeutral),
                         text = thirdButtonText,
                         size = ButtonSize.Medium,
-                        onClick = onThirdButtonClicked,
+                        onClick = onThirdButtonClick,
                     )
                 }
                 if (cancelText != null) {
@@ -123,14 +115,14 @@ internal fun SimpleAlertDialogContent(
                         modifier = Modifier.testTag(TestTags.dialogNegative),
                         text = cancelText,
                         size = ButtonSize.Medium,
-                        onClick = onCancelClicked,
+                        onClick = onCancelClick,
                     )
                     Button(
                         modifier = Modifier.testTag(TestTags.dialogPositive),
                         text = submitText,
                         enabled = enabled,
                         size = ButtonSize.Medium,
-                        onClick = onSubmitClicked,
+                        onClick = onSubmitClick,
                         destructive = destructiveSubmit,
                     )
                 } else {
@@ -139,7 +131,7 @@ internal fun SimpleAlertDialogContent(
                         text = submitText,
                         enabled = enabled,
                         size = ButtonSize.Medium,
-                        onClick = onSubmitClicked,
+                        onClick = onSubmitClick,
                         destructive = destructiveSubmit,
                     )
                 }
@@ -150,6 +142,7 @@ internal fun SimpleAlertDialogContent(
                 Text(
                     text = titleText,
                     style = ElementTheme.typography.fontHeadingSmMedium,
+                    textAlign = TextAlign.Center,
                 )
             }
         },
@@ -166,7 +159,7 @@ internal fun SimpleAlertDialogContent(
         // most cases, TextButtons should be used for dismiss and confirm buttons.
         // TextButtons will not consume this provided content color value, and will used their
         // own defined or default colors.
-        buttonContentColor = MaterialTheme.colorScheme.primary,
+        buttonContentColor = ElementTheme.colors.textPrimary,
         applyPaddingToContents = applyPaddingToContents,
     )
 }
@@ -174,6 +167,7 @@ internal fun SimpleAlertDialogContent(
 /**
  * Copy of M3's `AlertDialogContent` so we can use it for previews.
  */
+@Suppress("ContentTrailingLambda")
 @Composable
 internal fun AlertDialogContent(
     buttons: @Composable () -> Unit,
@@ -444,7 +438,7 @@ internal fun DialogWithTitleIconAndOkButtonPreview() {
                 content = "A dialog is a type of modal window that appears in front of app content to provide critical information," +
                     " or prompt for a decision to be made. Learn more",
                 submitText = "OK",
-                onSubmitClicked = {},
+                onSubmitClick = {},
             )
         }
     }
@@ -461,7 +455,7 @@ internal fun DialogWithTitleAndOkButtonPreview() {
                 content = "A dialog is a type of modal window that appears in front of app content to provide critical information," +
                     " or prompt for a decision to be made. Learn more",
                 submitText = "OK",
-                onSubmitClicked = {},
+                onSubmitClick = {},
             )
         }
     }
@@ -477,7 +471,7 @@ internal fun DialogWithOnlyMessageAndOkButtonPreview() {
                 content = "A dialog is a type of modal window that appears in front of app content to provide critical information," +
                     " or prompt for a decision to be made. Learn more",
                 submitText = "OK",
-                onSubmitClicked = {},
+                onSubmitClick = {},
             )
         }
     }
@@ -494,7 +488,7 @@ internal fun DialogWithDestructiveButtonPreview() {
                 cancelText = "Cancel",
                 submitText = "Delete",
                 destructiveSubmit = true,
-                onSubmitClicked = {},
+                onSubmitClick = {},
             )
         }
     }
@@ -511,7 +505,7 @@ internal fun DialogWithThirdButtonPreview() {
                 cancelText = "Cancel",
                 submitText = "Delete",
                 thirdButtonText = "Other",
-                onSubmitClicked = {},
+                onSubmitClick = {},
             )
         }
     }

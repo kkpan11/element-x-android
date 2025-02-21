@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.lockscreen.impl.setup.pin
@@ -20,7 +11,7 @@ import app.cash.molecule.RecompositionMode
 import app.cash.molecule.moleculeFlow
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import io.element.android.appconfig.LockScreenConfig
+import io.element.android.features.lockscreen.impl.LockScreenConfig
 import io.element.android.features.lockscreen.impl.fixtures.aLockScreenConfig
 import io.element.android.features.lockscreen.impl.fixtures.aPinCodeManager
 import io.element.android.features.lockscreen.impl.pin.DefaultPinCodeManagerCallback
@@ -37,7 +28,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class SetupPinPresenterTest {
-    private val blacklistedPin = "1234"
+    private val forbiddenPin = "1234"
     private val halfCompletePin = "12"
     private val completePin = "1235"
     private val mismatchedPin = "1236"
@@ -66,11 +57,11 @@ class SetupPinPresenterTest {
                 state.confirmPinEntry.assertEmpty()
                 assertThat(state.setupPinFailure).isNull()
                 assertThat(state.isConfirmationStep).isFalse()
-                state.onPinEntryChanged(blacklistedPin)
+                state.onPinEntryChanged(forbiddenPin)
             }
             awaitLastSequentialItem().also { state ->
-                state.choosePinEntry.assertText(blacklistedPin)
-                assertThat(state.setupPinFailure).isEqualTo(SetupPinFailure.PinBlacklisted)
+                state.choosePinEntry.assertText(forbiddenPin)
+                assertThat(state.setupPinFailure).isEqualTo(SetupPinFailure.ForbiddenPin)
                 state.eventSink(SetupPinEvents.ClearFailure)
             }
             awaitLastSequentialItem().also { state ->
@@ -89,7 +80,7 @@ class SetupPinPresenterTest {
             awaitLastSequentialItem().also { state ->
                 state.choosePinEntry.assertText(completePin)
                 state.confirmPinEntry.assertText(mismatchedPin)
-                assertThat(state.setupPinFailure).isEqualTo(SetupPinFailure.PinsDontMatch)
+                assertThat(state.setupPinFailure).isEqualTo(SetupPinFailure.PinsDoNotMatch)
                 state.eventSink(SetupPinEvents.ClearFailure)
             }
             awaitLastSequentialItem().also { state ->
@@ -122,7 +113,7 @@ class SetupPinPresenterTest {
     private fun createSetupPinPresenter(
         callback: PinCodeManager.Callback,
         lockScreenConfig: LockScreenConfig = aLockScreenConfig(
-            pinBlacklist = setOf(blacklistedPin)
+            forbiddenPinCodes = setOf(forbiddenPin)
         ),
     ): SetupPinPresenter {
         val pinCodeManager = aPinCodeManager()

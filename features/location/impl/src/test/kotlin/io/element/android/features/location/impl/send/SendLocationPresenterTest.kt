@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.location.impl.send
@@ -24,18 +15,22 @@ import im.vector.app.features.analytics.plan.Composer
 import io.element.android.features.location.api.Location
 import io.element.android.features.location.impl.aPermissionsState
 import io.element.android.features.location.impl.common.actions.FakeLocationActions
+import io.element.android.features.location.impl.common.permissions.FakePermissionsPresenter
 import io.element.android.features.location.impl.common.permissions.PermissionsEvents
 import io.element.android.features.location.impl.common.permissions.PermissionsPresenter
-import io.element.android.features.location.impl.common.permissions.PermissionsPresenterFake
 import io.element.android.features.location.impl.common.permissions.PermissionsState
 import io.element.android.features.messages.test.FakeMessageComposerContext
+import io.element.android.libraries.matrix.api.room.MatrixRoom
 import io.element.android.libraries.matrix.api.room.location.AssetType
+import io.element.android.libraries.matrix.api.timeline.item.event.toEventOrTransactionId
+import io.element.android.libraries.matrix.test.AN_EVENT_ID
 import io.element.android.libraries.matrix.test.core.aBuildMeta
 import io.element.android.libraries.matrix.test.room.FakeMatrixRoom
-import io.element.android.libraries.matrix.test.room.SendLocationInvocation
 import io.element.android.libraries.textcomposer.model.MessageComposerMode
 import io.element.android.services.analytics.test.FakeAnalyticsService
 import io.element.android.tests.testutils.WarmUpRule
+import io.element.android.tests.testutils.lambda.lambdaRecorder
+import io.element.android.tests.testutils.lambda.value
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -45,17 +40,19 @@ class SendLocationPresenterTest {
     @get:Rule
     val warmUpRule = WarmUpRule()
 
-    private val permissionsPresenterFake = PermissionsPresenterFake()
-    private val fakeMatrixRoom = FakeMatrixRoom()
+    private val fakePermissionsPresenter = FakePermissionsPresenter()
     private val fakeAnalyticsService = FakeAnalyticsService()
     private val fakeMessageComposerContext = FakeMessageComposerContext()
     private val fakeLocationActions = FakeLocationActions()
     private val fakeBuildMeta = aBuildMeta(applicationName = "app name")
-    private val sendLocationPresenter: SendLocationPresenter = SendLocationPresenter(
+
+    private fun createSendLocationPresenter(
+        matrixRoom: MatrixRoom = FakeMatrixRoom(),
+    ): SendLocationPresenter = SendLocationPresenter(
         permissionsPresenterFactory = object : PermissionsPresenter.Factory {
-            override fun create(permissions: List<String>): PermissionsPresenter = permissionsPresenterFake
+            override fun create(permissions: List<String>): PermissionsPresenter = fakePermissionsPresenter
         },
-        room = fakeMatrixRoom,
+        room = matrixRoom,
         analyticsService = fakeAnalyticsService,
         messageComposerContext = fakeMessageComposerContext,
         locationActions = fakeLocationActions,
@@ -64,7 +61,8 @@ class SendLocationPresenterTest {
 
     @Test
     fun `initial state with permissions granted`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.AllGranted,
                 shouldShowRationale = false,
@@ -90,7 +88,8 @@ class SendLocationPresenterTest {
 
     @Test
     fun `initial state with permissions partially granted`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.SomeGranted,
                 shouldShowRationale = false,
@@ -116,7 +115,8 @@ class SendLocationPresenterTest {
 
     @Test
     fun `initial state with permissions denied`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = false,
@@ -142,7 +142,8 @@ class SendLocationPresenterTest {
 
     @Test
     fun `initial state with permissions denied once`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = true,
@@ -168,7 +169,8 @@ class SendLocationPresenterTest {
 
     @Test
     fun `rationale dialog dismiss`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = true,
@@ -199,7 +201,8 @@ class SendLocationPresenterTest {
 
     @Test
     fun `rationale dialog continue`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = true,
@@ -221,13 +224,14 @@ class SendLocationPresenterTest {
 
             // Continue the dialog sends permission request to the permissions presenter
             myLocationState.eventSink(SendLocationEvents.RequestPermissions)
-            assertThat(permissionsPresenterFake.events.last()).isEqualTo(PermissionsEvents.RequestPermissions)
+            assertThat(fakePermissionsPresenter.events.last()).isEqualTo(PermissionsEvents.RequestPermissions)
         }
     }
 
     @Test
     fun `permission denied dialog dismiss`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = false,
@@ -258,7 +262,14 @@ class SendLocationPresenterTest {
 
     @Test
     fun `share sender location`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationResult = lambdaRecorder<String, String, String?, Int?, AssetType?, Result<Unit>> { _, _, _, _, _ ->
+            Result.success(Unit)
+        }
+        val matrixRoom = FakeMatrixRoom(
+            sendLocationResult = sendLocationResult,
+        )
+        val sendLocationPresenter = createSendLocationPresenter(matrixRoom)
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.AllGranted,
                 shouldShowRationale = false,
@@ -289,16 +300,14 @@ class SendLocationPresenterTest {
 
             delay(1) // Wait for the coroutine to finish
 
-            assertThat(fakeMatrixRoom.sentLocations.size).isEqualTo(1)
-            assertThat(fakeMatrixRoom.sentLocations.last()).isEqualTo(
-                SendLocationInvocation(
-                    body = "Location was shared at geo:3.0,4.0;u=5.0",
-                    geoUri = "geo:3.0,4.0;u=5.0",
-                    description = null,
-                    zoomLevel = 15,
-                    assetType = AssetType.SENDER
+            sendLocationResult.assertions().isCalledOnce()
+                .with(
+                    value("Location was shared at geo:3.0,4.0;u=5.0"),
+                    value("geo:3.0,4.0;u=5.0"),
+                    value(null),
+                    value(15),
+                    value(AssetType.SENDER),
                 )
-            )
 
             assertThat(fakeAnalyticsService.capturedEvents.size).isEqualTo(1)
             assertThat(fakeAnalyticsService.capturedEvents.last()).isEqualTo(
@@ -314,7 +323,14 @@ class SendLocationPresenterTest {
 
     @Test
     fun `share pin location`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationResult = lambdaRecorder<String, String, String?, Int?, AssetType?, Result<Unit>> { _, _, _, _, _ ->
+            Result.success(Unit)
+        }
+        val matrixRoom = FakeMatrixRoom(
+            sendLocationResult = sendLocationResult,
+        )
+        val sendLocationPresenter = createSendLocationPresenter(matrixRoom)
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = false,
@@ -345,16 +361,14 @@ class SendLocationPresenterTest {
 
             delay(1) // Wait for the coroutine to finish
 
-            assertThat(fakeMatrixRoom.sentLocations.size).isEqualTo(1)
-            assertThat(fakeMatrixRoom.sentLocations.last()).isEqualTo(
-                SendLocationInvocation(
-                    body = "Location was shared at geo:0.0,1.0",
-                    geoUri = "geo:0.0,1.0",
-                    description = null,
-                    zoomLevel = 15,
-                    assetType = AssetType.PIN
+            sendLocationResult.assertions().isCalledOnce()
+                .with(
+                    value("Location was shared at geo:0.0,1.0"),
+                    value("geo:0.0,1.0"),
+                    value(null),
+                    value(15),
+                    value(AssetType.PIN),
                 )
-            )
 
             assertThat(fakeAnalyticsService.capturedEvents.size).isEqualTo(1)
             assertThat(fakeAnalyticsService.capturedEvents.last()).isEqualTo(
@@ -370,7 +384,14 @@ class SendLocationPresenterTest {
 
     @Test
     fun `composer context passes through analytics`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationResult = lambdaRecorder<String, String, String?, Int?, AssetType?, Result<Unit>> { _, _, _, _, _ ->
+            Result.success(Unit)
+        }
+        val matrixRoom = FakeMatrixRoom(
+            sendLocationResult = sendLocationResult,
+        )
+        val sendLocationPresenter = createSendLocationPresenter(matrixRoom)
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = false,
@@ -378,9 +399,8 @@ class SendLocationPresenterTest {
         )
         fakeMessageComposerContext.apply {
             composerMode = MessageComposerMode.Edit(
-                eventId = null,
-                defaultContent = "",
-                transactionId = null
+                eventOrTransactionId = AN_EVENT_ID.toEventOrTransactionId(),
+                content = ""
             )
         }
 
@@ -418,7 +438,8 @@ class SendLocationPresenterTest {
 
     @Test
     fun `open settings activity`() = runTest {
-        permissionsPresenterFake.givenState(
+        val sendLocationPresenter = createSendLocationPresenter()
+        fakePermissionsPresenter.givenState(
             aPermissionsState(
                 permissions = PermissionsState.Permissions.NoneGranted,
                 shouldShowRationale = false,
@@ -426,9 +447,8 @@ class SendLocationPresenterTest {
         )
         fakeMessageComposerContext.apply {
             composerMode = MessageComposerMode.Edit(
-                eventId = null,
-                defaultContent = "",
-                transactionId = null
+                eventOrTransactionId = AN_EVENT_ID.toEventOrTransactionId(),
+                content = ""
             )
         }
 
@@ -452,6 +472,7 @@ class SendLocationPresenterTest {
 
     @Test
     fun `application name is in state`() = runTest {
+        val sendLocationPresenter = createSendLocationPresenter()
         moleculeFlow(RecompositionMode.Immediate) {
             sendLocationPresenter.present()
         }.test {

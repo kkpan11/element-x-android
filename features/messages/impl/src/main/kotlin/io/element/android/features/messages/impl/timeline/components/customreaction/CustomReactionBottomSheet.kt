@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components.customreaction
@@ -25,13 +16,13 @@ import androidx.compose.ui.Modifier
 import io.element.android.emojibasebindings.Emoji
 import io.element.android.libraries.designsystem.theme.components.ModalBottomSheet
 import io.element.android.libraries.designsystem.theme.components.hide
-import io.element.android.libraries.matrix.api.core.EventId
+import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomReactionBottomSheet(
     state: CustomReactionState,
-    onEmojiSelected: (EventId, Emoji) -> Unit,
+    onSelectEmoji: (EventOrTransactionId, Emoji) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState()
@@ -43,10 +34,10 @@ fun CustomReactionBottomSheet(
     }
 
     fun onEmojiSelectedDismiss(emoji: Emoji) {
-        if (target?.event?.eventId == null) return
+        if (target?.event == null) return
         sheetState.hide(coroutineScope) {
             state.eventSink(CustomReactionEvents.DismissCustomReactionSheet)
-            onEmojiSelected(target.event.eventId, emoji)
+            onSelectEmoji(target.event.eventOrTransactionId, emoji)
         }
     }
 
@@ -57,7 +48,7 @@ fun CustomReactionBottomSheet(
             modifier = modifier
         ) {
             EmojiPicker(
-                onEmojiSelected = ::onEmojiSelectedDismiss,
+                onSelectEmoji = ::onEmojiSelectedDismiss,
                 emojibaseStore = target.emojibaseStore,
                 selectedEmojis = state.selectedEmoji,
                 modifier = Modifier.fillMaxSize(),

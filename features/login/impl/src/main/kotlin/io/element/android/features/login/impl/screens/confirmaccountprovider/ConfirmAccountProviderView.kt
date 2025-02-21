@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.login.impl.screens.confirmaccountprovider
@@ -31,10 +22,12 @@ import androidx.compose.ui.unit.dp
 import io.element.android.features.login.impl.R
 import io.element.android.features.login.impl.dialogs.SlidingSyncNotSupportedDialog
 import io.element.android.features.login.impl.error.ChangeServerError
+import io.element.android.features.login.impl.screens.createaccount.AccountCreationNotSupported
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.designsystem.atomic.molecules.ButtonColumnMolecule
 import io.element.android.libraries.designsystem.atomic.molecules.IconTitleSubtitleMolecule
 import io.element.android.libraries.designsystem.atomic.pages.HeaderFooterPage
+import io.element.android.libraries.designsystem.components.BigIcon
 import io.element.android.libraries.designsystem.components.dialogs.ErrorDialog
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -49,8 +42,9 @@ import io.element.android.libraries.ui.strings.CommonStrings
 fun ConfirmAccountProviderView(
     state: ConfirmAccountProviderState,
     onOidcDetails: (OidcDetails) -> Unit,
-    onLoginPasswordNeeded: () -> Unit,
-    onLearnMoreClicked: () -> Unit,
+    onNeedLoginPassword: () -> Unit,
+    onLearnMoreClick: () -> Unit,
+    onCreateAccountContinue: (url: String) -> Unit,
     onChange: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -66,7 +60,7 @@ fun ConfirmAccountProviderView(
         header = {
             IconTitleSubtitleMolecule(
                 modifier = Modifier.padding(top = 60.dp),
-                iconImageVector = Icons.Filled.AccountCircle,
+                iconStyle = BigIcon.Style.Default(Icons.Filled.AccountCircle),
                 title = stringResource(
                     id = if (state.isAccountCreation) {
                         R.string.screen_account_provider_signup_title
@@ -112,18 +106,29 @@ fun ConfirmAccountProviderView(
                     is ChangeServerError.Error -> {
                         ErrorDialog(
                             content = error.message(),
-                            onDismiss = {
+                            onSubmit = {
                                 eventSink.invoke(ConfirmAccountProviderEvents.ClearError)
                             }
                         )
                     }
                     is ChangeServerError.SlidingSyncAlert -> {
-                        SlidingSyncNotSupportedDialog(onLearnMoreClicked = {
-                            onLearnMoreClicked()
-                            eventSink(ConfirmAccountProviderEvents.ClearError)
-                        }, onDismiss = {
-                            eventSink(ConfirmAccountProviderEvents.ClearError)
-                        })
+                        SlidingSyncNotSupportedDialog(
+                            onLearnMoreClick = {
+                                onLearnMoreClick()
+                                eventSink(ConfirmAccountProviderEvents.ClearError)
+                            },
+                            onDismiss = {
+                                eventSink(ConfirmAccountProviderEvents.ClearError)
+                            }
+                        )
+                    }
+                    is AccountCreationNotSupported -> {
+                        ErrorDialog(
+                            content = stringResource(CommonStrings.error_account_creation_not_possible),
+                            onSubmit = {
+                                eventSink.invoke(ConfirmAccountProviderEvents.ClearError)
+                            }
+                        )
                     }
                 }
             }
@@ -131,7 +136,8 @@ fun ConfirmAccountProviderView(
             is AsyncData.Success -> {
                 when (val loginFlowState = state.loginFlow.data) {
                     is LoginFlow.OidcFlow -> onOidcDetails(loginFlowState.oidcDetails)
-                    LoginFlow.PasswordLogin -> onLoginPasswordNeeded()
+                    LoginFlow.PasswordLogin -> onNeedLoginPassword()
+                    is LoginFlow.AccountCreationFlow -> onCreateAccountContinue(loginFlowState.url)
                 }
             }
             AsyncData.Uninitialized -> Unit
@@ -147,8 +153,9 @@ internal fun ConfirmAccountProviderViewPreview(
     ConfirmAccountProviderView(
         state = state,
         onOidcDetails = {},
-        onLoginPasswordNeeded = {},
-        onLearnMoreClicked = {},
+        onNeedLoginPassword = {},
+        onCreateAccountContinue = {},
+        onLearnMoreClick = {},
         onChange = {},
     )
 }

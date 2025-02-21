@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.list
@@ -41,7 +32,7 @@ import kotlinx.collections.immutable.toImmutableList
 fun MultipleSelectionListItem(
     headline: String,
     options: ImmutableList<ListOption>,
-    onSelectionChanged: (List<Int>) -> Unit,
+    onSelectionChange: (List<Int>) -> Unit,
     resultFormatter: (List<Int>) -> String?,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
@@ -87,9 +78,9 @@ fun MultipleSelectionListItem(
         MultipleSelectionDialog(
             title = headline,
             options = options,
-            onConfirmClicked = { newSelectedIndexes ->
+            onConfirmClick = { newSelectedIndexes ->
                 if (newSelectedIndexes != selectedIndexes.toList()) {
-                    onSelectionChanged(newSelectedIndexes)
+                    onSelectionChange(newSelectedIndexes)
                     selectedIndexes.clear()
                     selectedIndexes.addAll(newSelectedIndexes)
                 }
@@ -109,7 +100,7 @@ internal fun MutipleSelectionListItemPreview() {
         MultipleSelectionListItem(
             headline = "Headline",
             options = options,
-            onSelectionChanged = {},
+            onSelectionChange = {},
             supportingText = "Supporting text",
             resultFormatter = { result -> formatResult(result, options) },
         )
@@ -125,7 +116,7 @@ internal fun MutipleSelectionListItemSelectedPreview() {
         MultipleSelectionListItem(
             headline = "Headline",
             options = options,
-            onSelectionChanged = {},
+            onSelectionChange = {},
             supportingText = "Supporting text",
             resultFormatter = {
                 val selectedValues = formatResult(it, options)
@@ -145,7 +136,7 @@ internal fun MutipleSelectionListItemSelectedTrailingContentPreview() {
         MultipleSelectionListItem(
             headline = "Headline",
             options = options,
-            onSelectionChanged = {},
+            onSelectionChange = {},
             supportingText = "Supporting text",
             resultFormatter = { selected.size.toString() },
             displayResultInTrailingContent = true,

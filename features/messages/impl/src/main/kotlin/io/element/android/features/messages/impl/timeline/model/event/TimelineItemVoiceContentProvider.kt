@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.model.event
@@ -44,17 +35,24 @@ open class TimelineItemVoiceContentProvider : PreviewParameterProvider<TimelineI
 }
 
 fun aTimelineItemVoiceContent(
-    eventId: String? = "\$anEventId",
-    body: String = "body doesn't really matter for a voice message",
+    eventId: EventId? = EventId("\$anEventId"),
+    filename: String = "filename doesn't really matter for a voice message",
+    caption: String? = "body doesn't really matter for a voice message",
     duration: Duration = 61_000.milliseconds,
     contentUri: String = "mxc://matrix.org/1234567890abcdefg",
     mimeType: String = MimeTypes.Ogg,
+    mediaSource: MediaSource = MediaSource(contentUri),
     waveform: List<Float> = listOf(0f, 1f, 2f, 3f, 4f, 5f, 6f, 7f, 8f, 9f, 8f, 7f, 6f, 5f, 4f, 3f, 2f, 1f, 0f),
 ) = TimelineItemVoiceContent(
-    eventId = eventId?.let { EventId(it) },
-    body = body,
+    eventId = eventId,
+    filename = filename,
+    caption = caption,
+    formattedCaption = null,
+    isEdited = false,
     duration = duration,
-    mediaSource = MediaSource(contentUri),
+    mediaSource = mediaSource,
     mimeType = mimeType,
     waveform = waveform.toPersistentList(),
+    formattedFileSize = "1.0 MB",
+    fileExtension = "ogg",
 )

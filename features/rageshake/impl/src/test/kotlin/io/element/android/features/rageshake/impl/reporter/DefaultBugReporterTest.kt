@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.rageshake.impl.reporter
@@ -20,17 +11,24 @@ import com.google.common.truth.Truth.assertThat
 import io.element.android.features.rageshake.api.reporter.BugReporterListener
 import io.element.android.features.rageshake.test.crash.FakeCrashDataStore
 import io.element.android.features.rageshake.test.screenshot.FakeScreenshotHolder
+import io.element.android.libraries.matrix.test.FakeMatrixClient
+import io.element.android.libraries.matrix.test.FakeMatrixClientProvider
 import io.element.android.libraries.matrix.test.FakeSdkMetadata
 import io.element.android.libraries.matrix.test.core.aBuildMeta
+import io.element.android.libraries.matrix.test.encryption.FakeEncryptionService
 import io.element.android.libraries.network.useragent.DefaultUserAgentProvider
 import io.element.android.libraries.sessionstorage.impl.memory.InMemorySessionStore
-import io.element.android.services.toolbox.test.systemclock.FakeSystemClock
+import io.element.android.libraries.sessionstorage.test.aSessionData
 import io.element.android.tests.testutils.testCoroutineDispatchers
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import okhttp3.MultipartReader
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import okio.buffer
+import okio.source
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -55,7 +53,7 @@ class DefaultBugReporterTest {
             withDevicesLogs = true,
             withCrashLogs = true,
             withScreenshot = true,
-            theBugDescription = "a bug occurred",
+            problemDescription = "a bug occurred",
             canContact = true,
             listener = object : BugReporterListener {
                 override fun onUploadCancelled() {
@@ -86,6 +84,189 @@ class DefaultBugReporterTest {
     }
 
     @Test
+    fun `test sendBugReport form data`() = runTest {
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+        )
+        server.start()
+
+        val mockSessionStore = InMemorySessionStore().apply {
+            storeData(aSessionData(sessionId = "@foo:example.com", deviceId = "ABCDEFGH"))
+        }
+
+        val buildMeta = aBuildMeta()
+        val fakeEncryptionService = FakeEncryptionService()
+        val matrixClient = FakeMatrixClient(encryptionService = fakeEncryptionService)
+
+        fakeEncryptionService.givenDeviceKeys("CURVECURVECURVE", "EDKEYEDKEYEDKY")
+        val sut = DefaultBugReporter(
+            context = RuntimeEnvironment.getApplication(),
+            screenshotHolder = FakeScreenshotHolder(),
+            crashDataStore = FakeCrashDataStore(),
+            coroutineDispatchers = testCoroutineDispatchers(),
+            okHttpClient = { OkHttpClient.Builder().build() },
+            userAgentProvider = DefaultUserAgentProvider(buildMeta, FakeSdkMetadata("123456789")),
+            sessionStore = mockSessionStore,
+            buildMeta = buildMeta,
+            bugReporterUrlProvider = { server.url("/") },
+            sdkMetadata = FakeSdkMetadata("123456789"),
+            matrixClientProvider = FakeMatrixClientProvider(getClient = { Result.success(matrixClient) })
+        )
+
+        val progressValues = mutableListOf<Int>()
+        sut.sendBugReport(
+            withDevicesLogs = true,
+            withCrashLogs = true,
+            withScreenshot = true,
+            problemDescription = "a bug occurred",
+            canContact = true,
+            listener = object : BugReporterListener {
+                override fun onUploadCancelled() {}
+
+                override fun onUploadFailed(reason: String?) {}
+
+                override fun onProgress(progress: Int) {
+                    progressValues.add(progress)
+                }
+
+                override fun onUploadSucceed() {}
+            },
+        )
+        val request = server.takeRequest()
+
+        val foundValues = collectValuesFromFormData(request)
+
+        assertThat(foundValues["app"]).isEqualTo("element-x-android")
+        assertThat(foundValues["can_contact"]).isEqualTo("true")
+        assertThat(foundValues["device_id"]).isEqualTo("ABCDEFGH")
+        assertThat(foundValues["sdk_sha"]).isEqualTo("123456789")
+        assertThat(foundValues["user_id"]).isEqualTo("@foo:example.com")
+        assertThat(foundValues["text"]).isEqualTo("a bug occurred")
+        assertThat(foundValues["device_keys"]).isEqualTo("curve25519:CURVECURVECURVE, ed25519:EDKEYEDKEYEDKY")
+
+        // device_key now added given they are not null
+        assertThat(progressValues.size).isEqualTo(EXPECTED_NUMBER_OF_PROGRESS_VALUE + 1)
+
+        server.shutdown()
+    }
+
+    @Test
+    fun `test sendBugReport should not report device_keys if not known`() = runTest {
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+        )
+        server.start()
+
+        val mockSessionStore = InMemorySessionStore().apply {
+            storeData(aSessionData("@foo:example.com", "ABCDEFGH"))
+        }
+
+        val buildMeta = aBuildMeta()
+        val fakeEncryptionService = FakeEncryptionService()
+        val matrixClient = FakeMatrixClient(encryptionService = fakeEncryptionService)
+
+        fakeEncryptionService.givenDeviceKeys(null, null)
+        val sut = DefaultBugReporter(
+            context = RuntimeEnvironment.getApplication(),
+            screenshotHolder = FakeScreenshotHolder(),
+            crashDataStore = FakeCrashDataStore(),
+            coroutineDispatchers = testCoroutineDispatchers(),
+            okHttpClient = { OkHttpClient.Builder().build() },
+            userAgentProvider = DefaultUserAgentProvider(buildMeta, FakeSdkMetadata("123456789")),
+            sessionStore = mockSessionStore,
+            buildMeta = buildMeta,
+            bugReporterUrlProvider = { server.url("/") },
+            sdkMetadata = FakeSdkMetadata("123456789"),
+            matrixClientProvider = FakeMatrixClientProvider(getClient = { Result.success(matrixClient) })
+        )
+
+        sut.sendBugReport(
+            withDevicesLogs = true,
+            withCrashLogs = true,
+            withScreenshot = true,
+            problemDescription = "a bug occurred",
+            canContact = true,
+            listener = NoopBugReporterListener(),
+        )
+        val request = server.takeRequest()
+
+        val foundValues = collectValuesFromFormData(request)
+        assertThat(foundValues["device_keys"]).isNull()
+        server.shutdown()
+    }
+
+    @Test
+    fun `test sendBugReport no client provider no session data`() = runTest {
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+        )
+        server.start()
+
+        val buildMeta = aBuildMeta()
+        val fakeEncryptionService = FakeEncryptionService()
+
+        fakeEncryptionService.givenDeviceKeys(null, null)
+        val sut = DefaultBugReporter(
+            context = RuntimeEnvironment.getApplication(),
+            screenshotHolder = FakeScreenshotHolder(),
+            crashDataStore = FakeCrashDataStore("I did crash", true),
+            coroutineDispatchers = testCoroutineDispatchers(),
+            okHttpClient = { OkHttpClient.Builder().build() },
+            userAgentProvider = DefaultUserAgentProvider(buildMeta, FakeSdkMetadata("123456789")),
+            sessionStore = InMemorySessionStore(),
+            buildMeta = buildMeta,
+            bugReporterUrlProvider = { server.url("/") },
+            sdkMetadata = FakeSdkMetadata("123456789"),
+            matrixClientProvider = FakeMatrixClientProvider(getClient = { Result.failure(Exception("Mock no client")) })
+        )
+
+        sut.sendBugReport(
+            withDevicesLogs = true,
+            withCrashLogs = true,
+            withScreenshot = true,
+            problemDescription = "a bug occurred",
+            canContact = true,
+            listener = NoopBugReporterListener(),
+        )
+        val request = server.takeRequest()
+
+        val foundValues = collectValuesFromFormData(request)
+        println("## FOUND VALUES $foundValues")
+        assertThat(foundValues["device_keys"]).isNull()
+        assertThat(foundValues["device_id"]).isEqualTo("undefined")
+        assertThat(foundValues["user_id"]).isEqualTo("undefined")
+        assertThat(foundValues["label"]).isEqualTo("crash")
+    }
+
+    private fun collectValuesFromFormData(request: RecordedRequest): HashMap<String, String> {
+        val boundary = request.headers["Content-Type"]!!.split("=").last()
+        val foundValues = HashMap<String, String>()
+        request.body.inputStream().source().buffer().use {
+            val multipartReader = MultipartReader(it, boundary)
+            // Just use simple parsing to detect basic properties
+            val regex = "form-data; name=\"(\\w*)\".*".toRegex()
+            multipartReader.use {
+                var part = multipartReader.nextPart()
+                while (part != null) {
+                    part.headers["Content-Disposition"]?.let { contentDisposition ->
+                        regex.find(contentDisposition)?.groupValues?.get(1)?.let { name ->
+                            foundValues.put(name, part!!.body.readUtf8())
+                        }
+                    }
+                    part = multipartReader.nextPart()
+                }
+            }
+        }
+        return foundValues
+    }
+
+    @Test
     fun `test sendBugReport error`() = runTest {
         val server = MockWebServer()
         server.enqueue(
@@ -104,7 +285,7 @@ class DefaultBugReporterTest {
             withDevicesLogs = true,
             withCrashLogs = true,
             withScreenshot = true,
-            theBugDescription = "a bug occurred",
+            problemDescription = "a bug occurred",
             canContact = true,
             listener = object : BugReporterListener {
                 override fun onUploadCancelled() {
@@ -144,19 +325,18 @@ class DefaultBugReporterTest {
             context = RuntimeEnvironment.getApplication(),
             screenshotHolder = FakeScreenshotHolder(),
             crashDataStore = FakeCrashDataStore(),
-            coroutineScope = this,
-            systemClock = FakeSystemClock(),
             coroutineDispatchers = testCoroutineDispatchers(),
             okHttpClient = { OkHttpClient.Builder().build() },
-            userAgentProvider = DefaultUserAgentProvider(buildMeta),
+            userAgentProvider = DefaultUserAgentProvider(buildMeta, FakeSdkMetadata("123456789")),
             sessionStore = InMemorySessionStore(),
             buildMeta = buildMeta,
             bugReporterUrlProvider = { server.url("/") },
             sdkMetadata = FakeSdkMetadata("123456789"),
+            matrixClientProvider = FakeMatrixClientProvider()
         )
     }
 
     companion object {
-        private const val EXPECTED_NUMBER_OF_PROGRESS_VALUE = 15
+        private const val EXPECTED_NUMBER_OF_PROGRESS_VALUE = 17
     }
 }

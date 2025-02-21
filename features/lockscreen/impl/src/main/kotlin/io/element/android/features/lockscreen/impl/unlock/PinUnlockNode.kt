@@ -1,21 +1,13 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.lockscreen.impl.unlock
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
@@ -26,8 +18,8 @@ import com.bumble.appyx.core.plugin.plugins
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.element.android.anvilannotations.ContributesNode
-import io.element.android.libraries.architecture.NodeInputs
-import io.element.android.libraries.architecture.inputs
+import io.element.android.compound.theme.ElementTheme
+import io.element.android.features.logout.api.util.onSuccessLogout
 import io.element.android.libraries.di.SessionScope
 
 @ContributesNode(SessionScope::class)
@@ -40,12 +32,6 @@ class PinUnlockNode @AssistedInject constructor(
         fun onUnlock()
     }
 
-    data class Inputs(
-        val isInAppUnlock: Boolean
-    ) : NodeInputs
-
-    private val inputs: Inputs = inputs()
-
     private fun onUnlock() {
         plugins<Callback>().forEach {
             it.onUnlock()
@@ -55,6 +41,8 @@ class PinUnlockNode @AssistedInject constructor(
     @Composable
     override fun View(modifier: Modifier) {
         val state = presenter.present()
+        val activity = requireNotNull(LocalActivity.current)
+        val isDark = ElementTheme.isLightTheme.not()
         LaunchedEffect(state.isUnlocked) {
             if (state.isUnlocked) {
                 onUnlock()
@@ -62,7 +50,10 @@ class PinUnlockNode @AssistedInject constructor(
         }
         PinUnlockView(
             state = state,
-            isInAppUnlock = inputs.isInAppUnlock,
+            // UnlockNode is only used for in-app unlock, so we can safely set isInAppUnlock to true.
+            // It's set to false in PinUnlockActivity.
+            isInAppUnlock = true,
+            onSuccessLogout = { onSuccessLogout(activity, isDark, it) },
             modifier = modifier
         )
     }

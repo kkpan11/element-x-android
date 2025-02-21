@@ -1,23 +1,15 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline
 
+import io.element.android.features.messages.impl.crypto.sendfailure.resolve.ResolveVerifiedUserSendFailureState
+import io.element.android.features.messages.impl.crypto.sendfailure.resolve.aResolveVerifiedUserSendFailureState
 import io.element.android.features.messages.impl.timeline.components.receipt.aReadReceiptData
-import io.element.android.features.messages.impl.timeline.model.InReplyToDetails
 import io.element.android.features.messages.impl.timeline.model.NewEventState
 import io.element.android.features.messages.impl.timeline.model.ReadReceiptData
 import io.element.android.features.messages.impl.timeline.model.TimelineItem
@@ -29,15 +21,20 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.aTimelineItemStateEventContent
 import io.element.android.features.messages.impl.timeline.model.event.aTimelineItemTextContent
 import io.element.android.features.messages.impl.timeline.model.virtual.aTimelineItemDaySeparatorModel
-import io.element.android.features.messages.impl.timeline.session.aSessionState
+import io.element.android.features.messages.impl.typing.TypingNotificationState
+import io.element.android.features.messages.impl.typing.aTypingNotificationState
+import io.element.android.features.roomcall.api.aStandByCallState
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.TransactionId
+import io.element.android.libraries.matrix.api.core.UniqueId
 import io.element.android.libraries.matrix.api.core.UserId
-import io.element.android.libraries.matrix.api.timeline.MatrixTimeline
 import io.element.android.libraries.matrix.api.timeline.item.TimelineItemDebugInfo
 import io.element.android.libraries.matrix.api.timeline.item.event.LocalEventSendState
+import io.element.android.libraries.matrix.api.timeline.item.event.MessageShield
+import io.element.android.libraries.matrix.ui.messages.reply.InReplyToDetails
+import io.element.android.libraries.matrix.ui.messages.reply.aProfileTimelineDetailsReady
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -47,33 +44,30 @@ import kotlin.random.Random
 
 fun aTimelineState(
     timelineItems: ImmutableList<TimelineItem> = persistentListOf(),
-    paginationState: MatrixTimeline.PaginationState = aPaginationState(),
     renderReadReceipts: Boolean = false,
     timelineRoomInfo: TimelineRoomInfo = aTimelineRoomInfo(),
+    focusedEventIndex: Int = -1,
+    isLive: Boolean = true,
+    messageShield: MessageShield? = null,
+    resolveVerifiedUserSendFailureState: ResolveVerifiedUserSendFailureState = aResolveVerifiedUserSendFailureState(),
     eventSink: (TimelineEvents) -> Unit = {},
-) = TimelineState(
-    timelineItems = timelineItems,
-    timelineRoomInfo = timelineRoomInfo,
-    paginationState = paginationState,
-    renderReadReceipts = renderReadReceipts,
-    highlightedEventId = null,
-    newEventState = NewEventState.None,
-    sessionState = aSessionState(
-        isSessionVerified = true,
-        isKeyBackupEnabled = true,
-    ),
-    eventSink = eventSink,
-)
-
-fun aPaginationState(
-    isBackPaginating: Boolean = false,
-    hasMoreToLoadBackwards: Boolean = true,
-    beginningOfRoomReached: Boolean = false,
-): MatrixTimeline.PaginationState {
-    return MatrixTimeline.PaginationState(
-        isBackPaginating = isBackPaginating,
-        hasMoreToLoadBackwards = hasMoreToLoadBackwards,
-        beginningOfRoomReached = beginningOfRoomReached,
+): TimelineState {
+    val focusedEventId = timelineItems.filterIsInstance<TimelineItem.Event>().getOrNull(focusedEventIndex)?.eventId
+    val focusRequestState = if (focusedEventId != null) {
+        FocusRequestState.Success(focusedEventId, focusedEventIndex)
+    } else {
+        FocusRequestState.None
+    }
+    return TimelineState(
+        timelineItems = timelineItems,
+        timelineRoomInfo = timelineRoomInfo,
+        renderReadReceipts = renderReadReceipts,
+        newEventState = NewEventState.None,
+        isLive = isLive,
+        focusRequestState = focusRequestState,
+        messageShield = messageShield,
+        resolveVerifiedUserSendFailureState = resolveVerifiedUserSendFailureState,
+        eventSink = eventSink,
     )
 }
 
@@ -89,7 +83,7 @@ internal fun aTimelineItemList(content: TimelineItemEventContent): ImmutableList
             isMine = false,
             content = content,
             groupPosition = TimelineItemGroupPosition.Middle,
-            sendState = LocalEventSendState.SendingFailed("Message failed to send"),
+            sendState = LocalEventSendState.Failed.Unknown("Message failed to send"),
         ),
         aTimelineItemEvent(
             isMine = false,
@@ -112,7 +106,7 @@ internal fun aTimelineItemList(content: TimelineItemEventContent): ImmutableList
             isMine = true,
             content = content,
             groupPosition = TimelineItemGroupPosition.Middle,
-            sendState = LocalEventSendState.SendingFailed("Message failed to send"),
+            sendState = LocalEventSendState.Failed.Unknown("Message failed to send"),
         ),
         aTimelineItemEvent(
             isMine = true,
@@ -127,7 +121,10 @@ internal fun aTimelineItemList(content: TimelineItemEventContent): ImmutableList
 }
 
 fun aTimelineItemDaySeparator(): TimelineItem.Virtual {
-    return TimelineItem.Virtual(UUID.randomUUID().toString(), aTimelineItemDaySeparatorModel("Today"))
+    return TimelineItem.Virtual(
+        id = UniqueId(UUID.randomUUID().toString()),
+        model = aTimelineItemDaySeparatorModel("Today"),
+    )
 }
 
 internal fun aTimelineItemEvent(
@@ -135,7 +132,9 @@ internal fun aTimelineItemEvent(
     transactionId: TransactionId? = null,
     isMine: Boolean = false,
     isEditable: Boolean = false,
+    canBeRepliedTo: Boolean = false,
     senderDisplayName: String = "Sender",
+    displayNameAmbiguous: Boolean = false,
     content: TimelineItemEventContent = aTimelineItemTextContent(),
     groupPosition: TimelineItemGroupPosition = TimelineItemGroupPosition.None,
     sendState: LocalEventSendState? = null,
@@ -144,9 +143,10 @@ internal fun aTimelineItemEvent(
     debugInfo: TimelineItemDebugInfo = aTimelineItemDebugInfo(),
     timelineItemReactions: TimelineItemReactions = aTimelineItemReactions(),
     readReceiptState: TimelineItemReadReceipts = aTimelineItemReadReceipts(),
+    messageShield: MessageShield? = null,
 ): TimelineItem.Event {
     return TimelineItem.Event(
-        id = UUID.randomUUID().toString(),
+        id = UniqueId(UUID.randomUUID().toString()),
         eventId = eventId,
         transactionId = transactionId,
         senderId = UserId("@senderId:domain"),
@@ -157,13 +157,19 @@ internal fun aTimelineItemEvent(
         sentTime = "12:34",
         isMine = isMine,
         isEditable = isEditable,
-        senderDisplayName = senderDisplayName,
+        canBeRepliedTo = canBeRepliedTo,
+        senderProfile = aProfileTimelineDetailsReady(
+            displayName = senderDisplayName,
+            displayNameAmbiguous = displayNameAmbiguous,
+        ),
         groupPosition = groupPosition,
         localSendState = sendState,
         inReplyTo = inReplyTo,
-        debugInfo = debugInfo,
         isThreaded = isThreaded,
-        origin = null
+        origin = null,
+        timelineItemDebugInfoProvider = { debugInfo },
+        messageShieldProvider = { messageShield },
+        sendHandleProvider = { null }
     )
 }
 
@@ -207,7 +213,7 @@ internal fun aTimelineItemReadReceipts(
 }
 
 internal fun aGroupedEvents(
-    id: Long = 0,
+    id: UniqueId = UniqueId("0"),
     withReadReceipts: Boolean = false,
 ): TimelineItem.GroupedEvents {
     val event1 = aTimelineItemEvent(
@@ -228,17 +234,24 @@ internal fun aGroupedEvents(
     )
     val events = listOf(event1, event2)
     return TimelineItem.GroupedEvents(
-        id = id.toString(),
+        id = id,
         events = events.toImmutableList(),
         aggregatedReadReceipts = events.flatMap { it.readReceiptState.receipts }.toImmutableList(),
     )
 }
 
 internal fun aTimelineRoomInfo(
-    isDirect: Boolean = false,
+    name: String = "Room name",
+    isDm: Boolean = false,
     userHasPermissionToSendMessage: Boolean = true,
+    pinnedEventIds: List<EventId> = emptyList(),
+    typingNotificationState: TypingNotificationState = aTypingNotificationState(),
 ) = TimelineRoomInfo(
-    isDirect = isDirect,
+    isDm = isDm,
+    name = name,
     userHasPermissionToSendMessage = userHasPermissionToSendMessage,
     userHasPermissionToSendReaction = true,
+    roomCallState = aStandByCallState(),
+    pinnedEventIds = pinnedEventIds,
+    typingNotificationState = typingNotificationState,
 )

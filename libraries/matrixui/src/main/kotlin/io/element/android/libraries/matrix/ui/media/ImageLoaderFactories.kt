@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.ui.media
@@ -22,18 +13,24 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import com.squareup.anvil.annotations.ContributesBinding
+import io.element.android.libraries.di.AppScope
 import io.element.android.libraries.di.ApplicationContext
 import io.element.android.libraries.matrix.api.MatrixClient
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Provider
 
-class LoggedInImageLoaderFactory(
-    private val context: Context,
-    private val matrixClient: MatrixClient,
+interface LoggedInImageLoaderFactory {
+    fun newImageLoader(matrixClient: MatrixClient): ImageLoader
+}
+
+@ContributesBinding(AppScope::class)
+class DefaultLoggedInImageLoaderFactory @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val okHttpClient: Provider<OkHttpClient>,
-) : ImageLoaderFactory {
-    override fun newImageLoader(): ImageLoader {
+) : LoggedInImageLoaderFactory {
+    override fun newImageLoader(matrixClient: MatrixClient): ImageLoader {
         return ImageLoader
             .Builder(context)
             .okHttpClient { okHttpClient.get() }
@@ -46,8 +43,8 @@ class LoggedInImageLoaderFactory(
                 }
                 add(AvatarDataKeyer())
                 add(MediaRequestDataKeyer())
-                add(CoilMediaFetcher.AvatarFactory(context, matrixClient))
-                add(CoilMediaFetcher.MediaRequestDataFactory(context, matrixClient))
+                add(AvatarDataFetcherFactory(matrixClient))
+                add(MediaRequestDataFetcherFactory(matrixClient))
             }
             .build()
     }

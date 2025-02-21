@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.pushproviders.unifiedpush
@@ -19,32 +10,44 @@ package io.element.android.libraries.pushproviders.unifiedpush
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.squareup.anvil.annotations.ContributesBinding
+import io.element.android.libraries.di.AppScope
 import io.element.android.libraries.di.ApplicationContext
-import io.element.android.libraries.di.DefaultPreferences
+import io.element.android.libraries.matrix.api.core.UserId
 import javax.inject.Inject
 
-class UnifiedPushStore @Inject constructor(
+interface UnifiedPushStore {
+    fun getEndpoint(clientSecret: String): String?
+    fun storeUpEndpoint(clientSecret: String, endpoint: String?)
+    fun getPushGateway(clientSecret: String): String?
+    fun storePushGateway(clientSecret: String, gateway: String?)
+    fun getDistributorValue(userId: UserId): String?
+    fun setDistributorValue(userId: UserId, value: String)
+}
+
+@ContributesBinding(AppScope::class)
+class SharedPreferencesUnifiedPushStore @Inject constructor(
     @ApplicationContext val context: Context,
-    @DefaultPreferences private val defaultPrefs: SharedPreferences,
-) {
+    private val sharedPreferences: SharedPreferences,
+) : UnifiedPushStore {
     /**
      * Retrieves the UnifiedPush Endpoint.
      *
      * @param clientSecret the client secret, to identify the session
      * @return the UnifiedPush Endpoint or null if not received
      */
-    fun getEndpoint(clientSecret: String): String? {
-        return defaultPrefs.getString(PREFS_ENDPOINT_OR_TOKEN + clientSecret, null)
+    override fun getEndpoint(clientSecret: String): String? {
+        return sharedPreferences.getString(PREFS_ENDPOINT_OR_TOKEN + clientSecret, null)
     }
 
     /**
      * Store UnifiedPush Endpoint to the SharedPrefs.
      *
-     * @param endpoint the endpoint to store
      * @param clientSecret the client secret, to identify the session
+     * @param endpoint the endpoint to store
      */
-    fun storeUpEndpoint(endpoint: String?, clientSecret: String) {
-        defaultPrefs.edit {
+    override fun storeUpEndpoint(clientSecret: String, endpoint: String?) {
+        sharedPreferences.edit {
             putString(PREFS_ENDPOINT_OR_TOKEN + clientSecret, endpoint)
         }
     }
@@ -55,24 +58,35 @@ class UnifiedPushStore @Inject constructor(
      * @param clientSecret the client secret, to identify the session
      * @return the Push Gateway or null if not defined
      */
-    fun getPushGateway(clientSecret: String): String? {
-        return defaultPrefs.getString(PREFS_PUSH_GATEWAY + clientSecret, null)
+    override fun getPushGateway(clientSecret: String): String? {
+        return sharedPreferences.getString(PREFS_PUSH_GATEWAY + clientSecret, null)
     }
 
     /**
      * Store Push Gateway to the SharedPrefs.
      *
-     * @param gateway the push gateway to store
      * @param clientSecret the client secret, to identify the session
+     * @param gateway the push gateway to store
      */
-    fun storePushGateway(gateway: String?, clientSecret: String) {
-        defaultPrefs.edit {
+    override fun storePushGateway(clientSecret: String, gateway: String?) {
+        sharedPreferences.edit {
             putString(PREFS_PUSH_GATEWAY + clientSecret, gateway)
+        }
+    }
+
+    override fun getDistributorValue(userId: UserId): String? {
+        return sharedPreferences.getString(PREFS_DISTRIBUTOR + userId, null)
+    }
+
+    override fun setDistributorValue(userId: UserId, value: String) {
+        sharedPreferences.edit {
+            putString(PREFS_DISTRIBUTOR + userId, value)
         }
     }
 
     companion object {
         private const val PREFS_ENDPOINT_OR_TOKEN = "UP_ENDPOINT_OR_TOKEN"
         private const val PREFS_PUSH_GATEWAY = "PUSH_GATEWAY"
+        private const val PREFS_DISTRIBUTOR = "DISTRIBUTOR"
     }
 }
