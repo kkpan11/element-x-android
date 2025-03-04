@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.preferences.impl.store
@@ -24,22 +15,23 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.squareup.anvil.annotations.ContributesBinding
-import io.element.android.features.preferences.api.store.AppPreferencesStore
-import io.element.android.libraries.core.bool.orTrue
 import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.core.meta.BuildType
 import io.element.android.libraries.di.AppScope
 import io.element.android.libraries.di.ApplicationContext
+import io.element.android.libraries.matrix.api.tracing.LogLevel
+import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "elementx_preferences")
 
-private val richTextEditorKey = booleanPreferencesKey("richTextEditor")
 private val developerModeKey = booleanPreferencesKey("developerMode")
 private val customElementCallBaseUrlKey = stringPreferencesKey("elementCallBaseUrl")
 private val themeKey = stringPreferencesKey("theme")
+private val hideImagesAndVideosKey = booleanPreferencesKey("hideImagesAndVideos")
+private val logLevelKey = stringPreferencesKey("logLevel")
 
 @ContributesBinding(AppScope::class)
 class DefaultAppPreferencesStore @Inject constructor(
@@ -47,19 +39,6 @@ class DefaultAppPreferencesStore @Inject constructor(
     private val buildMeta: BuildMeta,
 ) : AppPreferencesStore {
     private val store = context.dataStore
-
-    override suspend fun setRichTextEditorEnabled(enabled: Boolean) {
-        store.edit { prefs ->
-            prefs[richTextEditorKey] = enabled
-        }
-    }
-
-    override fun isRichTextEditorEnabledFlow(): Flow<Boolean> {
-        return store.data.map { prefs ->
-            // enabled by default
-            prefs[richTextEditorKey].orTrue()
-        }
-    }
 
     override suspend fun setDeveloperModeEnabled(enabled: Boolean) {
         store.edit { prefs ->
@@ -102,7 +81,39 @@ class DefaultAppPreferencesStore @Inject constructor(
         }
     }
 
+    override suspend fun setHideImagesAndVideos(value: Boolean) {
+        store.edit { prefs ->
+            prefs[hideImagesAndVideosKey] = value
+        }
+    }
+
+    override fun doesHideImagesAndVideosFlow(): Flow<Boolean> {
+        return store.data.map { prefs ->
+            prefs[hideImagesAndVideosKey] ?: false
+        }
+    }
+
+    override suspend fun setTracingLogLevel(logLevel: LogLevel) {
+        store.edit { prefs ->
+            prefs[logLevelKey] = logLevel.name
+        }
+    }
+
+    override fun getTracingLogLevelFlow(): Flow<LogLevel> {
+        return store.data.map { prefs ->
+            prefs[logLevelKey]?.let { LogLevel.valueOf(it) } ?: buildMeta.defaultLogLevel()
+        }
+    }
+
     override suspend fun reset() {
         store.edit { it.clear() }
+    }
+}
+
+private fun BuildMeta.defaultLogLevel(): LogLevel {
+    return when (buildType) {
+        BuildType.DEBUG -> LogLevel.TRACE
+        BuildType.NIGHTLY -> LogLevel.DEBUG
+        BuildType.RELEASE -> LogLevel.INFO
     }
 }

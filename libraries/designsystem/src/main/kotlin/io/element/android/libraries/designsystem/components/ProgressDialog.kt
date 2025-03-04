@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components
@@ -35,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.ElementThemedPreview
 import io.element.android.libraries.designsystem.preview.PreviewGroup
@@ -51,7 +43,8 @@ fun ProgressDialog(
     modifier: Modifier = Modifier,
     text: String? = null,
     type: ProgressDialogType = ProgressDialogType.Indeterminate,
-    isCancellable: Boolean = false,
+    properties: DialogProperties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+    showCancelButton: Boolean = false,
     onDismissRequest: () -> Unit = {},
 ) {
     DisposableEffect(Unit) {
@@ -61,24 +54,24 @@ fun ProgressDialog(
     }
     Dialog(
         onDismissRequest = onDismissRequest,
-        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+        properties = properties,
     ) {
         ProgressDialogContent(
             modifier = modifier,
             text = text,
-            isCancellable = isCancellable,
-            onCancelClicked = onDismissRequest,
+            showCancelButton = showCancelButton,
+            onCancelClick = onDismissRequest,
             progressIndicator = {
                 when (type) {
                     is ProgressDialogType.Indeterminate -> {
                         CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary
+                            color = ElementTheme.colors.iconPrimary
                         )
                     }
                     is ProgressDialogType.Determinate -> {
                         CircularProgressIndicator(
                             progress = { type.progress },
-                            color = MaterialTheme.colorScheme.primary
+                            color = ElementTheme.colors.iconPrimary
                         )
                     }
                 }
@@ -97,11 +90,11 @@ sealed interface ProgressDialogType {
 private fun ProgressDialogContent(
     modifier: Modifier = Modifier,
     text: String? = null,
-    isCancellable: Boolean = false,
-    onCancelClicked: () -> Unit = {},
+    showCancelButton: Boolean = false,
+    onCancelClick: () -> Unit = {},
     progressIndicator: @Composable () -> Unit = {
         CircularProgressIndicator(
-            color = MaterialTheme.colorScheme.primary
+            color = ElementTheme.colors.iconPrimary
         )
     }
 ) {
@@ -122,10 +115,10 @@ private fun ProgressDialogContent(
                 Spacer(modifier = Modifier.height(22.dp))
                 Text(
                     text = text,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = ElementTheme.colors.textPrimary,
                 )
             }
-            if (isCancellable) {
+            if (showCancelButton) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Box(
                     modifier = Modifier.fillMaxWidth(),
@@ -133,7 +126,7 @@ private fun ProgressDialogContent(
                 ) {
                     TextButton(
                         text = stringResource(id = CommonStrings.action_cancel),
-                        onClick = onCancelClicked,
+                        onClick = onCancelClick,
                     )
                 }
             }
@@ -145,12 +138,12 @@ private fun ProgressDialogContent(
 @Composable
 internal fun ProgressDialogContentPreview() = ElementThemedPreview {
     DialogPreview {
-        ProgressDialogContent(text = "test dialog content", isCancellable = true)
+        ProgressDialogContent(text = "test dialog content", showCancelButton = true)
     }
 }
 
 @PreviewsDayNight
 @Composable
 internal fun ProgressDialogPreview() = ElementPreview {
-    ProgressDialog(text = "test dialog content", isCancellable = true)
+    ProgressDialog(text = "test dialog content", showCancelButton = true)
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.typing
@@ -21,8 +12,6 @@ import app.cash.molecule.moleculeFlow
 import app.cash.turbine.Event
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import io.element.android.features.preferences.api.store.SessionPreferencesStore
-import io.element.android.libraries.featureflag.test.InMemorySessionPreferencesStore
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.room.MatrixRoom
 import io.element.android.libraries.matrix.api.room.MatrixRoomMembersState
@@ -32,6 +21,9 @@ import io.element.android.libraries.matrix.test.A_USER_ID_3
 import io.element.android.libraries.matrix.test.A_USER_ID_4
 import io.element.android.libraries.matrix.test.room.FakeMatrixRoom
 import io.element.android.libraries.matrix.test.room.aRoomInfo
+import io.element.android.libraries.matrix.test.room.aRoomMember
+import io.element.android.libraries.preferences.api.store.SessionPreferencesStore
+import io.element.android.libraries.preferences.test.InMemorySessionPreferencesStore
 import io.element.android.tests.testutils.WarmUpRule
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.test.runTest
@@ -58,7 +50,6 @@ class TypingNotificationPresenterTest {
 
     @Test
     fun `present - typing notification disabled`() = runTest {
-        val aDefaultRoomMember = createDefaultRoomMember(A_USER_ID_2)
         val room = FakeMatrixRoom()
         val sessionPreferencesStore = InMemorySessionPreferencesStore(
             isRenderTypingNotificationsEnabled = false
@@ -82,7 +73,11 @@ class TypingNotificationPresenterTest {
             val oneMemberTypingState = awaitItem()
             assertThat(oneMemberTypingState.renderTypingNotifications).isTrue()
             assertThat(oneMemberTypingState.typingMembers.size).isEqualTo(1)
-            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(aDefaultRoomMember)
+            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(
+                TypingRoomMember(
+                    disambiguatedDisplayName = A_USER_ID_2.value,
+                )
+            )
             // Preferences changes again
             sessionPreferencesStore.setRenderTypingNotifications(false)
             skipItems(2)
@@ -94,7 +89,6 @@ class TypingNotificationPresenterTest {
 
     @Test
     fun `present - state is updated when a member is typing, member is not known`() = runTest {
-        val aDefaultRoomMember = createDefaultRoomMember(A_USER_ID_2)
         val room = FakeMatrixRoom()
         val presenter = createPresenter(matrixRoom = room)
         moleculeFlow(RecompositionMode.Immediate) {
@@ -105,7 +99,11 @@ class TypingNotificationPresenterTest {
             room.givenRoomTypingMembers(listOf(A_USER_ID_2))
             val oneMemberTypingState = awaitItem()
             assertThat(oneMemberTypingState.typingMembers.size).isEqualTo(1)
-            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(aDefaultRoomMember)
+            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(
+                TypingRoomMember(
+                    disambiguatedDisplayName = A_USER_ID_2.value,
+                )
+            )
             // User stops typing
             room.givenRoomTypingMembers(emptyList())
             skipItems(1)
@@ -138,7 +136,11 @@ class TypingNotificationPresenterTest {
             room.givenRoomTypingMembers(listOf(A_USER_ID_2))
             val oneMemberTypingState = awaitItem()
             assertThat(oneMemberTypingState.typingMembers.size).isEqualTo(1)
-            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(aKnownRoomMember)
+            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(
+                TypingRoomMember(
+                    disambiguatedDisplayName = "Alice Doe (@bob:server.org)",
+                )
+            )
             // User stops typing
             room.givenRoomTypingMembers(emptyList())
             skipItems(1)
@@ -149,7 +151,6 @@ class TypingNotificationPresenterTest {
 
     @Test
     fun `present - state is updated when a member is typing, member is not known, then known`() = runTest {
-        val aDefaultRoomMember = createDefaultRoomMember(A_USER_ID_2)
         val aKnownRoomMember = createKnownRoomMember(A_USER_ID_2)
         val room = FakeMatrixRoom()
         val presenter = createPresenter(matrixRoom = room)
@@ -161,7 +162,11 @@ class TypingNotificationPresenterTest {
             room.givenRoomTypingMembers(listOf(A_USER_ID_2))
             val oneMemberTypingState = awaitItem()
             assertThat(oneMemberTypingState.typingMembers.size).isEqualTo(1)
-            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(aDefaultRoomMember)
+            assertThat(oneMemberTypingState.typingMembers.first()).isEqualTo(
+                TypingRoomMember(
+                    disambiguatedDisplayName = A_USER_ID_2.value,
+                )
+            )
             // User is getting known
             room.givenRoomMembersState(
                 MatrixRoomMembersState.Ready(
@@ -170,7 +175,11 @@ class TypingNotificationPresenterTest {
             )
             skipItems(1)
             val finalState = awaitItem()
-            assertThat(finalState.typingMembers.first()).isEqualTo(aKnownRoomMember)
+            assertThat(finalState.typingMembers.first()).isEqualTo(
+                TypingRoomMember(
+                    disambiguatedDisplayName = "Alice Doe (@bob:server.org)",
+                )
+            )
         }
     }
 
@@ -201,7 +210,7 @@ class TypingNotificationPresenterTest {
 
     private fun createPresenter(
         matrixRoom: MatrixRoom = FakeMatrixRoom().apply {
-            givenRoomInfo(aRoomInfo(id = roomId.value, name = ""))
+            givenRoomInfo(aRoomInfo(id = roomId, name = ""))
         },
         sessionPreferencesStore: SessionPreferencesStore = InMemorySessionPreferencesStore(
             isRenderTypingNotificationsEnabled = true
@@ -211,17 +220,9 @@ class TypingNotificationPresenterTest {
         sessionPreferencesStore = sessionPreferencesStore,
     )
 
-    private fun createDefaultRoomMember(
-        userId: UserId,
-    ) = aTypingRoomMember(
-        userId = userId,
-        displayName = null,
-        isNameAmbiguous = false,
-    )
-
     private fun createKnownRoomMember(
         userId: UserId,
-    ) = aTypingRoomMember(
+    ) = aRoomMember(
         userId = userId,
         displayName = "Alice Doe",
         isNameAmbiguous = true,

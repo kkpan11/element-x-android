@@ -1,21 +1,13 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.test.roomlist
 
+import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.roomlist.DynamicRoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomList
 import io.element.android.libraries.matrix.api.roomlist.RoomListFilter
@@ -24,11 +16,11 @@ import io.element.android.libraries.matrix.api.roomlist.RoomSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class FakeRoomListService : RoomListService {
+class FakeRoomListService(
+    var subscribeToVisibleRoomsLambda: (List<RoomId>) -> Unit = {},
+) : RoomListService {
     private val allRoomSummariesFlow = MutableStateFlow<List<RoomSummary>>(emptyList())
-    private val inviteRoomSummariesFlow = MutableStateFlow<List<RoomSummary>>(emptyList())
     private val allRoomsLoadingStateFlow = MutableStateFlow<RoomList.LoadingState>(RoomList.LoadingState.NotLoaded)
-    private val inviteRoomsLoadingStateFlow = MutableStateFlow<RoomList.LoadingState>(RoomList.LoadingState.NotLoaded)
     private val roomListStateFlow = MutableStateFlow<RoomListService.State>(RoomListService.State.Idle)
     private val syncIndicatorStateFlow = MutableStateFlow<RoomListService.SyncIndicator>(RoomListService.SyncIndicator.Hide)
 
@@ -36,16 +28,8 @@ class FakeRoomListService : RoomListService {
         allRoomSummariesFlow.emit(roomSummaries)
     }
 
-    suspend fun postInviteRooms(roomSummaries: List<RoomSummary>) {
-        inviteRoomSummariesFlow.emit(roomSummaries)
-    }
-
     suspend fun postAllRoomsLoadingState(loadingState: RoomList.LoadingState) {
         allRoomsLoadingStateFlow.emit(loadingState)
-    }
-
-    suspend fun postInviteRoomsLoadingState(loadingState: RoomList.LoadingState) {
-        inviteRoomsLoadingStateFlow.emit(loadingState)
     }
 
     suspend fun postState(state: RoomListService.State) {
@@ -56,9 +40,6 @@ class FakeRoomListService : RoomListService {
         syncIndicatorStateFlow.emit(value)
     }
 
-    var latestSlidingSyncRange: IntRange? = null
-        private set
-
     override fun createRoomList(
         pageSize: Int,
         initialFilter: RoomListFilter,
@@ -66,8 +47,11 @@ class FakeRoomListService : RoomListService {
     ): DynamicRoomList {
         return when (source) {
             RoomList.Source.All -> allRooms
-            RoomList.Source.Invites -> invites
         }
+    }
+
+    override suspend fun subscribeToVisibleRooms(roomIds: List<RoomId>) {
+        subscribeToVisibleRoomsLambda(roomIds)
     }
 
     override val allRooms = SimplePagedRoomList(
@@ -75,16 +59,6 @@ class FakeRoomListService : RoomListService {
         allRoomsLoadingStateFlow,
         MutableStateFlow(RoomListFilter.all())
     )
-
-    override val invites = SimplePagedRoomList(
-        inviteRoomSummariesFlow,
-        inviteRoomsLoadingStateFlow,
-        MutableStateFlow(RoomListFilter.all())
-    )
-
-    override fun updateAllRoomsVisibleRange(range: IntRange) {
-        latestSlidingSyncRange = range
-    }
 
     override val state: StateFlow<RoomListService.State> = roomListStateFlow
 

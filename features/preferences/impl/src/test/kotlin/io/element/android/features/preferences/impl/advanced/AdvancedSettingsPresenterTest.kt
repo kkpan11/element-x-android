@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.advanced
@@ -21,8 +12,8 @@ import app.cash.molecule.moleculeFlow
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import io.element.android.compound.theme.Theme
-import io.element.android.libraries.featureflag.test.InMemoryAppPreferencesStore
-import io.element.android.libraries.featureflag.test.InMemorySessionPreferencesStore
+import io.element.android.libraries.preferences.test.InMemoryAppPreferencesStore
+import io.element.android.libraries.preferences.test.InMemorySessionPreferencesStore
 import io.element.android.tests.testutils.WarmUpRule
 import io.element.android.tests.testutils.awaitLastSequentialItem
 import kotlinx.coroutines.test.runTest
@@ -41,9 +32,9 @@ class AdvancedSettingsPresenterTest {
         }.test {
             val initialState = awaitLastSequentialItem()
             assertThat(initialState.isDeveloperModeEnabled).isFalse()
-            assertThat(initialState.isRichTextEditorEnabled).isFalse()
             assertThat(initialState.showChangeThemeDialog).isFalse()
             assertThat(initialState.isSharePresenceEnabled).isTrue()
+            assertThat(initialState.doesCompressMedia).isTrue()
             assertThat(initialState.theme).isEqualTo(Theme.System)
         }
     }
@@ -64,21 +55,6 @@ class AdvancedSettingsPresenterTest {
     }
 
     @Test
-    fun `present - rich text editor on off`() = runTest {
-        val presenter = createAdvancedSettingsPresenter()
-        moleculeFlow(RecompositionMode.Immediate) {
-            presenter.present()
-        }.test {
-            val initialState = awaitLastSequentialItem()
-            assertThat(initialState.isRichTextEditorEnabled).isFalse()
-            initialState.eventSink.invoke(AdvancedSettingsEvents.SetRichTextEditorEnabled(true))
-            assertThat(awaitItem().isRichTextEditorEnabled).isTrue()
-            initialState.eventSink.invoke(AdvancedSettingsEvents.SetRichTextEditorEnabled(false))
-            assertThat(awaitItem().isRichTextEditorEnabled).isFalse()
-        }
-    }
-
-    @Test
     fun `present - share presence off on`() = runTest {
         val presenter = createAdvancedSettingsPresenter()
         moleculeFlow(RecompositionMode.Immediate) {
@@ -90,6 +66,21 @@ class AdvancedSettingsPresenterTest {
             assertThat(awaitItem().isSharePresenceEnabled).isFalse()
             initialState.eventSink.invoke(AdvancedSettingsEvents.SetSharePresenceEnabled(true))
             assertThat(awaitItem().isSharePresenceEnabled).isTrue()
+        }
+    }
+
+    @Test
+    fun `present - compress media off on`() = runTest {
+        val presenter = createAdvancedSettingsPresenter()
+        moleculeFlow(RecompositionMode.Immediate) {
+            presenter.present()
+        }.test {
+            val initialState = awaitLastSequentialItem()
+            assertThat(initialState.doesCompressMedia).isTrue()
+            initialState.eventSink.invoke(AdvancedSettingsEvents.SetCompressMedia(false))
+            assertThat(awaitItem().doesCompressMedia).isFalse()
+            initialState.eventSink.invoke(AdvancedSettingsEvents.SetCompressMedia(true))
+            assertThat(awaitItem().doesCompressMedia).isTrue()
         }
     }
 

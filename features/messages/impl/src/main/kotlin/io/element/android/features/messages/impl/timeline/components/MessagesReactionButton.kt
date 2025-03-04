@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components
@@ -32,7 +23,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -43,7 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.messages.impl.R
 import io.element.android.features.messages.impl.timeline.model.AggregatedReaction
@@ -85,7 +75,7 @@ fun MessagesReactionButton(
             .background(Color.Transparent)
             // Outer border, same colour as background
             .border(
-                BorderStroke(2.dp, MaterialTheme.colorScheme.background),
+                BorderStroke(2.dp, ElementTheme.colors.bgCanvasDefault),
                 shape = RoundedCornerShape(corner = CornerSize(14.dp))
             )
             .padding(vertical = 2.dp, horizontal = 2.dp)
@@ -131,7 +121,7 @@ private fun TextContent(
         .height(REACTION_EMOJI_LINE_HEIGHT.toDp()),
     text = text,
     style = ElementTheme.typography.fontBodyMdRegular,
-    color = ElementTheme.materialColors.primary
+    color = ElementTheme.colors.textPrimary
 )
 
 @Composable
@@ -140,7 +130,7 @@ private fun IconContent(
 ) = Icon(
     resourceId = resourceId,
     contentDescription = stringResource(id = R.string.screen_room_timeline_add_reaction),
-    tint = ElementTheme.materialColors.secondary,
+    tint = ElementTheme.colors.iconSecondary,
     modifier = Modifier
         .size(ADD_EMOJI_SIZE)
 )
@@ -173,7 +163,7 @@ private fun ReactionContent(
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = reaction.count.toString(),
-            color = if (reaction.isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
+            color = if (reaction.isHighlighted) ElementTheme.colors.textPrimary else ElementTheme.colors.textSecondary,
             style = ElementTheme.typography.fontBodyMdRegular,
         )
     }
@@ -191,7 +181,7 @@ internal fun MessagesReactionButtonPreview(@PreviewParameter(AggregatedReactionP
 
 @PreviewsDayNight
 @Composable
-internal fun MessagesAddReactionButtonPreview() = ElementPreview {
+internal fun MessagesReactionButtonAddPreview() = ElementPreview {
     MessagesReactionButton(
         content = MessagesReactionsButtonContent.Icon(CompoundDrawables.ic_compound_reaction_add),
         onClick = {},
@@ -201,7 +191,7 @@ internal fun MessagesAddReactionButtonPreview() = ElementPreview {
 
 @PreviewsDayNight
 @Composable
-internal fun MessagesReactionExtraButtonsPreview() = ElementPreview {
+internal fun MessagesReactionButtonExtraPreview() = ElementPreview {
     Row {
         MessagesReactionButton(
             content = MessagesReactionsButtonContent.Text("12 more"),

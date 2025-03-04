@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components.reactionsummary
@@ -59,7 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.messages.impl.timeline.components.REACTION_IMAGE_ASPECT_RATIO
 import io.element.android.features.messages.impl.timeline.model.AggregatedReaction
@@ -98,14 +89,14 @@ fun ReactionSummaryView(
             sheetState = sheetState,
             modifier = modifier
         ) {
-            SheetContent(summary = state.target)
+            ReactionSummaryViewContent(summary = state.target)
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SheetContent(
+private fun ReactionSummaryViewContent(
     summary: ReactionSummaryState.Summary,
 ) {
     val animationScope = rememberCoroutineScope()
@@ -181,7 +172,7 @@ private fun AggregatedReactionButton(
     val textColor = if (isHighlighted) {
         MaterialTheme.colorScheme.inversePrimary
     } else {
-        MaterialTheme.colorScheme.primary
+        ElementTheme.colors.textPrimary
     }
 
     val roundedCornerShape = RoundedCornerShape(corner = CornerSize(percent = 50))
@@ -259,12 +250,12 @@ private fun SenderRow(
                     text = name,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = ElementTheme.colors.textPrimary,
                     style = ElementTheme.typography.fontBodyMdRegular,
                 )
                 Text(
                     text = sentTime,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = ElementTheme.colors.textSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = ElementTheme.typography.fontBodySmRegular,
@@ -272,7 +263,7 @@ private fun SenderRow(
             }
             Text(
                 text = userId,
-                color = MaterialTheme.colorScheme.secondary,
+                color = ElementTheme.colors.textSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = ElementTheme.typography.fontBodySmRegular,
@@ -283,8 +274,8 @@ private fun SenderRow(
 
 @PreviewsDayNight
 @Composable
-internal fun SheetContentPreview(
+internal fun ReactionSummaryViewContentPreview(
     @PreviewParameter(ReactionSummaryStateProvider::class) state: ReactionSummaryState
 ) = ElementPreview {
-    SheetContent(summary = state.target as ReactionSummaryState.Summary)
+    ReactionSummaryViewContent(summary = state.target as ReactionSummaryState.Summary)
 }

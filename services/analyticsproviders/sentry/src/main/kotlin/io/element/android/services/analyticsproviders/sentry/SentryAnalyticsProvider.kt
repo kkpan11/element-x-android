@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.services.analyticsproviders.sentry
@@ -20,6 +11,7 @@ import android.content.Context
 import com.squareup.anvil.annotations.ContributesMultibinding
 import im.vector.app.features.analytics.itf.VectorAnalyticsEvent
 import im.vector.app.features.analytics.itf.VectorAnalyticsScreen
+import im.vector.app.features.analytics.plan.SuperProperties
 import im.vector.app.features.analytics.plan.UserProperties
 import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.core.meta.BuildType
@@ -27,11 +19,16 @@ import io.element.android.libraries.di.AppScope
 import io.element.android.libraries.di.ApplicationContext
 import io.element.android.services.analyticsproviders.api.AnalyticsProvider
 import io.element.android.services.analyticsproviders.sentry.log.analyticsTag
+import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryOptions
 import io.sentry.android.core.SentryAndroid
 import timber.log.Timber
 import javax.inject.Inject
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.iterator
+import kotlin.collections.orEmpty
 
 @ContributesMultibinding(AppScope::class)
 class SentryAnalyticsProvider @Inject constructor(
@@ -43,13 +40,20 @@ class SentryAnalyticsProvider @Inject constructor(
     override fun init() {
         Timber.tag(analyticsTag.value).d("Initializing Sentry")
         if (Sentry.isEnabled()) return
+
+        val dsn = if (SentryConfig.DSN.isNotBlank()) {
+            SentryConfig.DSN
+        } else {
+            Timber.w("No Sentry DSN provided, Sentry will not be initialized")
+            return
+        }
+
         SentryAndroid.init(context) { options ->
-            options.dsn = SentryConfig.DNS
+            options.dsn = dsn
             options.beforeSend = SentryOptions.BeforeSendCallback { event, _ -> event }
             options.tracesSampleRate = 1.0
             options.isEnableUserInteractionTracing = true
             options.environment = buildMeta.buildType.toSentryEnv()
-            options.diagnosticLevel
         }
     }
 
@@ -59,12 +63,29 @@ class SentryAnalyticsProvider @Inject constructor(
     }
 
     override fun capture(event: VectorAnalyticsEvent) {
+        val breadcrumb = Breadcrumb(event.getName()).apply {
+            category = "event"
+            for ((key, value) in event.getProperties().orEmpty()) {
+                setData(key, value.toString())
+            }
+        }
+        Sentry.addBreadcrumb(breadcrumb)
     }
 
     override fun screen(screen: VectorAnalyticsScreen) {
+        val breadcrumb = Breadcrumb(screen.getName()).apply {
+            category = "screen"
+            for ((key, value) in screen.getProperties().orEmpty()) {
+                setData(key, value.toString())
+            }
+        }
+        Sentry.addBreadcrumb(breadcrumb)
     }
 
     override fun updateUserProperties(userProperties: UserProperties) {
+    }
+
+    override fun updateSuperProperties(updatedProperties: SuperProperties) {
     }
 
     override fun trackError(throwable: Throwable) {

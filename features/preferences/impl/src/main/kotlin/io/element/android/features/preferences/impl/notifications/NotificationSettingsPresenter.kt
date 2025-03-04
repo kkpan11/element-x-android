@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.notifications
@@ -20,17 +11,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import io.element.android.libraries.architecture.AsyncAction
+import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
-import io.element.android.libraries.architecture.runCatchingUpdatingState
+import io.element.android.libraries.architecture.runUpdatingStateNoSuccess
+import io.element.android.libraries.fullscreenintent.api.FullScreenIntentPermissionsState
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.notificationsettings.NotificationSettingsService
 import io.element.android.libraries.matrix.api.room.RoomNotificationMode
+import io.element.android.libraries.push.api.PushService
+import io.element.android.libraries.pushproviders.api.Distributor
+import io.element.android.libraries.pushproviders.api.PushProvider
 import io.element.android.libraries.pushstore.api.UserPushStore
 import io.element.android.libraries.pushstore.api.UserPushStoreFactory
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -44,11 +45,13 @@ class NotificationSettingsPresenter @Inject constructor(
     private val notificationSettingsService: NotificationSettingsService,
     private val userPushStoreFactory: UserPushStoreFactory,
     private val matrixClient: MatrixClient,
-    private val systemNotificationsEnabledProvider: SystemNotificationsEnabledProvider
+    private val pushService: PushService,
+    private val systemNotificationsEnabledProvider: SystemNotificationsEnabledProvider,
+    private val fullScreenIntentPermissionsPresenter: Presenter<FullScreenIntentPermissionsState>,
 ) : Presenter<NotificationSettingsState> {
     @Composable
     override fun present(): NotificationSettingsState {
-        val userPushStore = remember { userPushStoreFactory.create(matrixClient.sessionId) }
+        val userPushStore = remember { userPushStoreFactory.getOrCreate(matrixClient.sessionId) }
         val systemNotificationsEnabled: MutableState<Boolean> = remember {
             mutableStateOf(systemNotificationsEnabledProvider.notificationsEnabled())
         }
@@ -63,9 +66,65 @@ class NotificationSettingsPresenter @Inject constructor(
             mutableStateOf(NotificationSettingsState.MatrixSettings.Uninitialized)
         }
 
+        // Used to force a recomposition
+        var refreshFullScreenIntentSettings by remember { mutableIntStateOf(0) }
+
         LaunchedEffect(Unit) {
             fetchSettings(matrixSettings)
-            observeNotificationSettings(matrixSettings)
+            observeNotificationSettings(matrixSettings, changeNotificationSettingAction)
+        }
+
+        // List of PushProvider -> Distributor
+        val distributors = remember {
+            pushService.getAvailablePushProviders()
+                .flatMap { pushProvider ->
+                    pushProvider.getDistributors().map { distributor ->
+                        pushProvider to distributor
+                    }
+                }
+        }
+        // List of Distributors
+        val availableDistributors = remember {
+            distributors.map { it.second }.toImmutableList()
+        }
+
+        var currentDistributor by remember { mutableStateOf<AsyncData<Distributor>>(AsyncData.Uninitialized) }
+        var refreshPushProvider by remember { mutableIntStateOf(0) }
+
+        LaunchedEffect(refreshPushProvider) {
+            val p = pushService.getCurrentPushProvider()
+            val distributor = p?.getCurrentDistributor(matrixClient.sessionId)
+            currentDistributor = if (distributor != null) {
+                AsyncData.Success(distributor)
+            } else {
+                AsyncData.Failure(Exception("Failed to get current push provider"))
+            }
+        }
+
+        var showChangePushProviderDialog by remember { mutableStateOf(false) }
+
+        fun CoroutineScope.changePushProvider(
+            data: Pair<PushProvider, Distributor>?
+        ) = launch {
+            showChangePushProviderDialog = false
+            data ?: return@launch
+            val (pushProvider, distributor) = data
+            // No op if the distributor is the same.
+            if (distributor == currentDistributor.dataOrNull()) return@launch
+            currentDistributor = AsyncData.Loading(currentDistributor.dataOrNull())
+            pushService.registerWith(
+                matrixClient = matrixClient,
+                pushProvider = pushProvider,
+                distributor = distributor
+            )
+                .fold(
+                    {
+                        refreshPushProvider++
+                    },
+                    {
+                        currentDistributor = AsyncData.Failure(it)
+                    }
+                )
         }
 
         fun handleEvents(event: NotificationSettingsEvents) {
@@ -86,8 +145,12 @@ class NotificationSettingsPresenter @Inject constructor(
                 NotificationSettingsEvents.FixConfigurationMismatch -> localCoroutineScope.fixConfigurationMismatch(matrixSettings)
                 NotificationSettingsEvents.RefreshSystemNotificationsEnabled -> {
                     systemNotificationsEnabled.value = systemNotificationsEnabledProvider.notificationsEnabled()
+                    refreshFullScreenIntentSettings++
                 }
                 NotificationSettingsEvents.ClearNotificationChangeError -> changeNotificationSettingAction.value = AsyncAction.Uninitialized
+                NotificationSettingsEvents.ChangePushProvider -> showChangePushProviderDialog = true
+                NotificationSettingsEvents.CancelChangePushProvider -> showChangePushProviderDialog = false
+                is NotificationSettingsEvents.SetPushProvider -> localCoroutineScope.changePushProvider(distributors.getOrNull(event.index))
             }
         }
 
@@ -98,16 +161,24 @@ class NotificationSettingsPresenter @Inject constructor(
                 appNotificationsEnabled = appNotificationsEnabled.value
             ),
             changeNotificationSettingAction = changeNotificationSettingAction.value,
+            currentPushDistributor = currentDistributor,
+            availablePushDistributors = availableDistributors,
+            showChangePushProviderDialog = showChangePushProviderDialog,
+            fullScreenIntentPermissionsState = key(refreshFullScreenIntentSettings) { fullScreenIntentPermissionsPresenter.present() },
             eventSink = ::handleEvents
         )
     }
 
     @OptIn(FlowPreview::class)
-    private fun CoroutineScope.observeNotificationSettings(target: MutableState<NotificationSettingsState.MatrixSettings>) {
+    private fun CoroutineScope.observeNotificationSettings(
+        target: MutableState<NotificationSettingsState.MatrixSettings>,
+        changeNotificationSettingAction: MutableState<AsyncAction<Unit>>,
+    ) {
         notificationSettingsService.notificationSettingsChangeFlow
             .debounce(0.5.seconds)
             .onEach {
                 fetchSettings(target)
+                changeNotificationSettingAction.value = AsyncAction.Uninitialized
             }
             .launchIn(this)
     }
@@ -169,21 +240,21 @@ class NotificationSettingsPresenter @Inject constructor(
     }
 
     private fun CoroutineScope.setAtRoomNotificationsEnabled(enabled: Boolean, action: MutableState<AsyncAction<Unit>>) = launch {
-        suspend {
-            notificationSettingsService.setRoomMentionEnabled(enabled).getOrThrow()
-        }.runCatchingUpdatingState(action)
+        action.runUpdatingStateNoSuccess {
+            notificationSettingsService.setRoomMentionEnabled(enabled)
+        }
     }
 
     private fun CoroutineScope.setCallNotificationsEnabled(enabled: Boolean, action: MutableState<AsyncAction<Unit>>) = launch {
-        suspend {
-            notificationSettingsService.setCallEnabled(enabled).getOrThrow()
-        }.runCatchingUpdatingState(action)
+        action.runUpdatingStateNoSuccess {
+            notificationSettingsService.setCallEnabled(enabled)
+        }
     }
 
     private fun CoroutineScope.setInviteForMeNotificationsEnabled(enabled: Boolean, action: MutableState<AsyncAction<Unit>>) = launch {
-        suspend {
-            notificationSettingsService.setInviteForMeEnabled(enabled).getOrThrow()
-        }.runCatchingUpdatingState(action)
+        action.runUpdatingStateNoSuccess {
+            notificationSettingsService.setInviteForMeEnabled(enabled)
+        }
     }
 
     private fun CoroutineScope.setNotificationsEnabled(userPushStore: UserPushStore, enabled: Boolean) = launch {

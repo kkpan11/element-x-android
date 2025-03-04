@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.analytics
@@ -29,16 +20,16 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun AnalyticsSettingsView(
     state: AnalyticsSettingsState,
-    onBackPressed: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PreferencePage(
         modifier = modifier,
-        onBackPressed = onBackPressed,
+        onBackClick = onBackClick,
         title = stringResource(id = CommonStrings.common_analytics)
     ) {
         AnalyticsPreferencesView(
-            state = state.analyticsState,
+            state = state.analyticsPreferencesState,
         )
     }
 }
@@ -48,6 +39,6 @@ fun AnalyticsSettingsView(
 internal fun AnalyticsSettingsViewPreview(@PreviewParameter(AnalyticsSettingsStateProvider::class) state: AnalyticsSettingsState) = ElementPreview {
     AnalyticsSettingsView(
         state = state,
-        onBackPressed = {},
+        onBackClick = {},
     )
 }

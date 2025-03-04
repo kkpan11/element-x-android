@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.lockscreen.impl.unlock
@@ -24,24 +15,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import io.element.android.features.lockscreen.impl.biometric.BiometricUnlock
-import io.element.android.features.lockscreen.impl.biometric.BiometricUnlockManager
+import io.element.android.features.lockscreen.impl.biometric.BiometricAuthenticator
+import io.element.android.features.lockscreen.impl.biometric.BiometricAuthenticatorManager
 import io.element.android.features.lockscreen.impl.pin.PinCodeManager
 import io.element.android.features.lockscreen.impl.pin.model.PinEntry
 import io.element.android.features.lockscreen.impl.unlock.keypad.PinKeypadModel
+import io.element.android.features.logout.api.LogoutUseCase
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.architecture.runCatchingUpdatingState
 import io.element.android.libraries.core.bool.orFalse
-import io.element.android.libraries.matrix.api.MatrixClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class PinUnlockPresenter @Inject constructor(
     private val pinCodeManager: PinCodeManager,
-    private val biometricUnlockManager: BiometricUnlockManager,
-    private val matrixClient: MatrixClient,
+    private val biometricAuthenticatorManager: BiometricAuthenticatorManager,
+    private val logoutUseCase: LogoutUseCase,
     private val coroutineScope: CoroutineScope,
     private val pinUnlockHelper: PinUnlockHelper,
 ) : Presenter<PinUnlockState> {
@@ -61,15 +53,15 @@ class PinUnlockPresenter @Inject constructor(
             mutableStateOf(false)
         }
         val signOutAction = remember {
-            mutableStateOf<AsyncData<String?>>(AsyncData.Uninitialized)
+            mutableStateOf<AsyncAction<Unit>>(AsyncAction.Uninitialized)
         }
         var biometricUnlockResult by remember {
-            mutableStateOf<BiometricUnlock.AuthenticationResult?>(null)
+            mutableStateOf<BiometricAuthenticator.AuthenticationResult?>(null)
         }
         val isUnlocked = remember {
             mutableStateOf(false)
         }
-        val biometricUnlock = biometricUnlockManager.rememberBiometricUnlock()
+        val biometricUnlock = biometricAuthenticatorManager.rememberUnlockBiometricAuthenticator()
         LaunchedEffect(Unit) {
             suspend {
                 val pinCodeSize = pinCodeManager.getPinCodeSize()
@@ -177,9 +169,9 @@ class PinUnlockPresenter @Inject constructor(
         }
     }
 
-    private fun CoroutineScope.signOut(signOutAction: MutableState<AsyncData<String?>>) = launch {
+    private fun CoroutineScope.signOut(signOutAction: MutableState<AsyncAction<Unit>>) = launch {
         suspend {
-            matrixClient.logout(ignoreSdkError = true)
+            logoutUseCase.logout(ignoreSdkError = true)
         }.runCatchingUpdatingState(signOutAction)
     }
 }

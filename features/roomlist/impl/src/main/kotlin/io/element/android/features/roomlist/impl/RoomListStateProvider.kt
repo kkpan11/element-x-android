@@ -1,36 +1,30 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomlist.impl
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import io.element.android.features.invite.api.response.AcceptDeclineInviteState
+import io.element.android.features.invite.api.response.anAcceptDeclineInviteState
 import io.element.android.features.leaveroom.api.LeaveRoomState
 import io.element.android.features.leaveroom.api.aLeaveRoomState
-import io.element.android.features.roomlist.impl.datasource.RoomListRoomSummaryFactory
+import io.element.android.features.logout.api.direct.DirectLogoutState
+import io.element.android.features.logout.api.direct.aDirectLogoutState
 import io.element.android.features.roomlist.impl.filters.RoomListFiltersState
 import io.element.android.features.roomlist.impl.filters.aRoomListFiltersState
 import io.element.android.features.roomlist.impl.model.RoomListRoomSummary
+import io.element.android.features.roomlist.impl.model.RoomSummaryDisplayType
 import io.element.android.features.roomlist.impl.model.aRoomListRoomSummary
+import io.element.android.features.roomlist.impl.model.anInviteSender
 import io.element.android.features.roomlist.impl.search.RoomListSearchState
 import io.element.android.features.roomlist.impl.search.aRoomListSearchState
-import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
-import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -43,52 +37,54 @@ open class RoomListStateProvider : PreviewParameterProvider<RoomListState> {
             aRoomListState(),
             aRoomListState(snackbarMessage = SnackbarMessage(CommonStrings.common_verification_complete)),
             aRoomListState(hasNetworkConnection = false),
-            aRoomListState(invitesState = InvitesState.SeenInvites),
-            aRoomListState(invitesState = InvitesState.NewInvites),
+            aRoomListState(contextMenu = aContextMenuShown(roomName = null)),
             aRoomListState(contextMenu = aContextMenuShown(roomName = "A nice room name")),
             aRoomListState(contextMenu = aContextMenuShown(isFavorite = true)),
-            aRoomListState(securityBannerState = SecurityBannerState.SessionVerification),
-            aRoomListState(securityBannerState = SecurityBannerState.RecoveryKeyConfirmation),
-            aRoomListState(roomList = AsyncData.Success(persistentListOf())),
-            aRoomListState(roomList = AsyncData.Loading(prevData = RoomListRoomSummaryFactory.createFakeList())),
-            aRoomListState(matrixUser = null, displayMigrationStatus = true),
+            aRoomListState(contentState = aRoomsContentState(securityBannerState = SecurityBannerState.RecoveryKeyConfirmation)),
+            aRoomListState(contentState = anEmptyContentState()),
+            aRoomListState(contentState = aSkeletonContentState()),
             aRoomListState(searchState = aRoomListSearchState(isSearchActive = true, query = "Test")),
-            aRoomListState(filtersState = aRoomListFiltersState(isFeatureEnabled = true)),
+            aRoomListState(contentState = aRoomsContentState(securityBannerState = SecurityBannerState.SetUpRecovery)),
         )
 }
 
 internal fun aRoomListState(
-    matrixUser: MatrixUser? = MatrixUser(userId = UserId("@id:domain"), displayName = "User#1"),
+    matrixUser: MatrixUser = MatrixUser(userId = UserId("@id:domain"), displayName = "User#1"),
     showAvatarIndicator: Boolean = false,
-    roomList: AsyncData<ImmutableList<RoomListRoomSummary>> = AsyncData.Success(aRoomListRoomSummaryList()),
     hasNetworkConnection: Boolean = true,
     snackbarMessage: SnackbarMessage? = null,
-    securityBannerState: SecurityBannerState = SecurityBannerState.None,
-    invitesState: InvitesState = InvitesState.NoInvites,
     contextMenu: RoomListState.ContextMenu = RoomListState.ContextMenu.Hidden,
     leaveRoomState: LeaveRoomState = aLeaveRoomState(),
     searchState: RoomListSearchState = aRoomListSearchState(),
-    filtersState: RoomListFiltersState = aRoomListFiltersState(isFeatureEnabled = false),
-    displayMigrationStatus: Boolean = false,
+    filtersState: RoomListFiltersState = aRoomListFiltersState(),
+    contentState: RoomListContentState = aRoomsContentState(),
+    acceptDeclineInviteState: AcceptDeclineInviteState = anAcceptDeclineInviteState(),
+    directLogoutState: DirectLogoutState = aDirectLogoutState(),
     eventSink: (RoomListEvents) -> Unit = {}
 ) = RoomListState(
     matrixUser = matrixUser,
     showAvatarIndicator = showAvatarIndicator,
-    roomList = roomList,
     hasNetworkConnection = hasNetworkConnection,
     snackbarMessage = snackbarMessage,
-    securityBannerState = securityBannerState,
-    invitesState = invitesState,
     contextMenu = contextMenu,
     leaveRoomState = leaveRoomState,
-    searchState = searchState,
     filtersState = filtersState,
-    displayMigrationStatus = displayMigrationStatus,
+    searchState = searchState,
+    contentState = contentState,
+    acceptDeclineInviteState = acceptDeclineInviteState,
+    directLogoutState = directLogoutState,
     eventSink = eventSink,
 )
 
 internal fun aRoomListRoomSummaryList(): ImmutableList<RoomListRoomSummary> {
     return persistentListOf(
+        aRoomListRoomSummary(
+            name = "Room Invited",
+            avatarData = AvatarData("!roomId", "Room with Alice and Bob", size = AvatarSize.RoomListItem),
+            id = "!roomId:domain",
+            inviteSender = anInviteSender(),
+            displayType = RoomSummaryDisplayType.INVITE,
+        ),
         aRoomListRoomSummary(
             name = "Room",
             numberOfUnreadMessages = 1,
@@ -107,25 +103,11 @@ internal fun aRoomListRoomSummaryList(): ImmutableList<RoomListRoomSummary> {
         ),
         aRoomListRoomSummary(
             id = "!roomId3:domain",
-            isPlaceholder = true,
+            displayType = RoomSummaryDisplayType.PLACEHOLDER,
         ),
         aRoomListRoomSummary(
             id = "!roomId4:domain",
-            isPlaceholder = true,
+            displayType = RoomSummaryDisplayType.PLACEHOLDER,
         ),
     )
 }
-
-internal fun aContextMenuShown(
-    roomName: String = "aRoom",
-    isDm: Boolean = false,
-    hasNewContent: Boolean = false,
-    isFavorite: Boolean = false,
-) = RoomListState.ContextMenu.Shown(
-    roomId = RoomId("!aRoom:aDomain"),
-    roomName = roomName,
-    isDm = isDm,
-    markAsUnreadFeatureFlagEnabled = true,
-    hasNewContent = hasNewContent,
-    isFavorite = isFavorite,
-)

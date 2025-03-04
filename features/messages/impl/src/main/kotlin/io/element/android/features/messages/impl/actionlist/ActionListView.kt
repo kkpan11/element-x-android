@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.actionlist
@@ -34,10 +25,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,11 +46,18 @@ import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.messages.impl.actionlist.model.TimelineItemAction
+import io.element.android.features.messages.impl.crypto.sendfailure.VerifiedUserSendFailure
+import io.element.android.features.messages.impl.crypto.sendfailure.VerifiedUserSendFailure.ChangedIdentity
+import io.element.android.features.messages.impl.crypto.sendfailure.VerifiedUserSendFailure.None
+import io.element.android.features.messages.impl.crypto.sendfailure.VerifiedUserSendFailure.UnsignedDevice
+import io.element.android.features.messages.impl.timeline.components.MessageShieldView
 import io.element.android.features.messages.impl.timeline.model.TimelineItem
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemAudioContent
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemCallNotifyContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemEncryptedContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemFileContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemImageContent
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLegacyCallInviteContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLocationContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemPollContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemRedactedContent
@@ -69,7 +67,7 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemUnknownContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVideoContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVoiceContent
-import io.element.android.features.messages.impl.utils.messagesummary.MessageSummaryFormatterImpl
+import io.element.android.features.messages.impl.utils.messagesummary.DefaultMessageSummaryFormatter
 import io.element.android.libraries.designsystem.components.avatar.Avatar
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.designsystem.components.list.ListItemContent
@@ -84,6 +82,8 @@ import io.element.android.libraries.designsystem.theme.components.ListItemStyle
 import io.element.android.libraries.designsystem.theme.components.ModalBottomSheet
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.hide
+import io.element.android.libraries.matrix.ui.messages.sender.SenderName
+import io.element.android.libraries.matrix.ui.messages.sender.SenderNameMode
 import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.collections.immutable.ImmutableList
 
@@ -91,43 +91,52 @@ import kotlinx.collections.immutable.ImmutableList
 @Composable
 fun ActionListView(
     state: ActionListState,
-    onActionSelected: (action: TimelineItemAction, TimelineItem.Event) -> Unit,
-    onEmojiReactionClicked: (String, TimelineItem.Event) -> Unit,
-    onCustomReactionClicked: (TimelineItem.Event) -> Unit,
+    onSelectAction: (action: TimelineItemAction, TimelineItem.Event) -> Unit,
+    onEmojiReactionClick: (String, TimelineItem.Event) -> Unit,
+    onCustomReactionClick: (TimelineItem.Event) -> Unit,
+    onVerifiedUserSendFailureClick: (TimelineItem.Event) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val coroutineScope = rememberCoroutineScope()
     val targetItem = (state.target as? ActionListState.Target.Success)?.event
 
-    fun onItemActionClicked(
+    fun onItemActionClick(
         itemAction: TimelineItemAction
     ) {
         if (targetItem == null) return
         sheetState.hide(coroutineScope) {
             state.eventSink(ActionListEvents.Clear)
-            onActionSelected(itemAction, targetItem)
+            onSelectAction(itemAction, targetItem)
         }
     }
 
-    fun onEmojiReactionClicked(emoji: String) {
+    fun onEmojiReactionClick(emoji: String) {
         if (targetItem == null) return
         sheetState.hide(coroutineScope) {
             state.eventSink(ActionListEvents.Clear)
-            onEmojiReactionClicked(emoji, targetItem)
+            onEmojiReactionClick(emoji, targetItem)
         }
     }
 
-    fun onCustomReactionClicked() {
+    fun onCustomReactionClick() {
         if (targetItem == null) return
         sheetState.hide(coroutineScope) {
             state.eventSink(ActionListEvents.Clear)
-            onCustomReactionClicked(targetItem)
+            onCustomReactionClick(targetItem)
         }
     }
 
     fun onDismiss() {
         state.eventSink(ActionListEvents.Clear)
+    }
+
+    fun onVerifiedUserSendFailureClick() {
+        if (targetItem == null) return
+        sheetState.hide(coroutineScope) {
+            state.eventSink(ActionListEvents.Clear)
+            onVerifiedUserSendFailureClick(targetItem)
+        }
     }
 
     if (targetItem != null) {
@@ -136,11 +145,12 @@ fun ActionListView(
             onDismissRequest = ::onDismiss,
             modifier = modifier,
         ) {
-            SheetContent(
+            ActionListViewContent(
                 state = state,
-                onActionClicked = ::onItemActionClicked,
-                onEmojiReactionClicked = ::onEmojiReactionClicked,
-                onCustomReactionClicked = ::onCustomReactionClicked,
+                onActionClick = ::onItemActionClick,
+                onEmojiReactionClick = ::onEmojiReactionClick,
+                onCustomReactionClick = ::onCustomReactionClick,
+                onVerifiedUserSendFailureClick = ::onVerifiedUserSendFailureClick,
                 modifier = Modifier
                     .navigationBarsPadding()
                     .imePadding()
@@ -150,11 +160,12 @@ fun ActionListView(
 }
 
 @Composable
-private fun SheetContent(
+private fun ActionListViewContent(
     state: ActionListState,
-    onActionClicked: (TimelineItemAction) -> Unit,
-    onEmojiReactionClicked: (String) -> Unit,
-    onCustomReactionClicked: () -> Unit,
+    onActionClick: (TimelineItemAction) -> Unit,
+    onEmojiReactionClick: (String) -> Unit,
+    onCustomReactionClick: () -> Unit,
+    onVerifiedUserSendFailureClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when (val target = state.target) {
@@ -173,11 +184,29 @@ private fun SheetContent(
                     Column {
                         MessageSummary(
                             event = target.event,
+                            sentTimeFull = target.sentTimeFull,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                         )
-                        Spacer(modifier = Modifier.height(14.dp))
+                        if (target.event.messageShield != null) {
+                            MessageShieldView(
+                                shield = target.event.messageShield,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(14.dp))
+                        }
+                        HorizontalDivider()
+                    }
+                }
+                if (target.verifiedUserSendFailure != None) {
+                    item {
+                        VerifiedUserSendFailureView(
+                            sendFailure = target.verifiedUserSendFailure,
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = onVerifiedUserSendFailureClick
+                        )
                         HorizontalDivider()
                     }
                 }
@@ -185,8 +214,8 @@ private fun SheetContent(
                     item {
                         EmojiReactionsRow(
                             highlightedEmojis = target.event.reactionsState.highlightedKeys,
-                            onEmojiReactionClicked = onEmojiReactionClicked,
-                            onCustomReactionClicked = onCustomReactionClicked,
+                            onEmojiReactionClick = onEmojiReactionClick,
+                            onCustomReactionClick = onCustomReactionClick,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         HorizontalDivider()
@@ -197,7 +226,7 @@ private fun SheetContent(
                 ) { action ->
                     ListItem(
                         modifier = Modifier.clickable {
-                            onActionClicked(action)
+                            onActionClick(action)
                         },
                         headlineContent = {
                             Text(text = stringResource(id = action.titleRes))
@@ -214,11 +243,16 @@ private fun SheetContent(
     }
 }
 
+@Suppress("MultipleEmitters") // False positive
 @Composable
-private fun MessageSummary(event: TimelineItem.Event, modifier: Modifier = Modifier) {
+private fun MessageSummary(
+    event: TimelineItem.Event,
+    sentTimeFull: String,
+    modifier: Modifier = Modifier,
+) {
     val content: @Composable () -> Unit
     val icon: @Composable () -> Unit = { Avatar(avatarData = event.senderAvatar.copy(size = AvatarSize.MessageActionSender)) }
-    val contentStyle = ElementTheme.typography.fontBodyMdRegular.copy(color = MaterialTheme.colorScheme.secondary)
+    val contentStyle = ElementTheme.typography.fontBodyMdRegular.copy(color = ElementTheme.colors.textSecondary)
 
     @Composable
     fun ContentForBody(body: String) {
@@ -226,7 +260,7 @@ private fun MessageSummary(event: TimelineItem.Event, modifier: Modifier = Modif
     }
 
     val context = LocalContext.current
-    val formatter = remember(context) { MessageSummaryFormatterImpl(context) }
+    val formatter = remember(context) { DefaultMessageSummaryFormatter(context) }
     val textContent = remember(event.content) { formatter.format(event) }
 
     when (event.content) {
@@ -239,19 +273,19 @@ private fun MessageSummary(event: TimelineItem.Event, modifier: Modifier = Modif
             content = { ContentForBody(stringResource(CommonStrings.common_shared_location)) }
         }
         is TimelineItemImageContent -> {
-            content = { ContentForBody(event.content.body) }
+            content = { ContentForBody(event.content.bestDescription) }
         }
         is TimelineItemStickerContent -> {
-            content = { ContentForBody(event.content.body) }
+            content = { ContentForBody(event.content.bestDescription) }
         }
         is TimelineItemVideoContent -> {
-            content = { ContentForBody(event.content.body) }
+            content = { ContentForBody(event.content.bestDescription) }
         }
         is TimelineItemFileContent -> {
-            content = { ContentForBody(event.content.body) }
+            content = { ContentForBody(event.content.bestDescription) }
         }
         is TimelineItemAudioContent -> {
-            content = { ContentForBody(event.content.body) }
+            content = { ContentForBody(event.content.bestDescription) }
         }
         is TimelineItemVoiceContent -> {
             content = { ContentForBody(textContent) }
@@ -259,29 +293,34 @@ private fun MessageSummary(event: TimelineItem.Event, modifier: Modifier = Modif
         is TimelineItemPollContent -> {
             content = { ContentForBody(textContent) }
         }
+        is TimelineItemLegacyCallInviteContent -> {
+            content = { ContentForBody(textContent) }
+        }
+        is TimelineItemCallNotifyContent -> {
+            content = { ContentForBody(stringResource(CommonStrings.common_call_started)) }
+        }
     }
     Row(modifier = modifier) {
         icon()
         Spacer(modifier = Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row {
-                if (event.senderDisplayName != null) {
-                    Text(
-                        text = event.senderDisplayName,
-                        style = ElementTheme.typography.fontBodySmMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
+                SenderName(
+                    modifier = Modifier.weight(1f),
+                    senderId = event.senderId,
+                    senderProfile = event.senderProfile,
+                    senderNameMode = SenderNameMode.ActionList,
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = sentTimeFull,
+                    style = ElementTheme.typography.fontBodyXsRegular,
+                    color = ElementTheme.colors.textSecondary,
+                    textAlign = TextAlign.End,
+                )
             }
             content()
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        Text(
-            event.sentTime,
-            style = ElementTheme.typography.fontBodyXsRegular,
-            color = MaterialTheme.colorScheme.secondary,
-            textAlign = TextAlign.End,
-        )
     }
 }
 
@@ -290,8 +329,8 @@ private val emojiRippleRadius = 24.dp
 @Composable
 private fun EmojiReactionsRow(
     highlightedEmojis: ImmutableList<String>,
-    onEmojiReactionClicked: (String) -> Unit,
-    onCustomReactionClicked: () -> Unit,
+    onEmojiReactionClick: (String) -> Unit,
+    onCustomReactionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -308,7 +347,7 @@ private fun EmojiReactionsRow(
         )
         for (emoji in defaultEmojis) {
             val isHighlighted = highlightedEmojis.contains(emoji)
-            EmojiButton(emoji, isHighlighted, onEmojiReactionClicked)
+            EmojiButton(emoji, isHighlighted, onEmojiReactionClick)
         }
         Box(
             modifier = Modifier
@@ -318,13 +357,13 @@ private fun EmojiReactionsRow(
             Icon(
                 imageVector = CompoundIcons.ReactionAdd(),
                 contentDescription = stringResource(id = CommonStrings.a11y_react_with_other_emojis),
-                tint = MaterialTheme.colorScheme.secondary,
+                tint = ElementTheme.colors.iconSecondary,
                 modifier = Modifier
                     .size(24.dp)
                     .clickable(
                         enabled = true,
-                        onClick = onCustomReactionClicked,
-                        indication = rememberRipple(bounded = false, radius = emojiRippleRadius),
+                        onClick = onCustomReactionClick,
+                        indication = ripple(bounded = false, radius = emojiRippleRadius),
                         interactionSource = remember { MutableInteractionSource() }
                     )
             )
@@ -333,10 +372,47 @@ private fun EmojiReactionsRow(
 }
 
 @Composable
+private fun VerifiedUserSendFailureView(
+    sendFailure: VerifiedUserSendFailure,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    @Composable
+    fun VerifiedUserSendFailure.headline(): String {
+        return when (this) {
+            is None -> ""
+            is UnsignedDevice.FromOther -> stringResource(CommonStrings.screen_timeline_item_menu_send_failure_unsigned_device, userDisplayName)
+            is UnsignedDevice.FromYou -> stringResource(CommonStrings.screen_timeline_item_menu_send_failure_you_unsigned_device)
+            is ChangedIdentity -> stringResource(CommonStrings.screen_timeline_item_menu_send_failure_changed_identity, userDisplayName)
+        }
+    }
+
+    ListItem(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.ErrorSolid())),
+        trailingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.ChevronRight())),
+        headlineContent = {
+            Text(
+                text = sendFailure.headline(),
+                style = ElementTheme.typography.fontBodySmMedium,
+            )
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent,
+            leadingIconColor = ElementTheme.colors.iconCriticalPrimary,
+            trailingIconColor = ElementTheme.colors.iconPrimary,
+            headlineColor = ElementTheme.colors.textCriticalPrimary,
+        ),
+    )
+}
+
+@Composable
 private fun EmojiButton(
     emoji: String,
     isHighlighted: Boolean,
-    onClicked: (String) -> Unit,
+    onClick: (String) -> Unit,
 ) {
     val backgroundColor = if (isHighlighted) {
         ElementTheme.colors.bgActionPrimaryRest
@@ -363,8 +439,8 @@ private fun EmojiButton(
             modifier = Modifier
                 .clickable(
                     enabled = true,
-                    onClick = { onClicked(emoji) },
-                    indication = rememberRipple(bounded = false, radius = emojiRippleRadius),
+                    onClick = { onClick(emoji) },
+                    indication = ripple(bounded = false, radius = emojiRippleRadius),
                     interactionSource = remember { MutableInteractionSource() }
                 )
         )
@@ -373,13 +449,14 @@ private fun EmojiButton(
 
 @PreviewsDayNight
 @Composable
-internal fun SheetContentPreview(
+internal fun ActionListViewContentPreview(
     @PreviewParameter(ActionListStateProvider::class) state: ActionListState
 ) = ElementPreview {
-    SheetContent(
+    ActionListViewContent(
         state = state,
-        onActionClicked = {},
-        onEmojiReactionClicked = {},
-        onCustomReactionClicked = {},
+        onActionClick = {},
+        onEmojiReactionClick = {},
+        onCustomReactionClick = {},
+        onVerifiedUserSendFailureClick = {},
     )
 }

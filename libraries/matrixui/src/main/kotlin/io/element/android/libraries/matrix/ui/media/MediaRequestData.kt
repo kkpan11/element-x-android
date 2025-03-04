@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.ui.media
@@ -19,7 +10,7 @@ package io.element.android.libraries.matrix.ui.media
 import io.element.android.libraries.matrix.api.media.MediaSource
 
 /**
- * Can be use with [coil.compose.AsyncImage] to load a [MediaSource].
+ * Can be use with [coil3.compose.AsyncImage] to load a [MediaSource].
  * This will go internally through our [CoilMediaFetcher].
  *
  * Example of usage:
@@ -35,9 +26,20 @@ data class MediaRequestData(
 ) {
     sealed interface Kind {
         data object Content : Kind
-        data class File(val body: String?, val mimeType: String) : Kind
+
+        data class File(
+            val fileName: String,
+            val mimeType: String,
+        ) : Kind
+
         data class Thumbnail(val width: Long, val height: Long) : Kind {
             constructor(size: Long) : this(size, size)
         }
     }
 }
+
+/** Max width a thumbnail can have according to [the spec](https://spec.matrix.org/v1.10/client-server-api/#thumbnails). */
+const val MAX_THUMBNAIL_WIDTH = 800L
+
+/** Max height a thumbnail can have according to [the spec](https://spec.matrix.org/v1.10/client-server-api/#thumbnails). */
+const val MAX_THUMBNAIL_HEIGHT = 600L

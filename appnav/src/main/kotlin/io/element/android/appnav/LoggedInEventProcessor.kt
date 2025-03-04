@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.appnav
@@ -19,8 +10,6 @@ package io.element.android.appnav
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.matrix.api.room.RoomMembershipObserver
-import io.element.android.libraries.matrix.api.verification.SessionVerificationService
-import io.element.android.libraries.matrix.api.verification.VerificationFlowState
 import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -34,15 +23,11 @@ import javax.inject.Inject
 class LoggedInEventProcessor @Inject constructor(
     private val snackbarDispatcher: SnackbarDispatcher,
     roomMembershipObserver: RoomMembershipObserver,
-    sessionVerificationService: SessionVerificationService,
 ) {
     private var observingJob: Job? = null
 
     private val displayLeftRoomMessage = roomMembershipObserver.updates
         .map { !it.isUserInRoom }
-
-    private val displayVerificationSuccessfulMessage = sessionVerificationService.verificationFlowState
-        .map { it == VerificationFlowState.Finished }
 
     fun observeEvents(coroutineScope: CoroutineScope) {
         observingJob = coroutineScope.launch {
@@ -50,13 +35,6 @@ class LoggedInEventProcessor @Inject constructor(
                 .filter { it }
                 .onEach {
                     displayMessage(CommonStrings.common_current_user_left_room)
-                }
-                .launchIn(this)
-
-            displayVerificationSuccessfulMessage
-                .filter { it }
-                .onEach {
-                    displayMessage(CommonStrings.common_verification_complete)
                 }
                 .launchIn(this)
         }
@@ -67,7 +45,7 @@ class LoggedInEventProcessor @Inject constructor(
         observingJob = null
     }
 
-    private suspend fun displayMessage(message: Int) {
+    private fun displayMessage(message: Int) {
         snackbarDispatcher.post(SnackbarMessage(message))
     }
 }

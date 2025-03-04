@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.lockscreen.impl.unlock
@@ -20,16 +11,19 @@ import app.cash.molecule.RecompositionMode
 import app.cash.molecule.moleculeFlow
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
-import io.element.android.features.lockscreen.impl.biometric.BiometricUnlockManager
-import io.element.android.features.lockscreen.impl.biometric.FakeBiometricUnlockManager
+import io.element.android.features.lockscreen.impl.biometric.BiometricAuthenticatorManager
+import io.element.android.features.lockscreen.impl.biometric.FakeBiometricAuthenticatorManager
 import io.element.android.features.lockscreen.impl.fixtures.aPinCodeManager
 import io.element.android.features.lockscreen.impl.pin.DefaultPinCodeManagerCallback
 import io.element.android.features.lockscreen.impl.pin.PinCodeManager
 import io.element.android.features.lockscreen.impl.pin.model.PinEntry
 import io.element.android.features.lockscreen.impl.pin.model.assertText
 import io.element.android.features.lockscreen.impl.unlock.keypad.PinKeypadModel
+import io.element.android.features.logout.test.FakeLogoutUseCase
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.AsyncData
-import io.element.android.libraries.matrix.test.FakeMatrixClient
+import io.element.android.tests.testutils.lambda.assert
+import io.element.android.tests.testutils.lambda.lambdaRecorder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -49,7 +43,7 @@ class PinUnlockPresenterTest {
                 assertThat(state.showWrongPinTitle).isFalse()
                 assertThat(state.showSignOutPrompt).isFalse()
                 assertThat(state.isUnlocked).isFalse()
-                assertThat(state.signOutAction).isInstanceOf(AsyncData.Uninitialized::class.java)
+                assertThat(state.signOutAction).isInstanceOf(AsyncAction.Uninitialized::class.java)
                 assertThat(state.remainingAttempts).isInstanceOf(AsyncData.Uninitialized::class.java)
             }
             awaitItem().also { state ->
@@ -104,7 +98,9 @@ class PinUnlockPresenterTest {
 
     @Test
     fun `present - forgot pin flow`() = runTest {
-        val presenter = createPinUnlockPresenter(this)
+        val signOutLambda = lambdaRecorder<Boolean, Unit> {}
+        val signOut = FakeLogoutUseCase(signOutLambda)
+        val presenter = createPinUnlockPresenter(this, logoutUseCase = signOut)
         moleculeFlow(RecompositionMode.Immediate) {
             presenter.present()
         }.test {
@@ -129,8 +125,9 @@ class PinUnlockPresenterTest {
             }
             skipItems(2)
             awaitItem().also { state ->
-                assertThat(state.signOutAction).isInstanceOf(AsyncData.Success::class.java)
+                assertThat(state.signOutAction).isInstanceOf(AsyncAction.Success::class.java)
             }
+            assert(signOutLambda).isCalledOnce()
         }
     }
 
@@ -140,8 +137,9 @@ class PinUnlockPresenterTest {
 
     private suspend fun createPinUnlockPresenter(
         scope: CoroutineScope,
-        biometricUnlockManager: BiometricUnlockManager = FakeBiometricUnlockManager(),
+        biometricAuthenticatorManager: BiometricAuthenticatorManager = FakeBiometricAuthenticatorManager(),
         callback: PinCodeManager.Callback = DefaultPinCodeManagerCallback(),
+        logoutUseCase: FakeLogoutUseCase = FakeLogoutUseCase(logoutLambda = { "" }),
     ): PinUnlockPresenter {
         val pinCodeManager = aPinCodeManager().apply {
             addCallback(callback)
@@ -149,10 +147,10 @@ class PinUnlockPresenterTest {
         }
         return PinUnlockPresenter(
             pinCodeManager = pinCodeManager,
-            biometricUnlockManager = biometricUnlockManager,
-            matrixClient = FakeMatrixClient(),
+            biometricAuthenticatorManager = biometricAuthenticatorManager,
+            logoutUseCase = logoutUseCase,
             coroutineScope = scope,
-            pinUnlockHelper = PinUnlockHelper(biometricUnlockManager, pinCodeManager),
+            pinUnlockHelper = PinUnlockHelper(biometricAuthenticatorManager, pinCodeManager),
         )
     }
 }

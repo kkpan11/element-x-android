@@ -1,19 +1,9 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  * Copyright 2021 Google LLC
- * Copied and adapted from android-maps-compose (https://github.com/googlemaps/android-maps-compose)
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 @file:Suppress("MatchingDeclarationName")
 
@@ -26,17 +16,17 @@ import androidx.compose.runtime.ComposeNode
 import androidx.compose.runtime.currentComposer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import com.mapbox.mapboxsdk.location.LocationComponentActivationOptions
-import com.mapbox.mapboxsdk.location.LocationComponentOptions
-import com.mapbox.mapboxsdk.location.OnCameraTrackingChangedListener
-import com.mapbox.mapboxsdk.location.engine.LocationEngineRequest
-import com.mapbox.mapboxsdk.maps.MapboxMap
-import com.mapbox.mapboxsdk.maps.Style
+import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.LocationComponentOptions
+import org.maplibre.android.location.OnCameraTrackingChangedListener
+import org.maplibre.android.location.engine.LocationEngineRequest
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.Style
 
 private const val LOCATION_REQUEST_INTERVAL = 750L
 
 internal class MapPropertiesNode(
-    val map: MapboxMap,
+    val map: MapLibreMap,
     style: Style,
     context: Context,
     cameraPositionState: CameraPositionState,

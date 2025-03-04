@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.impl.roomlist
@@ -22,20 +13,18 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.matrix.rustcomponents.sdk.RoomListEntriesUpdate
-import org.matrix.rustcomponents.sdk.RoomListEntry
+import org.matrix.rustcomponents.sdk.RoomListItem
 import org.matrix.rustcomponents.sdk.RoomListServiceInterface
 import org.matrix.rustcomponents.sdk.use
 import timber.log.Timber
-import java.util.UUID
 import kotlin.coroutines.CoroutineContext
 
 class RoomSummaryListProcessor(
     private val roomSummaries: MutableSharedFlow<List<RoomSummary>>,
     private val roomListService: RoomListServiceInterface,
     private val coroutineContext: CoroutineContext,
-    private val roomSummaryDetailsFactory: RoomSummaryDetailsFactory = RoomSummaryDetailsFactory(),
+    private val roomSummaryDetailsFactory: RoomSummaryFactory = RoomSummaryFactory(),
 ) {
-    private val roomSummariesByIdentifier = HashMap<String, RoomSummary>()
     private val mutex = Mutex()
 
     suspend fun postUpdate(updates: List<RoomListEntriesUpdate>) {
@@ -50,15 +39,17 @@ class RoomSummaryListProcessor(
     suspend fun rebuildRoomSummaries() {
         updateRoomSummaries {
             forEachIndexed { i, summary ->
-                this[i] = when (summary) {
-                    is RoomSummary.Empty -> summary
-                    is RoomSummary.Filled -> buildAndCacheRoomSummaryForIdentifier(summary.identifier())
+                val result = buildRoomSummaryForIdentifier(summary.roomId.value)
+                if (result != null) {
+                    this[i] = result
                 }
             }
         }
     }
 
     private suspend fun MutableList<RoomSummary>.applyUpdate(update: RoomListEntriesUpdate) {
+        // Remove this comment to debug changes in the room list
+        // Timber.d("Apply room list update: ${update.describe()}")
         when (update) {
             is RoomListEntriesUpdate.Append -> {
                 val roomSummaries = update.values.map {
@@ -104,30 +95,18 @@ class RoomSummaryListProcessor(
         }
     }
 
-    private suspend fun buildSummaryForRoomListEntry(entry: RoomListEntry): RoomSummary {
-        return when (entry) {
-            RoomListEntry.Empty -> buildEmptyRoomSummary()
-            is RoomListEntry.Filled -> buildAndCacheRoomSummaryForIdentifier(entry.roomId)
-            is RoomListEntry.Invalidated -> {
-                roomSummariesByIdentifier[entry.roomId] ?: buildAndCacheRoomSummaryForIdentifier(entry.roomId)
-            }
+    private suspend fun buildSummaryForRoomListEntry(entry: RoomListItem): RoomSummary {
+        return buildRoomSummaryForRoomListItem(entry)
+    }
+
+    private suspend fun buildRoomSummaryForIdentifier(identifier: String): RoomSummary? {
+        return roomListService.roomOrNull(identifier)?.use { roomListItem ->
+            buildRoomSummaryForRoomListItem(roomListItem)
         }
     }
 
-    private fun buildEmptyRoomSummary(): RoomSummary {
-        return RoomSummary.Empty(UUID.randomUUID().toString())
-    }
-
-    private suspend fun buildAndCacheRoomSummaryForIdentifier(identifier: String): RoomSummary {
-        val builtRoomSummary = roomListService.roomOrNull(identifier)?.use { roomListItem ->
-            roomListItem.roomInfo().use { roomInfo ->
-                RoomSummary.Filled(
-                    details = roomSummaryDetailsFactory.create(roomInfo)
-                )
-            }
-        } ?: buildEmptyRoomSummary()
-        roomSummariesByIdentifier[builtRoomSummary.identifier()] = builtRoomSummary
-        return builtRoomSummary
+    private suspend fun buildRoomSummaryForRoomListItem(roomListItem: RoomListItem): RoomSummary {
+        return roomSummaryDetailsFactory.create(roomListItem = roomListItem)
     }
 
     private suspend fun updateRoomSummaries(block: suspend MutableList<RoomSummary>.() -> Unit) = withContext(coroutineContext) {
