@@ -1,26 +1,18 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.root
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -30,8 +22,10 @@ import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.preferences.impl.R
 import io.element.android.features.preferences.impl.user.UserPreferences
+import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
 import io.element.android.libraries.designsystem.components.list.ListItemContent
 import io.element.android.libraries.designsystem.components.preferences.PreferencePage
+import io.element.android.libraries.designsystem.icons.CompoundDrawables
 import io.element.android.libraries.designsystem.preview.ElementPreviewDark
 import io.element.android.libraries.designsystem.preview.ElementPreviewLight
 import io.element.android.libraries.designsystem.preview.PreviewWithLargeHeight
@@ -40,9 +34,9 @@ import io.element.android.libraries.designsystem.theme.components.IconSource
 import io.element.android.libraries.designsystem.theme.components.ListItem
 import io.element.android.libraries.designsystem.theme.components.ListItemStyle
 import io.element.android.libraries.designsystem.theme.components.Text
-import io.element.android.libraries.designsystem.utils.CommonDrawables
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarHost
 import io.element.android.libraries.designsystem.utils.snackbar.rememberSnackbarHostState
+import io.element.android.libraries.matrix.api.core.DeviceId
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.ui.components.MatrixUserProvider
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -50,10 +44,9 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun PreferencesRootView(
     state: PreferencesRootState,
-    onBackPressed: () -> Unit,
-    onVerifyClicked: () -> Unit,
-    onSecureBackupClicked: () -> Unit,
-    onManageAccountClicked: (url: String) -> Unit,
+    onBackClick: () -> Unit,
+    onSecureBackupClick: () -> Unit,
+    onManageAccountClick: (url: String) -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenRageShake: () -> Unit,
     onOpenLockScreenSettings: () -> Unit,
@@ -63,7 +56,8 @@ fun PreferencesRootView(
     onOpenNotificationSettings: () -> Unit,
     onOpenUserProfile: (MatrixUser) -> Unit,
     onOpenBlockedUsers: () -> Unit,
-    onSignOutClicked: () -> Unit,
+    onSignOutClick: () -> Unit,
+    onDeactivateClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = rememberSnackbarHostState(snackbarMessage = state.snackbarMessage)
@@ -71,117 +65,184 @@ fun PreferencesRootView(
     // Include pref from other modules
     PreferencePage(
         modifier = modifier,
-        onBackPressed = onBackPressed,
+        onBackClick = onBackClick,
         title = stringResource(id = CommonStrings.common_settings),
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) {
         UserPreferences(
             modifier = Modifier.clickable {
-                state.myUser?.let(onOpenUserProfile)
+                onOpenUserProfile(state.myUser)
             },
             user = state.myUser,
         )
-        if (state.showCompleteVerification) {
-            ListItem(
-                headlineContent = { Text(text = stringResource(CommonStrings.common_verify_device)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.CheckCircle())),
-                onClick = onVerifyClicked
-            )
-        }
-        if (state.showSecureBackup) {
-            ListItem(
-                headlineContent = { Text(stringResource(id = CommonStrings.common_chat_backup)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.KeySolid())),
-                trailingContent = ListItemContent.Badge.takeIf { state.showSecureBackupBadge },
-                onClick = onSecureBackupClicked,
-            )
-        }
-        if (state.showCompleteVerification || state.showSecureBackup) {
-            HorizontalDivider()
-        }
-        if (state.accountManagementUrl != null) {
-            ListItem(
-                headlineContent = { Text(stringResource(id = CommonStrings.action_manage_account)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.UserProfile())),
-                trailingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.PopOut())),
-                onClick = { onManageAccountClicked(state.accountManagementUrl) },
-            )
-            HorizontalDivider()
-        }
-        if (state.showAnalyticsSettings) {
-            ListItem(
-                headlineContent = { Text(stringResource(id = CommonStrings.common_analytics)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Chart())),
-                onClick = onOpenAnalytics,
-            )
-        }
-        if (state.showNotificationSettings) {
-            ListItem(
-                headlineContent = { Text(stringResource(id = R.string.screen_notification_settings_title)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Notifications())),
-                onClick = onOpenNotificationSettings,
-            )
-        }
-        if (state.showBlockedUsersItem) {
-            ListItem(
-                headlineContent = { Text(stringResource(id = CommonStrings.common_blocked_users)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Block())),
-                onClick = onOpenBlockedUsers,
-            )
-        }
-        ListItem(
-            headlineContent = { Text(stringResource(id = CommonStrings.common_report_a_problem)) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.ChatProblem())),
-            onClick = onOpenRageShake
+
+        // 'Manage my app' section
+        ManageAppSection(
+            state = state,
+            onOpenNotificationSettings = onOpenNotificationSettings,
+            onOpenLockScreenSettings = onOpenLockScreenSettings,
+            onSecureBackupClick = onSecureBackupClick,
         )
-        ListItem(
-            headlineContent = { Text(stringResource(id = CommonStrings.common_about)) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Info())),
-            onClick = onOpenAbout,
+
+        // 'Account' section
+        ManageAccountSection(
+            state = state,
+            onManageAccountClick = onManageAccountClick,
+            onOpenBlockedUsers = onOpenBlockedUsers
         )
-        if (state.showLockScreenSettings) {
-            ListItem(
-                headlineContent = { Text(stringResource(id = CommonStrings.common_screen_lock)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Lock())),
-                onClick = onOpenLockScreenSettings,
-            )
-        }
-        HorizontalDivider()
-        if (state.devicesManagementUrl != null) {
-            ListItem(
-                headlineContent = { Text(stringResource(id = CommonStrings.action_manage_devices)) },
-                leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Devices())),
-                trailingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.PopOut())),
-                onClick = { onManageAccountClicked(state.devicesManagementUrl) },
-            )
-            HorizontalDivider()
-        }
-        ListItem(
-            headlineContent = { Text(stringResource(id = CommonStrings.common_advanced_settings)) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Settings())),
-            onClick = onOpenAdvancedSettings,
+
+        // General section
+        GeneralSection(
+            state = state,
+            onOpenAbout = onOpenAbout,
+            onOpenAnalytics = onOpenAnalytics,
+            onOpenRageShake = onOpenRageShake,
+            onOpenAdvancedSettings = onOpenAdvancedSettings,
+            onOpenDeveloperSettings = onOpenDeveloperSettings,
+            onSignOutClick = onSignOutClick,
+            onDeactivateClick = onDeactivateClick,
         )
-        if (state.showDeveloperSettings) {
-            DeveloperPreferencesView(onOpenDeveloperSettings)
-        }
-        HorizontalDivider()
-        ListItem(
-            headlineContent = { Text(stringResource(id = CommonStrings.action_signout)) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.SignOut())),
-            style = ListItemStyle.Destructive,
-            onClick = onSignOutClicked,
-        )
+
         Footer(
             version = state.version,
             deviceId = state.deviceId,
+            onClick = if (!state.showDeveloperSettings) {
+                { state.eventSink(PreferencesRootEvents.OnVersionInfoClick) }
+            } else {
+                null
+            }
         )
     }
 }
 
 @Composable
-private fun Footer(
+private fun ColumnScope.ManageAppSection(
+    state: PreferencesRootState,
+    onOpenNotificationSettings: () -> Unit,
+    onOpenLockScreenSettings: () -> Unit,
+    onSecureBackupClick: () -> Unit,
+) {
+    if (state.showNotificationSettings) {
+        ListItem(
+            headlineContent = { Text(stringResource(id = R.string.screen_notification_settings_title)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Notifications())),
+            onClick = onOpenNotificationSettings,
+        )
+    }
+    if (state.showLockScreenSettings) {
+        ListItem(
+            headlineContent = { Text(stringResource(id = CommonStrings.common_screen_lock)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Lock())),
+            onClick = onOpenLockScreenSettings,
+        )
+    }
+    if (state.showSecureBackup) {
+        ListItem(
+            headlineContent = { Text(stringResource(id = CommonStrings.common_encryption)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Key())),
+            trailingContent = ListItemContent.Badge.takeIf { state.showSecureBackupBadge },
+            onClick = onSecureBackupClick,
+        )
+    }
+    if (state.showNotificationSettings || state.showLockScreenSettings || state.showSecureBackup) {
+        HorizontalDivider()
+    }
+}
+
+@Composable
+private fun ColumnScope.ManageAccountSection(
+    state: PreferencesRootState,
+    onManageAccountClick: (url: String) -> Unit,
+    onOpenBlockedUsers: () -> Unit,
+) {
+    state.accountManagementUrl?.let { url ->
+        ListItem(
+            headlineContent = { Text(stringResource(id = CommonStrings.action_manage_account)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.UserProfile())),
+            trailingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.PopOut())),
+            onClick = { onManageAccountClick(url) },
+        )
+    }
+
+    state.devicesManagementUrl?.let { url ->
+        ListItem(
+            headlineContent = { Text(stringResource(id = CommonStrings.action_manage_devices)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Devices())),
+            trailingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.PopOut())),
+            onClick = { onManageAccountClick(url) },
+        )
+    }
+
+    if (state.showBlockedUsersItem) {
+        ListItem(
+            headlineContent = { Text(stringResource(id = CommonStrings.common_blocked_users)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Block())),
+            onClick = onOpenBlockedUsers,
+        )
+    }
+
+    if (state.accountManagementUrl != null || state.devicesManagementUrl != null || state.showBlockedUsersItem) {
+        HorizontalDivider()
+    }
+}
+
+@Composable
+private fun ColumnScope.GeneralSection(
+    state: PreferencesRootState,
+    onOpenAbout: () -> Unit,
+    onOpenAnalytics: () -> Unit,
+    onOpenRageShake: () -> Unit,
+    onOpenAdvancedSettings: () -> Unit,
+    onOpenDeveloperSettings: () -> Unit,
+    onSignOutClick: () -> Unit,
+    onDeactivateClick: () -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(stringResource(id = CommonStrings.common_about)) },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Info())),
+        onClick = onOpenAbout,
+    )
+    ListItem(
+        headlineContent = { Text(stringResource(id = CommonStrings.common_report_a_problem)) },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.ChatProblem())),
+        onClick = onOpenRageShake
+    )
+    if (state.showAnalyticsSettings) {
+        ListItem(
+            headlineContent = { Text(stringResource(id = CommonStrings.common_analytics)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Chart())),
+            onClick = onOpenAnalytics,
+        )
+    }
+    ListItem(
+        headlineContent = { Text(stringResource(id = CommonStrings.common_advanced_settings)) },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Settings())),
+        onClick = onOpenAdvancedSettings,
+    )
+    if (state.showDeveloperSettings) {
+        DeveloperPreferencesView(onOpenDeveloperSettings)
+    }
+    ListItem(
+        headlineContent = { Text(stringResource(id = CommonStrings.action_signout)) },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.SignOut())),
+        style = ListItemStyle.Destructive,
+        onClick = onSignOutClick,
+    )
+    if (state.canDeactivateAccount) {
+        ListItem(
+            headlineContent = { Text(stringResource(id = CommonStrings.action_deactivate_account)) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Warning())),
+            style = ListItemStyle.Destructive,
+            onClick = onDeactivateClick,
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.Footer(
     version: String,
-    deviceId: String?
+    deviceId: DeviceId?,
+    onClick: (() -> Unit)?,
 ) {
     val text = remember(version, deviceId) {
         buildString {
@@ -194,12 +255,14 @@ private fun Footer(
     }
     Text(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 40.dp, bottom = 24.dp),
+            .align(Alignment.CenterHorizontally)
+            .padding(top = 16.dp)
+            .clickable(enabled = onClick != null, onClick = onClick ?: {})
+            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 24.dp),
         textAlign = TextAlign.Center,
         text = text,
         style = ElementTheme.typography.fontBodySmRegular,
-        color = ElementTheme.materialColors.secondary,
+        color = ElementTheme.colors.textSecondary,
     )
 }
 
@@ -207,7 +270,7 @@ private fun Footer(
 private fun DeveloperPreferencesView(onOpenDeveloperSettings: () -> Unit) {
     ListItem(
         headlineContent = { Text(stringResource(id = CommonStrings.common_developer_options)) },
-        leadingContent = ListItemContent.Icon(IconSource.Resource(CommonDrawables.ic_developer_options)),
+        leadingContent = ListItemContent.Icon(IconSource.Resource(CompoundDrawables.ic_compound_code)),
         onClick = onOpenDeveloperSettings
     )
 }
@@ -222,23 +285,24 @@ internal fun PreferencesRootViewLightPreview(@PreviewParameter(MatrixUserProvide
 internal fun PreferencesRootViewDarkPreview(@PreviewParameter(MatrixUserProvider::class) matrixUser: MatrixUser) =
     ElementPreviewDark { ContentToPreview(matrixUser) }
 
+@ExcludeFromCoverage
 @Composable
 private fun ContentToPreview(matrixUser: MatrixUser) {
     PreferencesRootView(
-        state = aPreferencesRootState().copy(myUser = matrixUser),
-        onBackPressed = {},
+        state = aPreferencesRootState(myUser = matrixUser),
+        onBackClick = {},
         onOpenAnalytics = {},
         onOpenRageShake = {},
         onOpenDeveloperSettings = {},
         onOpenAdvancedSettings = {},
         onOpenAbout = {},
-        onVerifyClicked = {},
-        onSecureBackupClicked = {},
-        onManageAccountClicked = {},
+        onSecureBackupClick = {},
+        onManageAccountClick = {},
         onOpenNotificationSettings = {},
         onOpenLockScreenSettings = {},
         onOpenUserProfile = {},
         onOpenBlockedUsers = {},
-        onSignOutClicked = {},
+        onSignOutClick = {},
+        onDeactivateClick = {},
     )
 }

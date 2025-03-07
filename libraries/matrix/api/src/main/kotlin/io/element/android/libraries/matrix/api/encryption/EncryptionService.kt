@@ -1,21 +1,13 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.encryption
 
+import io.element.android.libraries.matrix.api.core.UserId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -50,4 +42,80 @@ interface EncryptionService {
      * Wait for backup upload steady state.
      */
     fun waitForBackupUploadSteadyState(): Flow<BackupUploadState>
+
+    /**
+     * Get the public curve25519 key of our own device in base64. This is usually what is
+     * called the identity key of the device.
+     */
+    suspend fun deviceCurve25519(): String?
+
+    /**
+     * Get the public ed25519 key of our own device. This is usually what is
+     * called the fingerprint of the device.
+     */
+    suspend fun deviceEd25519(): String?
+
+    /**
+     * Starts the identity reset process. This will return a handle that can be used to reset the identity.
+     */
+    suspend fun startIdentityReset(): Result<IdentityResetHandle?>
+
+    suspend fun isUserVerified(userId: UserId): Result<Boolean>
+
+    /**
+     * Remember this identity, ensuring it does not result in a pin violation.
+     */
+    suspend fun pinUserIdentity(userId: UserId): Result<Unit>
+
+    /**
+     * Withdraw the verification for that user (also pin the identity).
+     *
+     * Useful when a user that was verified is not anymore, but it is not
+     * possible to re-verify immediately. This allows to restore communication by reverting the
+     * user trust from verified to TOFU verified.
+     */
+    suspend fun withdrawVerification(userId: UserId): Result<Unit>
+}
+
+/**
+ * A handle to reset the user's identity.
+ */
+sealed interface IdentityResetHandle {
+    /**
+     * Cancel the reset process and drops the existing handle in the SDK.
+     */
+    suspend fun cancel()
+}
+
+/**
+ * A handle to reset the user's identity with a password login type.
+ */
+interface IdentityPasswordResetHandle : IdentityResetHandle {
+    /**
+     * Reset the password of the user.
+     *
+     * This method will block the coroutine it's running on and keep polling indefinitely until either the coroutine is cancelled, the [cancel] method is
+     * called, or the identity is reset.
+     *
+     * @param password the current password, which will be validated before the process takes place.
+     */
+    suspend fun resetPassword(password: String): Result<Unit>
+}
+
+/**
+ * A handle to reset the user's identity with an OIDC login type.
+ */
+interface IdentityOidcResetHandle : IdentityResetHandle {
+    /**
+     * The URL to open in a webview/custom tab to reset the identity.
+     */
+    val url: String
+
+    /**
+     * Reset the identity using the OIDC flow.
+     *
+     * This method will block the coroutine it's running on and keep polling indefinitely until either the coroutine is cancelled, the [cancel] method is
+     * called, or the identity is reset.
+     */
+    suspend fun resetOidc(): Result<Unit>
 }

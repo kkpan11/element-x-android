@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.preferences.components
@@ -19,7 +10,6 @@ package io.element.android.libraries.designsystem.components.preferences.compone
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -31,13 +21,39 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import io.element.android.libraries.designsystem.atomic.atoms.RedIndicatorAtom
+import io.element.android.libraries.designsystem.components.list.ListItemContent
 import io.element.android.libraries.designsystem.preview.ElementThemedPreview
 import io.element.android.libraries.designsystem.preview.PreviewGroup
 import io.element.android.libraries.designsystem.theme.components.Icon
-import io.element.android.libraries.designsystem.toSecondaryEnabledColor
+import io.element.android.libraries.designsystem.toIconSecondaryEnabledColor
 
 @Composable
-fun PreferenceIcon(
+fun preferenceIcon(
+    icon: ImageVector? = null,
+    @DrawableRes iconResourceId: Int? = null,
+    showIconBadge: Boolean = false,
+    tintColor: Color? = null,
+    enabled: Boolean = true,
+    showIconAreaIfNoIcon: Boolean = false,
+): ListItemContent.Custom? {
+    return if (icon != null || iconResourceId != null || showIconAreaIfNoIcon) {
+        ListItemContent.Custom {
+            PreferenceIcon(
+                icon = icon,
+                iconResourceId = iconResourceId,
+                showIconBadge = showIconBadge,
+                enabled = enabled,
+                isVisible = showIconAreaIfNoIcon,
+                tintColor = tintColor,
+            )
+        }
+    } else {
+        null
+    }
+}
+
+@Composable
+private fun PreferenceIcon(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     @DrawableRes iconResourceId: Int? = null,
@@ -52,21 +68,19 @@ fun PreferenceIcon(
                 imageVector = icon,
                 resourceId = iconResourceId,
                 contentDescription = null,
-                tint = tintColor ?: enabled.toSecondaryEnabledColor(),
+                tint = tintColor ?: enabled.toIconSecondaryEnabledColor(),
                 modifier = Modifier
-                    .padding(end = 16.dp)
                     .size(24.dp),
             )
             if (showIconBadge) {
                 RedIndicatorAtom(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(end = 16.dp)
                 )
             }
         }
     } else if (isVisible) {
-        Spacer(modifier = modifier.width(40.dp))
+        Spacer(modifier = modifier.width(24.dp))
     }
 }
 

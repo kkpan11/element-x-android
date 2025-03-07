@@ -1,12 +1,5 @@
 <!-- Please read [CONTRIBUTING.md](https://github.com/element-hq/element-x-android/blob/develop/CONTRIBUTING.md) before submitting your pull request -->
  
-## Type of change
-
-- [ ] Feature
-- [ ] Bugfix
-- [ ] Technical
-- [ ] Other :
-
 ## Content
 
 <!-- Describe shortly what has been changed -->
@@ -51,11 +44,10 @@ Uncomment this markdown table below and edit the last line `|||`:
 
 <!-- Depending on the Pull Request content, it can be acceptable if some of the following checkboxes stay unchecked. -->
 
-- [ ] Changes have been tested on an Android device or Android emulator with API 23
+- [ ] Changes have been tested on an Android device or Android emulator with API 24
 - [ ] UI change has been tested on both light and dark themes
 - [ ] Accessibility has been taken into account. See https://github.com/element-hq/element-x-android/blob/develop/CONTRIBUTING.md#accessibility
 - [ ] Pull request is based on the develop branch
-- [ ] Pull request includes a new file under ./changelog.d. See https://github.com/element-hq/element-x-android/blob/develop/CONTRIBUTING.md#changelog
+- [ ] Pull request title will be used in the release note, it clearly define what will change for the user
 - [ ] Pull request includes screenshots or videos if containing UI changes
-- [ ] Pull request includes a [sign off](https://matrix-org.github.io/synapse/latest/development/contributing_guide.html#sign-off)
 - [ ] You've made a self review of your PR

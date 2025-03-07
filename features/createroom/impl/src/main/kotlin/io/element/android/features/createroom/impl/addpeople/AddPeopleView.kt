@@ -1,25 +1,14 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.createroom.impl.addpeople
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -44,8 +33,8 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun AddPeopleView(
     state: UserListState,
-    onBackPressed: () -> Unit,
-    onNextPressed: () -> Unit,
+    onBackClick: () -> Unit,
+    onNextClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -53,32 +42,27 @@ fun AddPeopleView(
         topBar = {
             AddPeopleViewTopBar(
                 hasSelectedUsers = state.selectedUsers.isNotEmpty(),
-                onBackPressed = {
+                onBackClick = {
                     if (state.isSearchActive) {
                         state.eventSink(UserListEvents.OnSearchActiveChanged(false))
                     } else {
-                        onBackPressed()
+                        onBackClick()
                     }
                 },
-                onNextPressed = onNextPressed,
+                onNextClick = onNextClick,
             )
         }
     ) { padding ->
-        Column(
+        UserListView(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .consumeWindowInsets(padding),
-        ) {
-            UserListView(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                state = state,
-                showBackButton = false,
-                onUserSelected = { },
-                onUserDeselected = {},
-            )
-        }
+            state = state,
+            showBackButton = false,
+            onSelectUser = {},
+            onDeselectUser = {},
+        )
     }
 }
 
@@ -86,8 +70,8 @@ fun AddPeopleView(
 @Composable
 private fun AddPeopleViewTopBar(
     hasSelectedUsers: Boolean,
-    onBackPressed: () -> Unit,
-    onNextPressed: () -> Unit,
+    onBackClick: () -> Unit,
+    onNextClick: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -96,12 +80,12 @@ private fun AddPeopleViewTopBar(
                 style = ElementTheme.typography.aliasScreenTitle
             )
         },
-        navigationIcon = { BackButton(onClick = onBackPressed) },
+        navigationIcon = { BackButton(onClick = onBackClick) },
         actions = {
             val textActionResId = if (hasSelectedUsers) CommonStrings.action_next else CommonStrings.action_skip
             TextButton(
                 text = stringResource(id = textActionResId),
-                onClick = onNextPressed,
+                onClick = onNextClick,
             )
         }
     )
@@ -112,7 +96,7 @@ private fun AddPeopleViewTopBar(
 internal fun AddPeopleViewPreview(@PreviewParameter(AddPeopleUserListStateProvider::class) state: UserListState) = ElementPreview {
     AddPeopleView(
         state = state,
-        onBackPressed = {},
-        onNextPressed = {},
+        onBackClick = {},
+        onNextClick = {},
     )
 }

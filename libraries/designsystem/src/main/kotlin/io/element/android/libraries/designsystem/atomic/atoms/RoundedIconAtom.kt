@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.atomic.atoms
@@ -22,9 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
+import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Icon
@@ -46,20 +35,22 @@ import io.element.android.libraries.designsystem.theme.temporaryColorBgSpecial
  * @param resourceId the resource id of the icon to display, exclusive with [imageVector]
  * @param imageVector the image vector of the icon to display, exclusive with [resourceId]
  * @param tint the tint to apply to the icon
+ * @param backgroundTint the tint to apply to the icon background
  */
 @Composable
 fun RoundedIconAtom(
     modifier: Modifier = Modifier,
-    size: RoundedIconAtomSize = RoundedIconAtomSize.Large,
+    size: RoundedIconAtomSize = RoundedIconAtomSize.Big,
     resourceId: Int? = null,
     imageVector: ImageVector? = null,
-    tint: Color = MaterialTheme.colorScheme.secondary
+    tint: Color = ElementTheme.colors.iconSecondary,
+    backgroundTint: Color = ElementTheme.colors.temporaryColorBgSpecial,
 ) {
     Box(
         modifier = modifier
             .size(size.toContainerSize())
             .background(
-                color = ElementTheme.colors.temporaryColorBgSpecial,
+                color = backgroundTint,
                 shape = RoundedCornerShape(size.toCornerSize())
             )
     ) {
@@ -78,21 +69,21 @@ fun RoundedIconAtom(
 private fun RoundedIconAtomSize.toContainerSize(): Dp {
     return when (this) {
         RoundedIconAtomSize.Medium -> 30.dp
-        RoundedIconAtomSize.Large -> 70.dp
+        RoundedIconAtomSize.Big -> 36.dp
     }
 }
 
 private fun RoundedIconAtomSize.toCornerSize(): Dp {
     return when (this) {
         RoundedIconAtomSize.Medium -> 8.dp
-        RoundedIconAtomSize.Large -> 14.dp
+        RoundedIconAtomSize.Big -> 8.dp
     }
 }
 
 private fun RoundedIconAtomSize.toIconSize(): Dp {
     return when (this) {
         RoundedIconAtomSize.Medium -> 16.dp
-        RoundedIconAtomSize.Large -> 48.dp
+        RoundedIconAtomSize.Big -> 24.dp
     }
 }
 
@@ -102,16 +93,16 @@ internal fun RoundedIconAtomPreview() = ElementPreview {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         RoundedIconAtom(
             size = RoundedIconAtomSize.Medium,
-            imageVector = Icons.Filled.Home,
+            imageVector = CompoundIcons.HomeSolid(),
         )
         RoundedIconAtom(
-            size = RoundedIconAtomSize.Large,
-            imageVector = Icons.Filled.Home,
+            size = RoundedIconAtomSize.Big,
+            imageVector = CompoundIcons.HomeSolid(),
         )
     }
 }
 
 enum class RoundedIconAtomSize {
     Medium,
-    Large
+    Big,
 }

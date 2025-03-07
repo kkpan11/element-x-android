@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomdetails.impl.notificationsettings
@@ -21,9 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.roomdetails.impl.R
 import io.element.android.libraries.core.bool.orTrue
+import io.element.android.libraries.designsystem.components.ClickableLinkText
 import io.element.android.libraries.designsystem.components.async.AsyncActionView
 import io.element.android.libraries.designsystem.components.button.BackButton
 import io.element.android.libraries.designsystem.components.preferences.PreferenceCategory
@@ -51,21 +41,21 @@ import io.element.android.libraries.ui.strings.CommonStrings
 fun RoomNotificationSettingsView(
     state: RoomNotificationSettingsState,
     onShowGlobalNotifications: () -> Unit,
-    onBackPressed: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (state.showUserDefinedSettingStyle) {
         UserDefinedRoomNotificationSettingsView(
             state = state,
             modifier = modifier,
-            onBackPressed = onBackPressed,
+            onBackClick = onBackClick,
         )
     } else {
         RoomSpecificNotificationSettingsView(
             state = state,
             modifier = modifier,
             onShowGlobalNotifications = onShowGlobalNotifications,
-            onBackPressed = onBackPressed,
+            onBackClick = onBackClick,
         )
     }
 }
@@ -74,14 +64,14 @@ fun RoomNotificationSettingsView(
 private fun RoomSpecificNotificationSettingsView(
     state: RoomNotificationSettingsState,
     onShowGlobalNotifications: () -> Unit,
-    onBackPressed: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
         modifier = modifier,
         topBar = {
             RoomNotificationSettingsTopBar(
-                onBackPressed = { onBackPressed() }
+                onBackClick = { onBackClick() }
             )
         }
     ) { padding ->
@@ -111,8 +101,8 @@ private fun RoomSpecificNotificationSettingsView(
                         underline = false,
                         bold = true,
                     )
-                    ClickableText(
-                        text = text,
+                    ClickableLinkText(
+                        annotatedString = text,
                         onClick = {
                             onShowGlobalNotifications()
                         },
@@ -120,7 +110,7 @@ private fun RoomSpecificNotificationSettingsView(
                             .padding(start = 16.dp, bottom = 16.dp, end = 16.dp),
                         style = ElementTheme.typography.fontBodyMdRegular
                             .copy(
-                                color = MaterialTheme.colorScheme.secondary,
+                                color = ElementTheme.colors.textSecondary,
                             )
                     )
                     if (state.defaultRoomNotificationMode != null) {
@@ -136,7 +126,7 @@ private fun RoomSpecificNotificationSettingsView(
                         RoomNotificationSettingsOption(
                             roomNotificationSettingsItem = RoomNotificationSettingsItem(state.defaultRoomNotificationMode, defaultModeTitle),
                             isSelected = true,
-                            onOptionSelected = { },
+                            onSelectOption = { },
                             displayMentionsOnlyDisclaimer = displayMentionsOnlyDisclaimer,
                             enabled = true
                         )
@@ -148,8 +138,8 @@ private fun RoomSpecificNotificationSettingsView(
                         selected = state.displayNotificationMode,
                         enabled = !state.displayIsDefault.orTrue(),
                         displayMentionsOnlyDisclaimer = state.displayMentionsOnlyDisclaimer,
-                        onOptionSelected = {
-                            state.eventSink(RoomNotificationSettingsEvents.RoomNotificationModeChanged(it.mode))
+                        onSelectOption = {
+                            state.eventSink(RoomNotificationSettingsEvents.ChangeRoomNotificationMode(it.mode))
                         },
                     )
                 }
@@ -175,7 +165,7 @@ private fun RoomSpecificNotificationSettingsView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RoomNotificationSettingsTopBar(
-    onBackPressed: () -> Unit,
+    onBackClick: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -184,18 +174,18 @@ private fun RoomNotificationSettingsTopBar(
                 style = ElementTheme.typography.aliasScreenTitle,
             )
         },
-        navigationIcon = { BackButton(onClick = onBackPressed) },
+        navigationIcon = { BackButton(onClick = onBackClick) },
     )
 }
 
 @PreviewsDayNight
 @Composable
-internal fun RoomNotificationSettingsPreview(
+internal fun RoomNotificationSettingsViewPreview(
     @PreviewParameter(RoomNotificationSettingsStateProvider::class) state: RoomNotificationSettingsState
 ) = ElementPreview {
     RoomNotificationSettingsView(
         state = state,
         onShowGlobalNotifications = {},
-        onBackPressed = {},
+        onBackClick = {},
     )
 }

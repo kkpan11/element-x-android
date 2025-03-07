@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.user.editprofile
@@ -25,12 +16,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ModalBottomSheetValue
-import androidx.compose.material.rememberModalBottomSheetState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -40,7 +29,6 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.preferences.impl.R
-import io.element.android.libraries.designsystem.components.LabelledOutlinedTextField
 import io.element.android.libraries.designsystem.components.async.AsyncActionView
 import io.element.android.libraries.designsystem.components.async.AsyncActionViewDefaults
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
@@ -52,32 +40,27 @@ import io.element.android.libraries.designsystem.theme.aliasScreenTitle
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TextButton
+import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.matrix.ui.components.AvatarActionBottomSheet
 import io.element.android.libraries.matrix.ui.components.EditableAvatarView
 import io.element.android.libraries.permissions.api.PermissionsView
 import io.element.android.libraries.ui.strings.CommonStrings
-import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterialApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditUserProfileView(
     state: EditUserProfileState,
-    onBackPressed: () -> Unit,
-    onProfileEdited: () -> Unit,
+    onBackClick: () -> Unit,
+    onEditProfileSuccess: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val coroutineScope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
-    val itemActionsBottomSheetState = rememberModalBottomSheetState(
-        initialValue = ModalBottomSheetValue.Hidden,
-    )
+    val isAvatarActionsSheetVisible = remember { mutableStateOf(false) }
 
-    fun onAvatarClicked() {
+    fun onAvatarClick() {
         focusManager.clearFocus()
-        coroutineScope.launch {
-            itemActionsBottomSheetState.show()
-        }
+        isAvatarActionsSheetVisible.value = true
     }
 
     Scaffold(
@@ -90,7 +73,7 @@ fun EditUserProfileView(
                         style = ElementTheme.typography.aliasScreenTitle,
                     )
                 },
-                navigationIcon = { BackButton(onClick = onBackPressed) },
+                navigationIcon = { BackButton(onClick = onBackClick) },
                 actions = {
                     TextButton(
                         text = stringResource(CommonStrings.action_save),
@@ -114,24 +97,22 @@ fun EditUserProfileView(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
             EditableAvatarView(
-                userId = state.userId?.value,
+                matrixId = state.userId.value,
                 displayName = state.displayName,
                 avatarUrl = state.userAvatarUrl,
-                avatarSize = AvatarSize.RoomHeader,
-                onAvatarClicked = { onAvatarClicked() },
+                avatarSize = AvatarSize.EditProfileDetails,
+                onAvatarClick = { onAvatarClick() },
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
             Spacer(modifier = Modifier.height(16.dp))
-            state.userId?.let {
-                Text(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = it.value,
-                    style = ElementTheme.typography.fontBodyLgRegular,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            Text(
+                modifier = Modifier.fillMaxWidth(),
+                text = state.userId.value,
+                style = ElementTheme.typography.fontBodyLgRegular,
+                textAlign = TextAlign.Center,
+            )
             Spacer(modifier = Modifier.height(40.dp))
-            LabelledOutlinedTextField(
+            TextField(
                 label = stringResource(R.string.screen_edit_profile_display_name),
                 value = state.displayName,
                 placeholder = stringResource(CommonStrings.common_room_name_placeholder),
@@ -142,8 +123,9 @@ fun EditUserProfileView(
 
         AvatarActionBottomSheet(
             actions = state.avatarActions,
-            modalBottomSheetState = itemActionsBottomSheetState,
-            onActionSelected = { state.eventSink(EditUserProfileEvents.HandleAvatarAction(it)) }
+            isVisible = isAvatarActionsSheetVisible.value,
+            onDismiss = { isAvatarActionsSheetVisible.value = false },
+            onSelectAction = { state.eventSink(EditUserProfileEvents.HandleAvatarAction(it)) }
         )
 
         AsyncActionView(
@@ -153,7 +135,7 @@ fun EditUserProfileView(
                     progressText = stringResource(R.string.screen_edit_profile_updating_details),
                 )
             },
-            onSuccess = { onProfileEdited() },
+            onSuccess = { onEditProfileSuccess() },
             errorTitle = { stringResource(R.string.screen_edit_profile_error_title) },
             errorMessage = { stringResource(R.string.screen_edit_profile_error) },
             onErrorDismiss = { state.eventSink(EditUserProfileEvents.CancelSaveChanges) },
@@ -169,8 +151,8 @@ fun EditUserProfileView(
 internal fun EditUserProfileViewPreview(@PreviewParameter(EditUserProfileStateProvider::class) state: EditUserProfileState) =
     ElementPreview {
         EditUserProfileView(
-            onBackPressed = {},
-            onProfileEdited = {},
+            onBackClick = {},
+            onEditProfileSuccess = {},
             state = state,
         )
     }

@@ -1,37 +1,31 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.button
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
@@ -50,28 +44,31 @@ fun MainActionButton(
     enabled: Boolean = true,
     contentDescription: String = title,
 ) {
-    val ripple = rememberRipple(bounded = false)
+    val ripple = ripple(bounded = false)
     val interactionSource = remember { MutableInteractionSource() }
     Column(
-        modifier.clickable(
-            enabled = enabled,
-            interactionSource = interactionSource,
-            onClick = onClick,
-            indication = ripple
-        ),
+        modifier
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                onClick = onClick,
+                indication = ripple
+            )
+            .widthIn(min = 76.dp, max = 96.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        val tintColor = if (enabled) LocalContentColor.current else MaterialTheme.colorScheme.secondary
         Icon(
             imageVector = imageVector,
             contentDescription = contentDescription,
-            tint = tintColor,
+            tint = if (enabled) LocalContentColor.current else ElementTheme.colors.iconDisabled,
         )
         Spacer(modifier = Modifier.height(14.dp))
         Text(
             title,
-            style = ElementTheme.typography.fontBodyMdMedium,
-            color = tintColor,
+            style = ElementTheme.typography.fontBodyMdMedium.copy(hyphens = Hyphens.Auto),
+            color = if (enabled) LocalContentColor.current else ElementTheme.colors.textDisabled,
+            overflow = TextOverflow.Visible,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -86,13 +83,20 @@ internal fun MainActionButtonPreview() {
 
 @Composable
 private fun ContentsToPreview() {
-    Row(Modifier.padding(10.dp)) {
+    Row(
+        modifier = Modifier.padding(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
         MainActionButton(
             title = "Share",
             imageVector = CompoundIcons.ShareAndroid(),
             onClick = { },
         )
-        Spacer(modifier = Modifier.width(20.dp))
+        MainActionButton(
+            title = "Share with a long text",
+            imageVector = CompoundIcons.ShareAndroid(),
+            onClick = { },
+        )
         MainActionButton(
             title = "Share",
             imageVector = CompoundIcons.ShareAndroid(),

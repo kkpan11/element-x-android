@@ -1,25 +1,31 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.appconfig
 
-object NotificationConfig {
-    // TODO EAx Implement and set to true at some point
-    const val SUPPORT_MARK_AS_READ_ACTION = false
+import android.graphics.Color
+import androidx.annotation.ColorInt
 
-    // TODO EAx Implement and set to true at some point
-    const val SUPPORT_QUICK_REPLY_ACTION = false
+object NotificationConfig {
+    /**
+     * If set to true, the notification will have a "Mark as read" action.
+     */
+    const val SHOW_MARK_AS_READ_ACTION = true
+
+    /**
+     * If set to true, the notification for invitation will have two actions to accept or decline the invite.
+     */
+    const val SHOW_ACCEPT_AND_DECLINE_INVITE_ACTIONS = true
+
+    /**
+     * If set to true, the notification will have a "Quick reply" action, allow to compose and send a message to the room.
+     */
+    const val SHOW_QUICK_REPLY_ACTION = true
+
+    @ColorInt
+    val NOTIFICATION_ACCENT_COLOR: Int = Color.parseColor("#FF0DBD8B")
 }

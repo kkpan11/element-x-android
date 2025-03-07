@@ -1,29 +1,43 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package extension
 
 import org.gradle.api.Project
+import org.gradle.api.provider.ValueSource
+import org.gradle.api.provider.ValueSourceParameters
+import org.gradle.process.ExecOperations
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.util.Properties
+import javax.inject.Inject
 
-private fun Project.runCommand(cmd: String): String {
+abstract class GitRevisionValueSource : ValueSource<String, ValueSourceParameters.None> {
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    override fun obtain(): String? {
+        return execOperations.runCommand("git rev-parse --short=8 HEAD")
+    }
+}
+
+abstract class GitBranchNameValueSource : ValueSource<String, ValueSourceParameters.None> {
+    @get:Inject
+    abstract val execOperations: ExecOperations
+
+    override fun obtain(): String? {
+        return execOperations.runCommand("git rev-parse --abbrev-ref HEAD")
+    }
+}
+
+private fun ExecOperations.runCommand(cmd: String): String {
     val outputStream = ByteArrayOutputStream()
     val errorStream = ByteArrayOutputStream()
-    project.exec {
+    exec {
         commandLine = cmd.split(" ")
         standardOutput = outputStream
         errorOutput = errorStream
@@ -35,6 +49,9 @@ private fun Project.runCommand(cmd: String): String {
     return String(outputStream.toByteArray()).trim()
 }
 
-fun Project.gitRevision() = runCommand("git rev-parse --short=8 HEAD")
-
-fun Project.gitBranchName() = runCommand("git rev-parse --abbrev-ref HEAD")
+fun Project.readLocalProperty(name: String): String? = Properties().apply {
+    try {
+        load(rootProject.file("local.properties").reader())
+    } catch (ignored: IOException) {
+    }
+}.getProperty(name)

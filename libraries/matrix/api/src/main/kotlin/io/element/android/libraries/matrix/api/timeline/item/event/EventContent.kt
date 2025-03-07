@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.timeline.item.event
@@ -19,6 +10,7 @@ package io.element.android.libraries.matrix.api.timeline.item.event
 import androidx.compose.runtime.Immutable
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.media.ImageInfo
+import io.element.android.libraries.matrix.api.media.MediaSource
 import io.element.android.libraries.matrix.api.poll.PollAnswer
 import io.element.android.libraries.matrix.api.poll.PollKind
 import kotlinx.collections.immutable.ImmutableList
@@ -38,10 +30,14 @@ data class MessageContent(
 data object RedactedContent : EventContent
 
 data class StickerContent(
-    val body: String,
+    val filename: String,
+    val body: String?,
     val info: ImageInfo,
-    val url: String
-) : EventContent
+    val source: MediaSource,
+) : EventContent {
+    val bestDescription: String
+        get() = body ?: filename
+}
 
 data class PollContent(
     val question: String,
@@ -63,7 +59,8 @@ data class UnableToDecryptContent(
         ) : Data
 
         data class MegolmV1AesSha2(
-            val sessionId: String
+            val sessionId: String,
+            val utdCause: UtdCause
         ) : Data
 
         data object Unknown : Data
@@ -72,6 +69,7 @@ data class UnableToDecryptContent(
 
 data class RoomMembershipContent(
     val userId: UserId,
+    val userDisplayName: String?,
     val change: MembershipChange?
 ) : EventContent
 
@@ -97,5 +95,9 @@ data class FailedToParseStateContent(
     val stateKey: String,
     val error: String
 ) : EventContent
+
+data object LegacyCallInviteContent : EventContent
+
+data object CallNotifyContent : EventContent
 
 data object UnknownContent : EventContent

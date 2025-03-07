@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.messagecomposer
@@ -48,8 +39,8 @@ import io.element.android.libraries.designsystem.theme.components.Text
 @Composable
 internal fun AttachmentsBottomSheet(
     state: MessageComposerState,
-    onSendLocationClicked: () -> Unit,
-    onCreatePollClicked: () -> Unit,
+    onSendLocationClick: () -> Unit,
+    onCreatePollClick: () -> Unit,
     enableTextFormatting: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -87,8 +78,8 @@ internal fun AttachmentsBottomSheet(
             AttachmentSourcePickerMenu(
                 state = state,
                 enableTextFormatting = enableTextFormatting,
-                onSendLocationClicked = onSendLocationClicked,
-                onCreatePollClicked = onCreatePollClicked,
+                onSendLocationClick = onSendLocationClick,
+                onCreatePollClick = onCreatePollClick,
             )
         }
     }
@@ -97,8 +88,8 @@ internal fun AttachmentsBottomSheet(
 @Composable
 private fun AttachmentSourcePickerMenu(
     state: MessageComposerState,
-    onSendLocationClicked: () -> Unit,
-    onCreatePollClicked: () -> Unit,
+    onSendLocationClick: () -> Unit,
+    onCreatePollClick: () -> Unit,
     enableTextFormatting: Boolean,
 ) {
     Column(
@@ -106,18 +97,6 @@ private fun AttachmentSourcePickerMenu(
             .navigationBarsPadding()
             .imePadding()
     ) {
-        ListItem(
-            modifier = Modifier.clickable { state.eventSink(MessageComposerEvents.PickAttachmentSource.FromGallery) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Image())),
-            headlineContent = { Text(stringResource(R.string.screen_room_attachment_source_gallery)) },
-            style = ListItemStyle.Primary,
-        )
-        ListItem(
-            modifier = Modifier.clickable { state.eventSink(MessageComposerEvents.PickAttachmentSource.FromFiles) },
-            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Attachment())),
-            headlineContent = { Text(stringResource(R.string.screen_room_attachment_source_files)) },
-            style = ListItemStyle.Primary,
-        )
         ListItem(
             modifier = Modifier.clickable { state.eventSink(MessageComposerEvents.PickAttachmentSource.PhotoFromCamera) },
             leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.TakePhoto())),
@@ -130,11 +109,23 @@ private fun AttachmentSourcePickerMenu(
             headlineContent = { Text(stringResource(R.string.screen_room_attachment_source_camera_video)) },
             style = ListItemStyle.Primary,
         )
+        ListItem(
+            modifier = Modifier.clickable { state.eventSink(MessageComposerEvents.PickAttachmentSource.FromGallery) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Image())),
+            headlineContent = { Text(stringResource(R.string.screen_room_attachment_source_gallery)) },
+            style = ListItemStyle.Primary,
+        )
+        ListItem(
+            modifier = Modifier.clickable { state.eventSink(MessageComposerEvents.PickAttachmentSource.FromFiles) },
+            leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Attachment())),
+            headlineContent = { Text(stringResource(R.string.screen_room_attachment_source_files)) },
+            style = ListItemStyle.Primary,
+        )
         if (state.canShareLocation) {
             ListItem(
                 modifier = Modifier.clickable {
                     state.eventSink(MessageComposerEvents.PickAttachmentSource.Location)
-                    onSendLocationClicked()
+                    onSendLocationClick()
                 },
                 leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.LocationPin())),
                 headlineContent = { Text(stringResource(R.string.screen_room_attachment_source_location)) },
@@ -145,7 +136,7 @@ private fun AttachmentSourcePickerMenu(
             ListItem(
                 modifier = Modifier.clickable {
                     state.eventSink(MessageComposerEvents.PickAttachmentSource.Poll)
-                    onCreatePollClicked()
+                    onCreatePollClick()
                 },
                 leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Polls())),
                 headlineContent = { Text(stringResource(R.string.screen_room_attachment_source_poll)) },
@@ -170,8 +161,8 @@ internal fun AttachmentSourcePickerMenuPreview() = ElementPreview {
         state = aMessageComposerState(
             canShareLocation = true,
         ),
-        onSendLocationClicked = {},
-        onCreatePollClicked = {},
+        onSendLocationClick = {},
+        onCreatePollClick = {},
         enableTextFormatting = true,
     )
 }

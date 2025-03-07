@@ -1,27 +1,22 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.test.room
 
+import io.element.android.libraries.matrix.api.core.DeviceId
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.ProgressCallback
+import io.element.android.libraries.matrix.api.core.RoomAlias
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.SendHandle
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.core.TransactionId
 import io.element.android.libraries.matrix.api.core.UserId
+import io.element.android.libraries.matrix.api.encryption.identity.IdentityStateChange
 import io.element.android.libraries.matrix.api.media.AudioInfo
 import io.element.android.libraries.matrix.api.media.FileInfo
 import io.element.android.libraries.matrix.api.media.ImageInfo
@@ -29,167 +24,180 @@ import io.element.android.libraries.matrix.api.media.MediaUploadHandler
 import io.element.android.libraries.matrix.api.media.VideoInfo
 import io.element.android.libraries.matrix.api.notificationsettings.NotificationSettingsService
 import io.element.android.libraries.matrix.api.poll.PollKind
-import io.element.android.libraries.matrix.api.room.CurrentUserMembership
+import io.element.android.libraries.matrix.api.room.CreateTimelineParams
+import io.element.android.libraries.matrix.api.room.IntentionalMention
 import io.element.android.libraries.matrix.api.room.MatrixRoom
 import io.element.android.libraries.matrix.api.room.MatrixRoomInfo
 import io.element.android.libraries.matrix.api.room.MatrixRoomMembersState
 import io.element.android.libraries.matrix.api.room.MatrixRoomNotificationSettingsState
-import io.element.android.libraries.matrix.api.room.Mention
 import io.element.android.libraries.matrix.api.room.MessageEventType
 import io.element.android.libraries.matrix.api.room.RoomMember
-import io.element.android.libraries.matrix.api.room.RoomNotificationMode
 import io.element.android.libraries.matrix.api.room.StateEventType
+import io.element.android.libraries.matrix.api.room.draft.ComposerDraft
+import io.element.android.libraries.matrix.api.room.history.RoomHistoryVisibility
+import io.element.android.libraries.matrix.api.room.join.JoinRule
+import io.element.android.libraries.matrix.api.room.knock.KnockRequest
 import io.element.android.libraries.matrix.api.room.location.AssetType
+import io.element.android.libraries.matrix.api.room.powerlevels.MatrixRoomPowerLevels
 import io.element.android.libraries.matrix.api.room.powerlevels.UserRoleChange
-import io.element.android.libraries.matrix.api.timeline.MatrixTimeline
+import io.element.android.libraries.matrix.api.roomdirectory.RoomVisibility
 import io.element.android.libraries.matrix.api.timeline.ReceiptType
-import io.element.android.libraries.matrix.api.timeline.item.event.EventTimelineItem
+import io.element.android.libraries.matrix.api.timeline.Timeline
+import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 import io.element.android.libraries.matrix.api.widget.MatrixWidgetDriver
 import io.element.android.libraries.matrix.api.widget.MatrixWidgetSettings
-import io.element.android.libraries.matrix.test.AN_AVATAR_URL
 import io.element.android.libraries.matrix.test.A_ROOM_ID
-import io.element.android.libraries.matrix.test.A_ROOM_NAME
 import io.element.android.libraries.matrix.test.A_SESSION_ID
 import io.element.android.libraries.matrix.test.media.FakeMediaUploadHandler
 import io.element.android.libraries.matrix.test.notificationsettings.FakeNotificationSettingsService
-import io.element.android.libraries.matrix.test.timeline.FakeMatrixTimeline
-import io.element.android.libraries.matrix.test.widget.FakeWidgetDriver
+import io.element.android.libraries.matrix.test.timeline.FakeTimeline
+import io.element.android.tests.testutils.lambda.lambdaError
 import io.element.android.tests.testutils.simulateLongTask
-import kotlinx.collections.immutable.ImmutableMap
-import kotlinx.collections.immutable.persistentMapOf
-import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.test.TestScope
 import java.io.File
 
 class FakeMatrixRoom(
     override val sessionId: SessionId = A_SESSION_ID,
     override val roomId: RoomId = A_ROOM_ID,
-    override val name: String? = null,
     override val displayName: String = "",
     override val topic: String? = null,
     override val avatarUrl: String? = null,
-    override val isEncrypted: Boolean = false,
-    override val alias: String? = null,
-    override val alternativeAliases: List<String> = emptyList(),
+    override var isEncrypted: Boolean = false,
+    override val canonicalAlias: RoomAlias? = null,
+    override val alternativeAliases: List<RoomAlias> = emptyList(),
     override val isPublic: Boolean = true,
+    override val isSpace: Boolean = false,
     override val isDirect: Boolean = false,
-    override val isOneToOne: Boolean = false,
     override val joinedMemberCount: Long = 123L,
     override val activeMemberCount: Long = 234L,
     val notificationSettingsService: NotificationSettingsService = FakeNotificationSettingsService(),
-    private val matrixTimeline: MatrixTimeline = FakeMatrixTimeline(),
-    canRedactOwn: Boolean = false,
-    canRedactOther: Boolean = false,
+    override val liveTimeline: Timeline = FakeTimeline(),
+    override val roomCoroutineScope: CoroutineScope = TestScope(),
+    private var roomPermalinkResult: () -> Result<String> = { lambdaError() },
+    private var eventPermalinkResult: (EventId) -> Result<String> = { lambdaError() },
+    private val sendCallNotificationIfNeededResult: () -> Result<Unit> = { lambdaError() },
+    private val userDisplayNameResult: (UserId) -> Result<String?> = { lambdaError() },
+    private val userAvatarUrlResult: () -> Result<String?> = { lambdaError() },
+    private val userRoleResult: () -> Result<RoomMember.Role> = { lambdaError() },
+    private val getUpdatedMemberResult: (UserId) -> Result<RoomMember> = { lambdaError() },
+    private val joinRoomResult: () -> Result<Unit> = { lambdaError() },
+    private val inviteUserResult: (UserId) -> Result<Unit> = { lambdaError() },
+    private val canInviteResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val canKickResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val canBanResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val canRedactOwnResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val canRedactOtherResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val canSendStateResult: (UserId, StateEventType) -> Result<Boolean> = { _, _ -> lambdaError() },
+    private val canUserSendMessageResult: (UserId, MessageEventType) -> Result<Boolean> = { _, _ -> lambdaError() },
+    private val sendImageResult: (File, File?, ImageInfo, String?, String?, ProgressCallback?) -> Result<FakeMediaUploadHandler> =
+        { _, _, _, _, _, _ -> lambdaError() },
+    private val sendVideoResult: (File, File?, VideoInfo, String?, String?, ProgressCallback?) -> Result<FakeMediaUploadHandler> =
+        { _, _, _, _, _, _ -> lambdaError() },
+    private val sendFileResult: (File, FileInfo, String?, String?, ProgressCallback?) -> Result<FakeMediaUploadHandler> =
+        { _, _, _, _, _ -> lambdaError() },
+    private val sendAudioResult: (File, AudioInfo, String?, String?, ProgressCallback?) -> Result<FakeMediaUploadHandler> =
+        { _, _, _, _, _ -> lambdaError() },
+    private val sendVoiceMessageResult: (File, AudioInfo, List<Float>, ProgressCallback?) -> Result<FakeMediaUploadHandler> =
+        { _, _, _, _ -> lambdaError() },
+    private val setNameResult: (String) -> Result<Unit> = { lambdaError() },
+    private val setTopicResult: (String) -> Result<Unit> = { lambdaError() },
+    private val updateAvatarResult: (String, ByteArray) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val removeAvatarResult: () -> Result<Unit> = { lambdaError() },
+    private val editMessageLambda: (EventId, String, String?, List<IntentionalMention>) -> Result<Unit> = { _, _, _, _ -> lambdaError() },
+    private val sendMessageResult: (String, String?, List<IntentionalMention>) -> Result<Unit> = { _, _, _ -> lambdaError() },
+    private val updateUserRoleResult: () -> Result<Unit> = { lambdaError() },
+    private val toggleReactionResult: (String, EventOrTransactionId) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val cancelSendResult: (TransactionId) -> Result<Unit> = { lambdaError() },
+    private val forwardEventResult: (EventId, List<RoomId>) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val reportContentResult: (EventId, String, UserId?) -> Result<Unit> = { _, _, _ -> lambdaError() },
+    private val kickUserResult: (UserId, String?) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val banUserResult: (UserId, String?) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val unBanUserResult: (UserId, String?) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val sendLocationResult: (String, String, String?, Int?, AssetType?) -> Result<Unit> = { _, _, _, _, _ -> lambdaError() },
+    private val createPollResult: (String, List<String>, Int, PollKind) -> Result<Unit> = { _, _, _, _ -> lambdaError() },
+    private val editPollResult: (EventId, String, List<String>, Int, PollKind) -> Result<Unit> = { _, _, _, _, _ -> lambdaError() },
+    private val sendPollResponseResult: (EventId, List<String>) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val endPollResult: (EventId, String) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val progressCallbackValues: List<Pair<Long, Long>> = emptyList(),
+    private val generateWidgetWebViewUrlResult: (MatrixWidgetSettings, String, String?, String?) -> Result<String> = { _, _, _, _ -> lambdaError() },
+    private val getWidgetDriverResult: (MatrixWidgetSettings) -> Result<MatrixWidgetDriver> = { lambdaError() },
+    private val canUserTriggerRoomNotificationResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val canUserJoinCallResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val canUserPinUnpinResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val setIsFavoriteResult: (Boolean) -> Result<Unit> = { lambdaError() },
+    private val powerLevelsResult: () -> Result<MatrixRoomPowerLevels> = { lambdaError() },
+    private val updatePowerLevelsResult: () -> Result<Unit> = { lambdaError() },
+    private val resetPowerLevelsResult: () -> Result<MatrixRoomPowerLevels> = { lambdaError() },
+    private val typingNoticeResult: (Boolean) -> Result<Unit> = { lambdaError() },
+    private val leaveRoomLambda: () -> Result<Unit> = { lambdaError() },
+    private val updateMembersResult: () -> Unit = { lambdaError() },
+    private val getMembersResult: (Int) -> Result<List<RoomMember>> = { lambdaError() },
+    private val createTimelineResult: (CreateTimelineParams) -> Result<Timeline> = { lambdaError() },
+    private val setSendQueueEnabledLambda: (Boolean) -> Unit = { _: Boolean -> },
+    private val saveComposerDraftLambda: (ComposerDraft) -> Result<Unit> = { _: ComposerDraft -> Result.success(Unit) },
+    private val loadComposerDraftLambda: () -> Result<ComposerDraft?> = { Result.success<ComposerDraft?>(null) },
+    private val clearComposerDraftLambda: () -> Result<Unit> = { Result.success(Unit) },
+    private val subscribeToSyncLambda: () -> Unit = { lambdaError() },
+    private val ignoreDeviceTrustAndResendResult: (Map<UserId, List<DeviceId>>, SendHandle) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val withdrawVerificationAndResendResult: (List<UserId>, SendHandle) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val updateCanonicalAliasResult: (RoomAlias?, List<RoomAlias>) -> Result<Unit> = { _, _ -> lambdaError() },
+    private val updateRoomVisibilityResult: (RoomVisibility) -> Result<Unit> = { lambdaError() },
+    private val updateRoomHistoryVisibilityResult: (RoomHistoryVisibility) -> Result<Unit> = { lambdaError() },
+    private val roomVisibilityResult: () -> Result<RoomVisibility> = { lambdaError() },
+    private val publishRoomAliasInRoomDirectoryResult: (RoomAlias) -> Result<Boolean> = { lambdaError() },
+    private val removeRoomAliasFromRoomDirectoryResult: (RoomAlias) -> Result<Boolean> = { lambdaError() },
+    private val enableEncryptionResult: () -> Result<Unit> = { lambdaError() },
+    private val updateJoinRuleResult: (JoinRule) -> Result<Unit> = { lambdaError() },
 ) : MatrixRoom {
-    private var ignoreResult: Result<Unit> = Result.success(Unit)
-    private var unignoreResult: Result<Unit> = Result.success(Unit)
-    private var userDisplayNameResult = Result.success<String?>(null)
-    private var userAvatarUrlResult = Result.success<String?>(null)
-    private var userRoleResult = Result.success(RoomMember.Role.USER)
-    private var updateMembersResult: Result<Unit> = Result.success(Unit)
-    private var joinRoomResult = Result.success(Unit)
-    private var inviteUserResult = Result.success(Unit)
-    private var canInviteResult = Result.success(true)
-    private var canKickResult = Result.success(false)
-    private var canBanResult = Result.success(false)
-    private var canRedactOwnResult = Result.success(canRedactOwn)
-    private var canRedactOtherResult = Result.success(canRedactOther)
-    private val canSendStateResults = mutableMapOf<StateEventType, Result<Boolean>>()
-    private val canSendEventResults = mutableMapOf<MessageEventType, Result<Boolean>>()
-    private var sendMediaResult = Result.success(FakeMediaUploadHandler())
-    private var setNameResult = Result.success(Unit)
-    private var setTopicResult = Result.success(Unit)
-    private var updateAvatarResult = Result.success(Unit)
-    private var removeAvatarResult = Result.success(Unit)
-    private var updateUserRoleResult = Result.success(Unit)
-    private var toggleReactionResult = Result.success(Unit)
-    private var retrySendMessageResult = Result.success(Unit)
-    private var cancelSendResult = Result.success(Unit)
-    private var forwardEventResult = Result.success(Unit)
-    private var reportContentResult = Result.success(Unit)
-    private var kickUserResult = Result.success(Unit)
-    private var banUserResult = Result.success(Unit)
-    private var unBanUserResult = Result.success(Unit)
-    private var sendLocationResult = Result.success(Unit)
-    private var createPollResult = Result.success(Unit)
-    private var editPollResult = Result.success(Unit)
-    private var sendPollResponseResult = Result.success(Unit)
-    private var endPollResult = Result.success(Unit)
-    private var progressCallbackValues = emptyList<Pair<Long, Long>>()
-    private var generateWidgetWebViewUrlResult = Result.success("https://call.element.io")
-    private var getWidgetDriverResult: Result<MatrixWidgetDriver> = Result.success(FakeWidgetDriver())
-    private var canUserTriggerRoomNotificationResult: Result<Boolean> = Result.success(true)
-    private var canUserJoinCallResult: Result<Boolean> = Result.success(true)
-    private var setIsFavoriteResult = Result.success(Unit)
-    var sendMessageMentions = emptyList<Mention>()
-    val editMessageCalls = mutableListOf<Pair<String, String?>>()
-    private val _typingRecord = mutableListOf<Boolean>()
-    val typingRecord: List<Boolean>
-        get() = _typingRecord
-
-    var sendMediaCount = 0
-        private set
-
-    private val _myReactions = mutableSetOf<String>()
-    val myReactions: Set<String> = _myReactions
-
-    var retrySendMessageCount: Int = 0
-        private set
-
-    var cancelSendCount: Int = 0
-        private set
-
-    var reportedContentCount: Int = 0
-        private set
-
-    private val _sentLocations = mutableListOf<SendLocationInvocation>()
-    val sentLocations: List<SendLocationInvocation> = _sentLocations
-
-    private val _createPollInvocations = mutableListOf<SavePollInvocation>()
-    val createPollInvocations: List<SavePollInvocation> = _createPollInvocations
-
-    private val _editPollInvocations = mutableListOf<SavePollInvocation>()
-    val editPollInvocations: List<SavePollInvocation> = _editPollInvocations
-
-    private val _sendPollResponseInvocations = mutableListOf<SendPollResponseInvocation>()
-    val sendPollResponseInvocations: List<SendPollResponseInvocation> = _sendPollResponseInvocations
-
-    private val _endPollInvocations = mutableListOf<EndPollInvocation>()
-    val endPollInvocations: List<EndPollInvocation> = _endPollInvocations
-
-    var invitedUserId: UserId? = null
-        private set
-
-    var newTopic: String? = null
-        private set
-
-    var newName: String? = null
-        private set
-
-    var newAvatarData: ByteArray? = null
-        private set
-
-    var removedAvatar: Boolean = false
-        private set
-
-    private var leaveRoomError: Throwable? = null
-
     private val _roomInfoFlow: MutableSharedFlow<MatrixRoomInfo> = MutableSharedFlow(replay = 1)
     override val roomInfoFlow: Flow<MatrixRoomInfo> = _roomInfoFlow
 
+    fun givenRoomInfo(roomInfo: MatrixRoomInfo) {
+        _roomInfoFlow.tryEmit(roomInfo)
+    }
+
     private val _roomTypingMembersFlow: MutableSharedFlow<List<UserId>> = MutableSharedFlow(replay = 1)
     override val roomTypingMembersFlow: Flow<List<UserId>> = _roomTypingMembersFlow
+
+    fun givenRoomTypingMembers(typingMembers: List<UserId>) {
+        _roomTypingMembersFlow.tryEmit(typingMembers)
+    }
+
+    private val _identityStateChangesFlow: MutableSharedFlow<List<IdentityStateChange>> = MutableSharedFlow(replay = 1)
+    override val identityStateChangesFlow: Flow<List<IdentityStateChange>> = _identityStateChangesFlow
+
+    fun emitIdentityStateChanges(identityStateChanges: List<IdentityStateChange>) {
+        _identityStateChangesFlow.tryEmit(identityStateChanges)
+    }
+
+    private val _knockRequestsFlow: MutableSharedFlow<List<KnockRequest>> = MutableSharedFlow(replay = 1)
+    override val knockRequestsFlow: Flow<List<KnockRequest>> = _knockRequestsFlow
+
+    fun emitKnockRequests(knockRequests: List<KnockRequest>) {
+        _knockRequestsFlow.tryEmit(knockRequests)
+    }
 
     override val membersStateFlow: MutableStateFlow<MatrixRoomMembersState> = MutableStateFlow(MatrixRoomMembersState.Unknown)
 
     override val roomNotificationSettingsStateFlow: MutableStateFlow<MatrixRoomNotificationSettingsState> =
         MutableStateFlow(MatrixRoomNotificationSettingsState.Unknown)
 
-    override suspend fun updateMembers() = Unit
+    override suspend fun updateMembers() = updateMembersResult()
+
+    override suspend fun getUpdatedMember(userId: UserId): Result<RoomMember> {
+        return getUpdatedMemberResult(userId)
+    }
+
+    override suspend fun getMembers(limit: Int): Result<List<RoomMember>> {
+        return getMembersResult(limit)
+    }
 
     override suspend fun updateRoomNotificationSettings(): Result<Unit> = simulateLongTask {
         val notificationSettings = notificationSettingsService.getRoomNotificationSettings(roomId, isEncrypted, isOneToOne).getOrThrow()
@@ -197,203 +205,233 @@ class FakeMatrixRoom(
         return Result.success(Unit)
     }
 
-    override val syncUpdateFlow: StateFlow<Long> = MutableStateFlow(0L)
+    override suspend fun enableEncryption(): Result<Unit> = simulateLongTask {
+        enableEncryptionResult().onSuccess {
+            isEncrypted = true
+            emitSyncUpdate()
+        }
+    }
 
-    override val timeline: MatrixTimeline = matrixTimeline
+    private val _syncUpdateFlow = MutableStateFlow(0L)
+    override val syncUpdateFlow: StateFlow<Long> = _syncUpdateFlow.asStateFlow()
 
-    override suspend fun subscribeToSync() = Unit
+    fun emitSyncUpdate() {
+        _syncUpdateFlow.tryEmit(_syncUpdateFlow.value + 1)
+    }
 
-    override suspend fun unsubscribeFromSync() = Unit
+    override suspend fun createTimeline(
+        createTimelineParams: CreateTimelineParams,
+    ): Result<Timeline> = simulateLongTask {
+        createTimelineResult(createTimelineParams)
+    }
+
+    override suspend fun subscribeToSync() {
+        subscribeToSyncLambda()
+    }
+
+    override suspend fun powerLevels(): Result<MatrixRoomPowerLevels> {
+        return powerLevelsResult()
+    }
+
+    override suspend fun updatePowerLevels(matrixRoomPowerLevels: MatrixRoomPowerLevels): Result<Unit> = simulateLongTask {
+        updatePowerLevelsResult()
+    }
+
+    override suspend fun resetPowerLevels(): Result<MatrixRoomPowerLevels> = simulateLongTask {
+        resetPowerLevelsResult()
+    }
 
     override fun destroy() = Unit
 
     override suspend fun userDisplayName(userId: UserId): Result<String?> = simulateLongTask {
-        userDisplayNameResult
+        userDisplayNameResult(userId)
     }
 
     override suspend fun userAvatarUrl(userId: UserId): Result<String?> = simulateLongTask {
-        userAvatarUrlResult
+        userAvatarUrlResult()
     }
 
     override suspend fun userRole(userId: UserId): Result<RoomMember.Role> {
-        return userRoleResult
+        return userRoleResult()
     }
 
     override suspend fun updateUsersRoles(changes: List<UserRoleChange>): Result<Unit> {
-        return updateUserRoleResult
+        return updateUserRoleResult()
     }
 
-    override suspend fun sendMessage(body: String, htmlBody: String?, mentions: List<Mention>) = simulateLongTask {
-        sendMessageMentions = mentions
-        Result.success(Unit)
+    override suspend fun editMessage(eventId: EventId, body: String, htmlBody: String?, intentionalMentions: List<IntentionalMention>) = simulateLongTask {
+        editMessageLambda(eventId, body, htmlBody, intentionalMentions)
     }
 
-    override suspend fun toggleReaction(emoji: String, eventId: EventId): Result<Unit> {
-        if (toggleReactionResult.isFailure) {
-            // Don't do the toggle if we failed
-            return toggleReactionResult
-        }
-
-        if (_myReactions.contains(emoji)) {
-            _myReactions.remove(emoji)
-        } else {
-            _myReactions.add(emoji)
-        }
-
-        return toggleReactionResult
+    override suspend fun sendMessage(body: String, htmlBody: String?, intentionalMentions: List<IntentionalMention>) = simulateLongTask {
+        sendMessageResult(body, htmlBody, intentionalMentions)
     }
 
-    override suspend fun retrySendMessage(transactionId: TransactionId): Result<Unit> {
-        retrySendMessageCount++
-        return retrySendMessageResult
+    override suspend fun toggleReaction(emoji: String, eventOrTransactionId: EventOrTransactionId): Result<Unit> {
+        return toggleReactionResult(emoji, eventOrTransactionId)
     }
 
     override suspend fun cancelSend(transactionId: TransactionId): Result<Unit> {
-        cancelSendCount++
-        return cancelSendResult
+        return cancelSendResult(transactionId)
     }
 
-    override suspend fun editMessage(
-        originalEventId: EventId?,
-        transactionId: TransactionId?,
-        body: String,
-        htmlBody: String?,
-        mentions: List<Mention>
-    ): Result<Unit> {
-        sendMessageMentions = mentions
-        editMessageCalls += body to htmlBody
-        return Result.success(Unit)
+    override suspend fun getPermalink(): Result<String> {
+        return roomPermalinkResult()
     }
 
-    var replyMessageParameter: Pair<String, String?>? = null
-        private set
-
-    override suspend fun enterSpecialMode(eventId: EventId?): Result<Unit> {
-        return Result.success(Unit)
+    override suspend fun getPermalinkFor(eventId: EventId): Result<String> {
+        return eventPermalinkResult(eventId)
     }
 
-    override suspend fun replyMessage(eventId: EventId, body: String, htmlBody: String?, mentions: List<Mention>): Result<Unit> {
-        sendMessageMentions = mentions
-        replyMessageParameter = body to htmlBody
-        return Result.success(Unit)
+    override suspend fun leave(): Result<Unit> {
+        return leaveRoomLambda()
     }
-
-    var redactEventEventIdParam: EventId? = null
-        private set
-
-    override suspend fun redactEvent(eventId: EventId, reason: String?): Result<Unit> {
-        redactEventEventIdParam = eventId
-        return Result.success(Unit)
-    }
-
-    override suspend fun leave(): Result<Unit> =
-        leaveRoomError?.let { Result.failure(it) } ?: Result.success(Unit)
 
     override suspend fun join(): Result<Unit> {
-        return joinRoomResult
+        return joinRoomResult()
     }
 
     override suspend fun inviteUserById(id: UserId): Result<Unit> = simulateLongTask {
-        invitedUserId = id
-        inviteUserResult
+        inviteUserResult(id)
     }
 
     override suspend fun canUserBan(userId: UserId): Result<Boolean> {
-        return canBanResult
+        return canBanResult(userId)
     }
 
     override suspend fun canUserKick(userId: UserId): Result<Boolean> {
-        return canKickResult
+        return canKickResult(userId)
     }
 
     override suspend fun canUserInvite(userId: UserId): Result<Boolean> {
-        return canInviteResult
+        return canInviteResult(userId)
     }
 
     override suspend fun canUserRedactOwn(userId: UserId): Result<Boolean> {
-        return canRedactOwnResult
+        return canRedactOwnResult(userId)
     }
 
     override suspend fun canUserRedactOther(userId: UserId): Result<Boolean> {
-        return canRedactOtherResult
+        return canRedactOtherResult(userId)
     }
 
     override suspend fun canUserSendState(userId: UserId, type: StateEventType): Result<Boolean> {
-        return canSendStateResults[type] ?: Result.failure(IllegalStateException("No fake answer"))
+        return canSendStateResult(userId, type)
     }
 
     override suspend fun canUserSendMessage(userId: UserId, type: MessageEventType): Result<Boolean> {
-        return canSendEventResults[type] ?: Result.failure(IllegalStateException("No fake answer"))
+        return canUserSendMessageResult(userId, type)
     }
 
     override suspend fun canUserTriggerRoomNotification(userId: UserId): Result<Boolean> {
-        return canUserTriggerRoomNotificationResult
+        return canUserTriggerRoomNotificationResult(userId)
     }
 
     override suspend fun canUserJoinCall(userId: UserId): Result<Boolean> {
-        return canUserJoinCallResult
+        return canUserJoinCallResult(userId)
+    }
+
+    override suspend fun canUserPinUnpin(userId: UserId): Result<Boolean> {
+        return canUserPinUnpinResult(userId)
     }
 
     override suspend fun sendImage(
         file: File,
         thumbnailFile: File?,
         imageInfo: ImageInfo,
+        caption: String?,
+        formattedCaption: String?,
         progressCallback: ProgressCallback?
-    ): Result<MediaUploadHandler> = fakeSendMedia(progressCallback)
+    ): Result<MediaUploadHandler> = simulateLongTask {
+        simulateSendMediaProgress(progressCallback)
+        sendImageResult(
+            file,
+            thumbnailFile,
+            imageInfo,
+            caption,
+            formattedCaption,
+            progressCallback,
+        )
+    }
 
     override suspend fun sendVideo(
         file: File,
         thumbnailFile: File?,
         videoInfo: VideoInfo,
+        caption: String?,
+        formattedCaption: String?,
         progressCallback: ProgressCallback?
-    ): Result<MediaUploadHandler> = fakeSendMedia(
-        progressCallback
-    )
+    ): Result<MediaUploadHandler> = simulateLongTask {
+        simulateSendMediaProgress(progressCallback)
+        sendVideoResult(
+            file,
+            thumbnailFile,
+            videoInfo,
+            caption,
+            formattedCaption,
+            progressCallback,
+        )
+    }
 
     override suspend fun sendAudio(
         file: File,
         audioInfo: AudioInfo,
+        caption: String?,
+        formattedCaption: String?,
         progressCallback: ProgressCallback?
-    ): Result<MediaUploadHandler> = fakeSendMedia(progressCallback)
+    ): Result<MediaUploadHandler> = simulateLongTask {
+        simulateSendMediaProgress(progressCallback)
+        sendAudioResult(
+            file,
+            audioInfo,
+            caption,
+            formattedCaption,
+            progressCallback,
+        )
+    }
 
     override suspend fun sendFile(
         file: File,
         fileInfo: FileInfo,
+        caption: String?,
+        formattedCaption: String?,
         progressCallback: ProgressCallback?
-    ): Result<MediaUploadHandler> = fakeSendMedia(progressCallback)
-
-    override suspend fun forwardEvent(eventId: EventId, roomIds: List<RoomId>): Result<Unit> = simulateLongTask {
-        forwardEventResult
+    ): Result<MediaUploadHandler> = simulateLongTask {
+        simulateSendMediaProgress(progressCallback)
+        sendFileResult(
+            file,
+            fileInfo,
+            caption,
+            formattedCaption,
+            progressCallback,
+        )
     }
 
-    private suspend fun fakeSendMedia(progressCallback: ProgressCallback?): Result<MediaUploadHandler> = simulateLongTask {
-        sendMediaResult.onSuccess {
-            progressCallbackValues.forEach { (current, total) ->
-                progressCallback?.onProgress(current, total)
-                delay(1)
-            }
-            sendMediaCount++
+    private suspend fun simulateSendMediaProgress(progressCallback: ProgressCallback?) {
+        progressCallbackValues.forEach { (current, total) ->
+            progressCallback?.onProgress(current, total)
+            delay(1)
         }
     }
 
+    override suspend fun forwardEvent(eventId: EventId, roomIds: List<RoomId>): Result<Unit> = simulateLongTask {
+        forwardEventResult(eventId, roomIds)
+    }
+
     override suspend fun updateAvatar(mimeType: String, data: ByteArray): Result<Unit> = simulateLongTask {
-        newAvatarData = data
-        updateAvatarResult
+        updateAvatarResult(mimeType, data)
     }
 
     override suspend fun removeAvatar(): Result<Unit> = simulateLongTask {
-        removedAvatar = true
-        removeAvatarResult
+        removeAvatarResult()
     }
 
     override suspend fun setName(name: String): Result<Unit> = simulateLongTask {
-        newName = name
-        setNameResult
+        setNameResult(name)
     }
 
     override suspend fun setTopic(topic: String): Result<Unit> = simulateLongTask {
-        newTopic = topic
-        setTopicResult
+        setTopicResult(topic)
     }
 
     override suspend fun reportContent(
@@ -401,28 +439,23 @@ class FakeMatrixRoom(
         reason: String,
         blockUserId: UserId?
     ): Result<Unit> = simulateLongTask {
-        reportedContentCount++
-        return reportContentResult
+        return reportContentResult(eventId, reason, blockUserId)
     }
 
     override suspend fun kickUser(userId: UserId, reason: String?): Result<Unit> {
-        return kickUserResult
+        return kickUserResult(userId, reason)
     }
 
     override suspend fun banUser(userId: UserId, reason: String?): Result<Unit> {
-        return banUserResult
+        return banUserResult(userId, reason)
     }
 
     override suspend fun unbanUser(userId: UserId, reason: String?): Result<Unit> {
-        return unBanUserResult
+        return unBanUserResult(userId, reason)
     }
 
-    val setIsFavoriteCalls = mutableListOf<Boolean>()
-
     override suspend fun setIsFavorite(isFavorite: Boolean): Result<Unit> {
-        return setIsFavoriteResult.also {
-            setIsFavoriteCalls.add(isFavorite)
-        }
+        return setIsFavoriteResult(isFavorite)
     }
 
     val markAsReadCalls = mutableListOf<ReceiptType>()
@@ -447,8 +480,13 @@ class FakeMatrixRoom(
         zoomLevel: Int?,
         assetType: AssetType?,
     ): Result<Unit> = simulateLongTask {
-        _sentLocations.add(SendLocationInvocation(body, geoUri, description, zoomLevel, assetType))
-        return sendLocationResult
+        return sendLocationResult(
+            body,
+            geoUri,
+            description,
+            zoomLevel,
+            assetType,
+        )
     }
 
     override suspend fun createPoll(
@@ -457,8 +495,12 @@ class FakeMatrixRoom(
         maxSelections: Int,
         pollKind: PollKind
     ): Result<Unit> = simulateLongTask {
-        _createPollInvocations.add(SavePollInvocation(question, answers, maxSelections, pollKind))
-        return createPollResult
+        return createPollResult(
+            question,
+            answers,
+            maxSelections,
+            pollKind,
+        )
     }
 
     override suspend fun editPoll(
@@ -468,24 +510,27 @@ class FakeMatrixRoom(
         maxSelections: Int,
         pollKind: PollKind
     ): Result<Unit> = simulateLongTask {
-        _editPollInvocations.add(SavePollInvocation(question, answers, maxSelections, pollKind))
-        return editPollResult
+        return editPollResult(
+            pollStartId,
+            question,
+            answers,
+            maxSelections,
+            pollKind,
+        )
     }
 
     override suspend fun sendPollResponse(
         pollStartId: EventId,
         answers: List<String>
     ): Result<Unit> = simulateLongTask {
-        _sendPollResponseInvocations.add(SendPollResponseInvocation(pollStartId, answers))
-        return sendPollResponseResult
+        return sendPollResponseResult(pollStartId, answers)
     }
 
     override suspend fun endPoll(
         pollStartId: EventId,
         text: String
     ): Result<Unit> = simulateLongTask {
-        _endPollInvocations.add(EndPollInvocation(pollStartId, text))
-        return endPollResult
+        return endPollResult(pollStartId, text)
     }
 
     override suspend fun sendVoiceMessage(
@@ -493,11 +538,18 @@ class FakeMatrixRoom(
         audioInfo: AudioInfo,
         waveform: List<Float>,
         progressCallback: ProgressCallback?
-    ): Result<MediaUploadHandler> = fakeSendMedia(progressCallback)
+    ): Result<MediaUploadHandler> = simulateLongTask {
+        simulateSendMediaProgress(progressCallback)
+        sendVoiceMessageResult(
+            file,
+            audioInfo,
+            waveform,
+            progressCallback,
+        )
+    }
 
     override suspend fun typingNotice(isTyping: Boolean): Result<Unit> {
-        _typingRecord += isTyping
-        return Result.success(Unit)
+        return typingNoticeResult(isTyping)
     }
 
     override suspend fun generateWidgetWebViewUrl(
@@ -505,250 +557,81 @@ class FakeMatrixRoom(
         clientId: String,
         languageTag: String?,
         theme: String?,
-    ): Result<String> = generateWidgetWebViewUrlResult
+    ): Result<String> = generateWidgetWebViewUrlResult(
+        widgetSettings,
+        clientId,
+        languageTag,
+        theme,
+    )
 
-    override fun getWidgetDriver(widgetSettings: MatrixWidgetSettings): Result<MatrixWidgetDriver> = getWidgetDriverResult
+    override suspend fun sendCallNotificationIfNeeded(): Result<Unit> {
+        return sendCallNotificationIfNeededResult()
+    }
 
-    fun givenLeaveRoomError(throwable: Throwable?) {
-        this.leaveRoomError = throwable
+    override suspend fun setSendQueueEnabled(enabled: Boolean) = setSendQueueEnabledLambda(enabled)
+
+    override suspend fun saveComposerDraft(composerDraft: ComposerDraft) = saveComposerDraftLambda(composerDraft)
+
+    override suspend fun loadComposerDraft() = loadComposerDraftLambda()
+
+    override suspend fun clearComposerDraft() = clearComposerDraftLambda()
+
+    override fun getWidgetDriver(widgetSettings: MatrixWidgetSettings): Result<MatrixWidgetDriver> {
+        return getWidgetDriverResult(widgetSettings)
+    }
+
+    override suspend fun ignoreDeviceTrustAndResend(devices: Map<UserId, List<DeviceId>>, sendHandle: SendHandle): Result<Unit> = simulateLongTask {
+        return ignoreDeviceTrustAndResendResult(devices, sendHandle)
+    }
+
+    override suspend fun withdrawVerificationAndResend(userIds: List<UserId>, sendHandle: SendHandle): Result<Unit> = simulateLongTask {
+        return withdrawVerificationAndResendResult(userIds, sendHandle)
+    }
+
+    override suspend fun updateCanonicalAlias(canonicalAlias: RoomAlias?, alternativeAliases: List<RoomAlias>): Result<Unit> = simulateLongTask {
+        updateCanonicalAliasResult(canonicalAlias, alternativeAliases)
+    }
+
+    override suspend fun updateRoomVisibility(roomVisibility: RoomVisibility): Result<Unit> = simulateLongTask {
+        updateRoomVisibilityResult(roomVisibility)
+    }
+
+    override suspend fun updateHistoryVisibility(historyVisibility: RoomHistoryVisibility): Result<Unit> = simulateLongTask {
+        updateRoomHistoryVisibilityResult(historyVisibility)
+    }
+
+    override suspend fun getRoomVisibility(): Result<RoomVisibility> = simulateLongTask {
+        roomVisibilityResult()
+    }
+
+    override suspend fun publishRoomAliasInRoomDirectory(roomAlias: RoomAlias): Result<Boolean> = simulateLongTask {
+        publishRoomAliasInRoomDirectoryResult(roomAlias)
+    }
+
+    override suspend fun removeRoomAliasFromRoomDirectory(roomAlias: RoomAlias): Result<Boolean> = simulateLongTask {
+        removeRoomAliasFromRoomDirectoryResult(roomAlias)
+    }
+
+    override suspend fun updateJoinRule(joinRule: JoinRule): Result<Unit> = simulateLongTask {
+        updateJoinRuleResult(joinRule)
     }
 
     fun givenRoomMembersState(state: MatrixRoomMembersState) {
         membersStateFlow.value = state
     }
 
-    fun givenUpdateMembersResult(result: Result<Unit>) {
-        updateMembersResult = result
-    }
-
-    fun givenUserDisplayNameResult(displayName: Result<String?>) {
-        userDisplayNameResult = displayName
-    }
-
-    fun givenUserAvatarUrlResult(avatarUrl: Result<String?>) {
-        userAvatarUrlResult = avatarUrl
-    }
-
-    fun givenUserRoleResult(role: Result<RoomMember.Role>) {
-        userRoleResult = role
-    }
-
-    fun givenUpdateUserRoleResult(result: Result<Unit>) {
-        updateUserRoleResult = result
-    }
-
-    fun givenJoinRoomResult(result: Result<Unit>) {
-        joinRoomResult = result
-    }
-
-    fun givenCanKickResult(result: Result<Boolean>) {
-        canKickResult = result
-    }
-
-    fun givenCanBanResult(result: Result<Boolean>) {
-        canBanResult = result
-    }
-
-    fun givenInviteUserResult(result: Result<Unit>) {
-        inviteUserResult = result
-    }
-
-    fun givenCanInviteResult(result: Result<Boolean>) {
-        canInviteResult = result
-    }
-
-    fun givenCanSendStateResult(type: StateEventType, result: Result<Boolean>) {
-        canSendStateResults[type] = result
-    }
-
-    fun givenCanSendEventResult(type: MessageEventType, result: Result<Boolean>) {
-        canSendEventResults[type] = result
-    }
-
-    fun givenCanTriggerRoomNotification(result: Result<Boolean>) {
-        canUserTriggerRoomNotificationResult = result
-    }
-
-    fun givenCanUserJoinCall(result: Result<Boolean>) {
-        canUserJoinCallResult = result
-    }
-
-    fun givenIgnoreResult(result: Result<Unit>) {
-        ignoreResult = result
-    }
-
-    fun givenUnIgnoreResult(result: Result<Unit>) {
-        unignoreResult = result
-    }
-
-    fun givenSendMediaResult(result: Result<FakeMediaUploadHandler>) {
-        sendMediaResult = result
-    }
-
-    fun givenUpdateAvatarResult(result: Result<Unit>) {
-        updateAvatarResult = result
-    }
-
-    fun givenRemoveAvatarResult(result: Result<Unit>) {
-        removeAvatarResult = result
-    }
-
-    fun givenSetNameResult(result: Result<Unit>) {
-        setNameResult = result
-    }
-
-    fun givenSetTopicResult(result: Result<Unit>) {
-        setTopicResult = result
-    }
-
-    fun givenToggleReactionResult(result: Result<Unit>) {
-        toggleReactionResult = result
-    }
-
-    fun givenRetrySendMessageResult(result: Result<Unit>) {
-        retrySendMessageResult = result
-    }
-
-    fun givenCancelSendResult(result: Result<Unit>) {
-        cancelSendResult = result
-    }
-
-    fun givenForwardEventResult(result: Result<Unit>) {
-        forwardEventResult = result
-    }
-
-    fun givenReportContentResult(result: Result<Unit>) {
-        reportContentResult = result
-    }
-
-    fun givenKickUserResult(result: Result<Unit>) {
-        kickUserResult = result
-    }
-
-    fun givenBanUserResult(result: Result<Unit>) {
-        banUserResult = result
-    }
-
-    fun givenUnbanUserResult(result: Result<Unit>) {
-        unBanUserResult = result
-    }
-
-    fun givenSendLocationResult(result: Result<Unit>) {
-        sendLocationResult = result
-    }
-
-    fun givenCreatePollResult(result: Result<Unit>) {
-        createPollResult = result
-    }
-
-    fun givenEditPollResult(result: Result<Unit>) {
-        editPollResult = result
-    }
-
-    fun givenSendPollResponseResult(result: Result<Unit>) {
-        sendPollResponseResult = result
-    }
-
-    fun givenEndPollResult(result: Result<Unit>) {
-        endPollResult = result
-    }
-
-    fun givenProgressCallbackValues(values: List<Pair<Long, Long>>) {
-        progressCallbackValues = values
-    }
-
-    fun givenGenerateWidgetWebViewUrlResult(result: Result<String>) {
-        generateWidgetWebViewUrlResult = result
-    }
-
-    fun givenGetWidgetDriverResult(result: Result<MatrixWidgetDriver>) {
-        getWidgetDriverResult = result
-    }
-
-    fun givenSetIsFavoriteResult(result: Result<Unit>) {
-        setIsFavoriteResult = result
-    }
-
-    fun givenRoomInfo(roomInfo: MatrixRoomInfo) {
-        _roomInfoFlow.tryEmit(roomInfo)
-    }
-
-    fun givenRoomTypingMembers(typingMembers: List<UserId>) {
-        _roomTypingMembersFlow.tryEmit(typingMembers)
+    override suspend fun clearEventCacheStorage(): Result<Unit> {
+        return Result.success(Unit)
     }
 }
 
-data class SendLocationInvocation(
-    val body: String,
-    val geoUri: String,
-    val description: String?,
-    val zoomLevel: Int?,
-    val assetType: AssetType?,
-)
-
-data class SavePollInvocation(
-    val question: String,
-    val answers: List<String>,
-    val maxSelections: Int,
-    val pollKind: PollKind,
-)
-
-data class SendPollResponseInvocation(
-    val pollStartId: EventId,
-    val answers: List<String>,
-)
-
-data class EndPollInvocation(
-    val pollStartId: EventId,
-    val text: String,
-)
-
-fun aRoomInfo(
-    id: String = A_ROOM_ID.value,
-    name: String? = A_ROOM_NAME,
-    topic: String? = "A topic",
-    avatarUrl: String? = AN_AVATAR_URL,
-    isDirect: Boolean = false,
-    isPublic: Boolean = true,
-    isSpace: Boolean = false,
-    isTombstoned: Boolean = false,
-    isFavorite: Boolean = false,
-    canonicalAlias: String? = null,
-    alternativeAliases: List<String> = emptyList(),
-    currentUserMembership: CurrentUserMembership = CurrentUserMembership.JOINED,
-    latestEvent: EventTimelineItem? = null,
-    inviter: RoomMember? = null,
-    activeMembersCount: Long = 1,
-    invitedMembersCount: Long = 0,
-    joinedMembersCount: Long = 1,
-    highlightCount: Long = 0,
-    notificationCount: Long = 0,
-    userDefinedNotificationMode: RoomNotificationMode? = null,
-    hasRoomCall: Boolean = false,
-    userPowerLevels: ImmutableMap<UserId, Long> = persistentMapOf(),
-    activeRoomCallParticipants: List<String> = emptyList()
-) = MatrixRoomInfo(
-    id = id,
-    name = name,
-    topic = topic,
-    avatarUrl = avatarUrl,
-    isDirect = isDirect,
-    isPublic = isPublic,
-    isSpace = isSpace,
-    isTombstoned = isTombstoned,
-    isFavorite = isFavorite,
-    canonicalAlias = canonicalAlias,
-    alternativeAliases = alternativeAliases.toImmutableList(),
-    currentUserMembership = currentUserMembership,
-    latestEvent = latestEvent,
-    inviter = inviter,
-    activeMembersCount = activeMembersCount,
-    invitedMembersCount = invitedMembersCount,
-    joinedMembersCount = joinedMembersCount,
-    highlightCount = highlightCount,
-    notificationCount = notificationCount,
-    userDefinedNotificationMode = userDefinedNotificationMode,
-    hasRoomCall = hasRoomCall,
-    userPowerLevels = userPowerLevels,
-    activeRoomCallParticipants = activeRoomCallParticipants.toImmutableList(),
+fun defaultRoomPowerLevels() = MatrixRoomPowerLevels(
+    ban = 50,
+    invite = 0,
+    kick = 50,
+    sendEvents = 0,
+    redactEvents = 50,
+    roomName = 100,
+    roomAvatar = 100,
+    roomTopic = 100
 )

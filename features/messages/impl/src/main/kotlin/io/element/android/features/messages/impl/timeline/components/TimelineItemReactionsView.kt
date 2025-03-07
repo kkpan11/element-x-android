@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components
@@ -31,6 +22,7 @@ import io.element.android.features.messages.impl.R
 import io.element.android.features.messages.impl.timeline.aTimelineItemReactions
 import io.element.android.features.messages.impl.timeline.model.AggregatedReaction
 import io.element.android.features.messages.impl.timeline.model.TimelineItemReactions
+import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
 import io.element.android.libraries.designsystem.icons.CompoundDrawables
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -41,9 +33,9 @@ fun TimelineItemReactionsView(
     reactionsState: TimelineItemReactions,
     isOutgoing: Boolean,
     userCanSendReaction: Boolean,
-    onReactionClicked: (emoji: String) -> Unit,
-    onReactionLongClicked: (emoji: String) -> Unit,
-    onMoreReactionsClicked: () -> Unit,
+    onReactionClick: (emoji: String) -> Unit,
+    onReactionLongClick: (emoji: String) -> Unit,
+    onMoreReactionsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded: Boolean by rememberSaveable { mutableStateOf(false) }
@@ -53,9 +45,9 @@ fun TimelineItemReactionsView(
         userCanSendReaction = userCanSendReaction,
         expanded = expanded,
         isOutgoing = isOutgoing,
-        onReactionClick = onReactionClicked,
-        onReactionLongClick = onReactionLongClicked,
-        onMoreReactionsClick = onMoreReactionsClicked,
+        onReactionClick = onReactionClick,
+        onReactionLongClick = onReactionLongClick,
+        onMoreReactionsClick = onMoreReactionsClick,
         onToggleExpandClick = { expanded = !expanded },
     )
 }
@@ -81,7 +73,7 @@ private fun TimelineItemReactionsView(
         else -> LayoutDirection.Ltr
     }
 
-    return CompositionLocalProvider(LocalLayoutDirection provides reactionsLayoutDirection) {
+    CompositionLocalProvider(LocalLayoutDirection provides reactionsLayoutDirection) {
         TimelineItemReactionsLayout(
             modifier = modifier,
             itemSpacing = 4.dp,
@@ -90,7 +82,13 @@ private fun TimelineItemReactionsView(
             expandButton = {
                 MessagesReactionButton(
                     content = MessagesReactionsButtonContent.Text(
-                        text = stringResource(id = if (expanded) R.string.screen_room_reactions_show_less else R.string.screen_room_reactions_show_more)
+                        text = stringResource(
+                            id = if (expanded) {
+                                R.string.screen_room_timeline_reactions_show_less
+                            } else {
+                                R.string.screen_room_timeline_reactions_show_more
+                            }
+                        )
                     ),
                     onClick = onToggleExpandClick,
                     onLongClick = {}
@@ -98,11 +96,13 @@ private fun TimelineItemReactionsView(
             },
             addMoreButton = if (userCanSendReaction) {
                 {
-                    MessagesReactionButton(
-                        content = MessagesReactionsButtonContent.Icon(CompoundDrawables.ic_compound_reaction_add),
-                        onClick = onMoreReactionsClick,
-                        onLongClick = {}
-                    )
+                    CompositionLocalProvider(LocalLayoutDirection provides currentLayout) {
+                        MessagesReactionButton(
+                            content = MessagesReactionsButtonContent.Icon(CompoundDrawables.ic_compound_reaction_add),
+                            onClick = onMoreReactionsClick,
+                            onLongClick = {}
+                        )
+                    }
                 }
             } else {
                 null
@@ -160,6 +160,7 @@ internal fun TimelineItemReactionsViewOutgoingPreview() = ElementPreview {
     )
 }
 
+@ExcludeFromCoverage
 @Composable
 private fun ContentToPreview(
     reactions: ImmutableList<AggregatedReaction>,
@@ -171,8 +172,8 @@ private fun ContentToPreview(
         ),
         userCanSendReaction = true,
         isOutgoing = isOutgoing,
-        onReactionClicked = {},
-        onReactionLongClicked = {},
-        onMoreReactionsClicked = {},
+        onReactionClick = {},
+        onReactionLongClick = {},
+        onMoreReactionsClick = {},
     )
 }

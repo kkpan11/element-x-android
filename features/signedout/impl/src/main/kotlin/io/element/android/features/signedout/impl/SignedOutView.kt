@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.signedout.impl
@@ -23,8 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
@@ -38,10 +27,10 @@ import io.element.android.libraries.designsystem.atomic.molecules.IconTitleSubti
 import io.element.android.libraries.designsystem.atomic.organisms.InfoListItem
 import io.element.android.libraries.designsystem.atomic.organisms.InfoListOrganism
 import io.element.android.libraries.designsystem.atomic.pages.HeaderFooterPage
+import io.element.android.libraries.designsystem.components.BigIcon
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Button
-import io.element.android.libraries.designsystem.theme.temporaryColorBgSpecial
 import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.collections.immutable.persistentListOf
 
@@ -72,8 +61,7 @@ private fun SignedOutHeader(state: SignedOutState) {
         modifier = Modifier.padding(top = 60.dp, bottom = 12.dp),
         title = stringResource(id = R.string.screen_signed_out_title),
         subTitle = stringResource(id = R.string.screen_signed_out_subtitle, state.appName),
-        iconImageVector = Icons.Filled.AccountCircle,
-        iconTint = ElementTheme.colors.iconSecondary,
+        iconStyle = BigIcon.Style.Default(CompoundIcons.UserProfileSolid()),
     )
 }
 
@@ -103,7 +91,6 @@ private fun SignedOutContent() {
             ),
             textStyle = ElementTheme.typography.fontBodyMdMedium,
             iconTint = ElementTheme.colors.iconSecondary,
-            backgroundColor = ElementTheme.colors.temporaryColorBgSpecial
         )
     }
 }

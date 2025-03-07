@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.lockscreen.impl.unlock.keypad
@@ -37,7 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.coerceAtMost
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
@@ -50,6 +41,7 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
 private val spaceBetweenPinKey = 16.dp
+private val minSizePinKey = 16.dp
 private val maxSizePinKey = 80.dp
 
 @Composable
@@ -61,8 +53,8 @@ fun PinKeypad(
     verticalAlignment: Alignment.Vertical = Alignment.Top,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
-    val pinKeyMaxWidth = ((maxWidth - 2 * spaceBetweenPinKey) / 3).coerceAtMost(maxSizePinKey)
-    val pinKeyMaxHeight = ((maxHeight - 3 * spaceBetweenPinKey) / 4).coerceAtMost(maxSizePinKey)
+    val pinKeyMaxWidth = ((maxWidth - 2 * spaceBetweenPinKey) / 3).coerceIn(minSizePinKey, maxSizePinKey)
+    val pinKeyMaxHeight = ((maxHeight - 3 * spaceBetweenPinKey) / 4).coerceIn(minSizePinKey, maxSizePinKey)
     val pinKeySize = if (pinKeyMaxWidth < pinKeyMaxHeight) pinKeyMaxWidth else pinKeyMaxHeight
 
     val horizontalArrangement = spacedBy(spaceBetweenPinKey, Alignment.CenterHorizontally)
@@ -129,7 +121,7 @@ private fun PinKeypadRow(
                     )
                 }
                 is PinKeypadModel.Number -> {
-                    PinKeyBadDigitButton(
+                    PinKeypadDigitButton(
                         size = pinKeySize,
                         modifier = commonModifier,
                         digit = model.number.toString(),
@@ -158,7 +150,7 @@ private fun PinKeypadButton(
 }
 
 @Composable
-private fun PinKeyBadDigitButton(
+private fun PinKeypadDigitButton(
     digit: String,
     size: Dp,
     onClick: (String) -> Unit,

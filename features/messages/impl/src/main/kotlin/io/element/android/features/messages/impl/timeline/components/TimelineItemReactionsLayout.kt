@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components
@@ -26,6 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import io.element.android.features.messages.impl.R
+import io.element.android.features.messages.impl.timeline.aTimelineItemReactions
 import io.element.android.libraries.designsystem.icons.CompoundDrawables
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -110,7 +102,7 @@ fun TimelineItemReactionsLayout(
             }
             val rows = rowsIn.toMutableList()
             val secondLastRow = rows[rows.size - 2].toMutableList()
-            val expandButtonPlaceable = secondLastRow.removeLast()
+            val expandButtonPlaceable = secondLastRow.removeAt(secondLastRow.lastIndex)
             lastRow.add(0, expandButtonPlaceable)
             rows[rows.size - 2] = secondLastRow
             rows[rows.size - 1] = lastRow
@@ -201,7 +193,7 @@ internal fun TimelineItemReactionsLayoutPreview() = ElementPreview {
             )
         },
         reactions = {
-            io.element.android.features.messages.impl.timeline.aTimelineItemReactions(count = 18).reactions.forEach {
+            aTimelineItemReactions(count = 18).reactions.forEach {
                 MessagesReactionButton(
                     content = MessagesReactionsButtonContent.Reaction(
                         it

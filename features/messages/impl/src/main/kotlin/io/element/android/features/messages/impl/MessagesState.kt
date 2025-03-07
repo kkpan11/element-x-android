@@ -1,53 +1,47 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl
 
 import androidx.compose.runtime.Immutable
 import io.element.android.features.messages.impl.actionlist.ActionListState
+import io.element.android.features.messages.impl.crypto.identity.IdentityChangeState
+import io.element.android.features.messages.impl.crypto.identity.RoomMemberIdentityStateChange
 import io.element.android.features.messages.impl.messagecomposer.MessageComposerState
+import io.element.android.features.messages.impl.pinned.banner.PinnedMessagesBannerState
 import io.element.android.features.messages.impl.timeline.TimelineState
 import io.element.android.features.messages.impl.timeline.components.customreaction.CustomReactionState
 import io.element.android.features.messages.impl.timeline.components.reactionsummary.ReactionSummaryState
 import io.element.android.features.messages.impl.timeline.components.receipt.bottomsheet.ReadReceiptBottomSheetState
-import io.element.android.features.messages.impl.timeline.components.retrysendmenu.RetrySendMenuState
-import io.element.android.features.messages.impl.typing.TypingNotificationState
+import io.element.android.features.messages.impl.timeline.protection.TimelineProtectionState
 import io.element.android.features.messages.impl.voicemessages.composer.VoiceMessageComposerState
+import io.element.android.features.roomcall.api.RoomCallState
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.matrix.api.core.RoomId
+import kotlinx.collections.immutable.ImmutableList
 
 @Immutable
 data class MessagesState(
     val roomId: RoomId,
     val roomName: AsyncData<String>,
     val roomAvatar: AsyncData<AvatarData>,
-    val userHasPermissionToSendMessage: Boolean,
-    val userHasPermissionToRedactOwn: Boolean,
-    val userHasPermissionToRedactOther: Boolean,
-    val userHasPermissionToSendReaction: Boolean,
+    val heroes: ImmutableList<AvatarData>,
+    val userEventPermissions: UserEventPermissions,
     val composerState: MessageComposerState,
+    val roomMemberIdentityStateChanges: ImmutableList<RoomMemberIdentityStateChange>,
     val voiceMessageComposerState: VoiceMessageComposerState,
     val timelineState: TimelineState,
-    val typingNotificationState: TypingNotificationState,
+    val timelineProtectionState: TimelineProtectionState,
+    val identityChangeState: IdentityChangeState,
     val actionListState: ActionListState,
     val customReactionState: CustomReactionState,
     val reactionSummaryState: ReactionSummaryState,
-    val retrySendMenuState: RetrySendMenuState,
     val readReceiptBottomSheetState: ReadReceiptBottomSheetState,
     val hasNetworkConnection: Boolean,
     val snackbarMessage: SnackbarMessage?,
@@ -55,13 +49,8 @@ data class MessagesState(
     val showReinvitePrompt: Boolean,
     val enableTextFormatting: Boolean,
     val enableVoiceMessages: Boolean,
-    val callState: RoomCallState,
+    val roomCallState: RoomCallState,
     val appName: String,
+    val pinnedMessagesBannerState: PinnedMessagesBannerState,
     val eventSink: (MessagesEvents) -> Unit
 )
-
-enum class RoomCallState {
-    ENABLED,
-    ONGOING,
-    DISABLED
-}

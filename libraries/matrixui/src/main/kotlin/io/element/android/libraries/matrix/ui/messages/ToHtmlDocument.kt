@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.ui.messages
@@ -29,9 +20,13 @@ import org.jsoup.nodes.Document
  *
  * This will also make sure mentions are prefixed with `@`.
  *
+ * @param permalinkParser the parser to use to parse the mentions.
  * @param prefix if not null, the prefix will be inserted at the beginning of the message.
  */
-fun FormattedBody.toHtmlDocument(prefix: String? = null): Document? {
+fun FormattedBody.toHtmlDocument(
+    permalinkParser: PermalinkParser,
+    prefix: String? = null,
+): Document? {
     return takeIf { it.format == MessageFormat.HTML }?.body
         // Trim whitespace at the end to avoid having wrong rendering of the message.
         // We don't trim the start in case it's used as indentation.
@@ -44,17 +39,20 @@ fun FormattedBody.toHtmlDocument(prefix: String? = null): Document? {
             }
 
             // Prepend `@` to mentions
-            fixMentions(dom)
+            fixMentions(dom, permalinkParser)
 
             dom
         }
 }
 
-private fun fixMentions(dom: Document) {
+private fun fixMentions(
+    dom: Document,
+    permalinkParser: PermalinkParser,
+) {
     val links = dom.getElementsByTag("a")
     links.forEach {
         if (it.hasAttr("href")) {
-            val link = PermalinkParser.parse(it.attr("href"))
+            val link = permalinkParser.parse(it.attr("href"))
             if (link is PermalinkData.UserLink && !it.text().startsWith("@")) {
                 it.prependText("@")
             }

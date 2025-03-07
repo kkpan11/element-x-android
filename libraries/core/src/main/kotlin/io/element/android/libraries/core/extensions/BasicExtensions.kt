@@ -1,20 +1,14 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.core.extensions
+
+import java.text.Normalizer
+import java.util.Locale
 
 fun Boolean.toOnOff() = if (this) "ON" else "OFF"
 fun Boolean.to01() = if (this) "1" else "0"
@@ -57,4 +51,41 @@ fun String.ellipsize(length: Int): String {
     }
 
     return "${this.take(length)}…"
+}
+
+/**
+ * Replace the old prefix with the new prefix.
+ * If the string does not start with the old prefix, the string is returned as is.
+ */
+fun String.replacePrefix(oldPrefix: String, newPrefix: String): String {
+    return if (startsWith(oldPrefix)) {
+        newPrefix + substring(oldPrefix.length)
+    } else {
+        this
+    }
+}
+
+/**
+ * Surround with brackets.
+ */
+fun String.withBrackets(prefix: String = "(", suffix: String = ")"): String {
+    return "$prefix$this$suffix"
+}
+
+/**
+ * Capitalize the string.
+ */
+fun String.safeCapitalize(): String {
+    return replaceFirstChar {
+        if (it.isLowerCase()) {
+            it.titlecase(Locale.getDefault())
+        } else {
+            it.toString()
+        }
+    }
+}
+
+fun String.withoutAccents(): String {
+    return Normalizer.normalize(this, Normalizer.Form.NFD)
+        .replace("\\p{Mn}+".toRegex(), "")
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.location.api
@@ -20,6 +11,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -31,9 +23,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImagePainter
-import coil.compose.rememberAsyncImagePainter
-import coil.request.ImageRequest
+import coil3.Extras
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.location.api.internal.StaticMapPlaceholder
 import io.element.android.features.location.api.internal.StaticMapUrlBuilder
@@ -42,7 +35,6 @@ import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.utils.CommonDrawables
-import timber.log.Timber
 
 /**
  * Shows a static map image downloaded via a third party service's static maps API.
@@ -84,14 +76,15 @@ fun StaticMapView(
                         )
                     )
                     .size(width = constraints.maxWidth, height = constraints.maxHeight)
-                    .setParameter("retry_hash", retryHash, memoryCacheKey = null)
+                    .apply {
+                        extras.set(Extras.Key("retry_hash"), retryHash).build()
+                    }
                     .build()
-            }.apply {
-                Timber.d("Static map image request: ${this?.data}")
             }
         )
 
-        if (painter.state is AsyncImagePainter.State.Success) {
+        val collectedState = painter.state.collectAsState()
+        if (collectedState.value is AsyncImagePainter.State.Success) {
             Image(
                 painter = painter,
                 contentDescription = contentDescription,
@@ -109,7 +102,7 @@ fun StaticMapView(
             )
         } else {
             StaticMapPlaceholder(
-                showProgress = painter.state is AsyncImagePainter.State.Loading,
+                showProgress = collectedState.value.isLoading(),
                 contentDescription = contentDescription,
                 width = maxWidth,
                 height = maxHeight,
@@ -117,6 +110,11 @@ fun StaticMapView(
             )
         }
     }
+}
+
+private fun AsyncImagePainter.State.isLoading(): Boolean {
+    return this is AsyncImagePainter.State.Empty ||
+        this is AsyncImagePainter.State.Loading
 }
 
 @PreviewsDayNight

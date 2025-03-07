@@ -1,6 +1,6 @@
 appId: ${MAESTRO_APP_ID}
 ---
-- tapOn: "Continue"
+- tapOn: "Sign in manually"
 - runFlow: ../assertions/assertLoginDisplayed.yaml
 - takeScreenshot: build/maestro/100-SignIn
 - runFlow: changeServer.yaml
@@ -23,9 +23,8 @@ appId: ${MAESTRO_APP_ID}
 - inputText: ${MAESTRO_PASSWORD}
 - pressKey: Enter
 - tapOn: "Continue"
-- runFlow: ../assertions/assertWelcomeScreenDisplayed.yaml
-- tapOn: "Continue"
+- runFlow: ../assertions/assertSessionVerificationDisplayed.yaml
+- runFlow: ./verifySession.yaml
 - runFlow: ../assertions/assertAnalyticsDisplayed.yaml
 - tapOn: "Not now"
 - runFlow: ../assertions/assertHomeDisplayed.yaml
-- runFlow: ./verifySession.yaml

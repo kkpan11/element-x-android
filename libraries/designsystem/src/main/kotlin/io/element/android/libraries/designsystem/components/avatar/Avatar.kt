@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.avatar
@@ -23,16 +14,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.SubcomposeAsyncImageContent
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.designsystem.colors.AvatarColorsProvider
 import io.element.android.libraries.designsystem.preview.ElementThemedPreview
@@ -47,18 +46,22 @@ fun Avatar(
     avatarData: AvatarData,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
+    // If not null, will be used instead of the size from avatarData
+    forcedAvatarSize: Dp? = null,
 ) {
     val commonModifier = modifier
-        .size(avatarData.size.dp)
+        .size(forcedAvatarSize ?: avatarData.size.dp)
         .clip(CircleShape)
     if (avatarData.url.isNullOrBlank()) {
         InitialsAvatar(
             avatarData = avatarData,
+            forcedAvatarSize = forcedAvatarSize,
             modifier = commonModifier,
         )
     } else {
         ImageAvatar(
             avatarData = avatarData,
+            forcedAvatarSize = forcedAvatarSize,
             modifier = commonModifier,
             contentDescription = contentDescription,
         )
@@ -68,31 +71,58 @@ fun Avatar(
 @Composable
 private fun ImageAvatar(
     avatarData: AvatarData,
+    forcedAvatarSize: Dp?,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    AsyncImage(
-        model = avatarData,
-        onError = {
-            Timber.e(it.result.throwable, "Error loading avatar $it\n${it.result}")
-        },
-        contentDescription = contentDescription,
-        contentScale = ContentScale.Crop,
-        placeholder = debugPlaceholderAvatar(),
-        modifier = modifier
-    )
+    if (LocalInspectionMode.current) {
+        // For compose previews, use debugPlaceholderAvatar()
+        // instead of falling back to initials avatar on load failure
+        AsyncImage(
+            model = avatarData,
+            contentDescription = contentDescription,
+            placeholder = debugPlaceholderAvatar(),
+            modifier = modifier
+        )
+    } else {
+        SubcomposeAsyncImage(
+            model = avatarData,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        ) {
+            val collectedState by painter.state.collectAsState()
+            when (val state = collectedState) {
+                is AsyncImagePainter.State.Success -> SubcomposeAsyncImageContent()
+                is AsyncImagePainter.State.Error -> {
+                    SideEffect {
+                        Timber.e(state.result.throwable, "Error loading avatar $state\n${state.result}")
+                    }
+                    InitialsAvatar(
+                        avatarData = avatarData,
+                        forcedAvatarSize = forcedAvatarSize,
+                    )
+                }
+                else -> InitialsAvatar(
+                    avatarData = avatarData,
+                    forcedAvatarSize = forcedAvatarSize,
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun InitialsAvatar(
     avatarData: AvatarData,
+    forcedAvatarSize: Dp?,
     modifier: Modifier = Modifier,
 ) {
-    val avatarColors = AvatarColorsProvider.provide(avatarData.id, ElementTheme.isLightTheme)
+    val avatarColors = AvatarColorsProvider.provide(avatarData.id)
     Box(
         modifier.background(color = avatarColors.background)
     ) {
-        val fontSize = avatarData.size.dp.toSp() / 2
+        val fontSize = (forcedAvatarSize ?: avatarData.size.dp).toSp() / 2
         val originalFont = ElementTheme.typography.fontHeadingMdBold
         val ratio = fontSize.value / originalFont.fontSize.value
         val lineHeight = originalFont.lineHeight * ratio

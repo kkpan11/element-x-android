@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.securebackup.impl.root
 
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.matrix.api.encryption.BackupState
@@ -29,25 +21,49 @@ open class SecureBackupRootStateProvider : PreviewParameterProvider<SecureBackup
             aSecureBackupRootState(backupState = BackupState.UNKNOWN, doesBackupExistOnServer = AsyncData.Success(true)),
             aSecureBackupRootState(backupState = BackupState.UNKNOWN, doesBackupExistOnServer = AsyncData.Success(false)),
             aSecureBackupRootState(backupState = BackupState.UNKNOWN, doesBackupExistOnServer = AsyncData.Failure(Exception("An error"))),
+            aSecureBackupRootState(backupState = BackupState.WAITING_FOR_SYNC),
+            aSecureBackupRootState(backupState = BackupState.CREATING),
+            aSecureBackupRootState(
+                backupState = BackupState.CREATING,
+                enableAction = AsyncAction.Failure(Exception("Error")),
+            ),
+            aSecureBackupRootState(backupState = BackupState.ENABLING),
+            aSecureBackupRootState(backupState = BackupState.RESUMING),
+            aSecureBackupRootState(backupState = BackupState.DOWNLOADING),
+            aSecureBackupRootState(backupState = BackupState.DISABLING),
             aSecureBackupRootState(backupState = BackupState.ENABLED),
-            aSecureBackupRootState(recoveryState = RecoveryState.UNKNOWN),
-            aSecureBackupRootState(recoveryState = RecoveryState.ENABLED),
-            aSecureBackupRootState(recoveryState = RecoveryState.DISABLED),
-            aSecureBackupRootState(recoveryState = RecoveryState.INCOMPLETE),
-            // Add other states here
+            aSecureBackupRootState(backupState = BackupState.ENABLED, recoveryState = RecoveryState.UNKNOWN),
+            aSecureBackupRootState(backupState = BackupState.ENABLED, recoveryState = RecoveryState.ENABLED),
+            aSecureBackupRootState(backupState = BackupState.ENABLED, recoveryState = RecoveryState.DISABLED),
+            aSecureBackupRootState(backupState = BackupState.ENABLED, recoveryState = RecoveryState.INCOMPLETE),
+            aSecureBackupRootState(
+                backupState = BackupState.UNKNOWN,
+                doesBackupExistOnServer = AsyncData.Success(false),
+                recoveryState = RecoveryState.ENABLED,
+            ),
+            aSecureBackupRootState(
+                backupState = BackupState.UNKNOWN,
+                doesBackupExistOnServer = AsyncData.Success(false),
+                recoveryState = RecoveryState.ENABLED,
+                displayKeyStorageDisabledError = true,
+            ),
         )
 }
 
 fun aSecureBackupRootState(
+    enableAction: AsyncAction<Unit> = AsyncAction.Uninitialized,
     backupState: BackupState = BackupState.UNKNOWN,
     doesBackupExistOnServer: AsyncData<Boolean> = AsyncData.Uninitialized,
     recoveryState: RecoveryState = RecoveryState.UNKNOWN,
+    displayKeyStorageDisabledError: Boolean = false,
     snackbarMessage: SnackbarMessage? = null,
 ) = SecureBackupRootState(
+    enableAction = enableAction,
     backupState = backupState,
     doesBackupExistOnServer = doesBackupExistOnServer,
     recoveryState = recoveryState,
     appName = "Element",
+    displayKeyStorageDisabledError = displayKeyStorageDisabledError,
     snackbarMessage = snackbarMessage,
     eventSink = {},
 )

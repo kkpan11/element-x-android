@@ -1,26 +1,21 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.featureflag.impl
 
+import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.featureflag.api.Feature
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class FakeMutableFeatureFlagProvider(override val priority: Int) : MutableFeatureFlagProvider {
+class FakeMutableFeatureFlagProvider(
+    override val priority: Int,
+    private val buildMeta: BuildMeta,
+) : MutableFeatureFlagProvider {
     private val enabledFeatures = mutableMapOf<String, MutableStateFlow<Boolean>>()
 
     override suspend fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
@@ -29,7 +24,7 @@ class FakeMutableFeatureFlagProvider(override val priority: Int) : MutableFeatur
     }
 
     override fun isFeatureEnabledFlow(feature: Feature): Flow<Boolean> {
-        return enabledFeatures.getOrPut(feature.key) { MutableStateFlow(feature.defaultValue) }
+        return enabledFeatures.getOrPut(feature.key) { MutableStateFlow(feature.defaultValue(buildMeta)) }
     }
 
     override fun hasFeature(feature: Feature): Boolean = true
