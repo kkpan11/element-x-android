@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+  <string name="screen_create_room_action_create_room">"Nova sala"</string>
+  <string name="screen_create_room_add_people_title">"Convidar pessoas"</string>
+  <string name="screen_create_room_error_creating_room">"Ocorreu um erro ao criar a sala"</string>
+  <string name="screen_create_room_private_option_description">"Apenas as pessoas convidadas podem aceder a esta sala. Todas as mensagens são criptografadas de ponta a ponta."</string>
+  <string name="screen_create_room_private_option_title">"Sala privativa (somente por convite)"</string>
+  <string name="screen_create_room_public_option_description">"Qualquer um pode encontrar esta sala.
+Você pode mudar isso a qualquer momento nas configurações da sala."</string>
+  <string name="screen_create_room_room_name_label">"Nome da sala"</string>
+  <string name="screen_create_room_title">"Criar uma sala"</string>
+  <string name="screen_create_room_topic_label">"Tópico (opcional)"</string>
+  <string name="screen_room_directory_search_title">"Diretório de salas"</string>
+  <string name="screen_start_chat_error_starting_chat">"Ocorreu um erro ao tentar iniciar um chat"</string>
+</resources>

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.actionlist.model
@@ -20,22 +11,30 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import io.element.android.libraries.designsystem.icons.CompoundDrawables
-import io.element.android.libraries.designsystem.utils.CommonDrawables
 import io.element.android.libraries.ui.strings.CommonStrings
 
 @Immutable
-sealed class TimelineItemAction(
+enum class TimelineItemAction(
     @StringRes val titleRes: Int,
     @DrawableRes val icon: Int,
     val destructive: Boolean = false
 ) {
-    data object Forward : TimelineItemAction(CommonStrings.action_forward, CompoundDrawables.ic_compound_forward)
-    data object Copy : TimelineItemAction(CommonStrings.action_copy, CompoundDrawables.ic_compound_copy)
-    data object Redact : TimelineItemAction(CommonStrings.action_remove, CompoundDrawables.ic_compound_delete, destructive = true)
-    data object Reply : TimelineItemAction(CommonStrings.action_reply, CompoundDrawables.ic_compound_reply)
-    data object ReplyInThread : TimelineItemAction(CommonStrings.action_reply_in_thread, CompoundDrawables.ic_compound_reply)
-    data object Edit : TimelineItemAction(CommonStrings.action_edit, CompoundDrawables.ic_compound_edit)
-    data object ViewSource : TimelineItemAction(CommonStrings.action_view_source, CommonDrawables.ic_developer_options)
-    data object ReportContent : TimelineItemAction(CommonStrings.action_report_content, CompoundDrawables.ic_compound_chat_problem, destructive = true)
-    data object EndPoll : TimelineItemAction(CommonStrings.action_end_poll, CompoundDrawables.ic_compound_polls_end)
+    ViewInTimeline(CommonStrings.action_view_in_timeline, CompoundDrawables.ic_compound_visibility_on),
+    Forward(CommonStrings.action_forward, CompoundDrawables.ic_compound_forward),
+    CopyText(CommonStrings.action_copy_text, CompoundDrawables.ic_compound_copy),
+    CopyCaption(CommonStrings.action_copy_caption, CompoundDrawables.ic_compound_copy),
+    CopyLink(CommonStrings.action_copy_link_to_message, CompoundDrawables.ic_compound_link),
+    Redact(CommonStrings.action_remove, CompoundDrawables.ic_compound_delete, destructive = true),
+    Reply(CommonStrings.action_reply, CompoundDrawables.ic_compound_reply),
+    ReplyInThread(CommonStrings.action_reply_in_thread, CompoundDrawables.ic_compound_reply),
+    Edit(CommonStrings.action_edit, CompoundDrawables.ic_compound_edit),
+    EditPoll(CommonStrings.action_edit_poll, CompoundDrawables.ic_compound_edit),
+    EditCaption(CommonStrings.action_edit_caption, CompoundDrawables.ic_compound_edit),
+    AddCaption(CommonStrings.action_add_caption, CompoundDrawables.ic_compound_edit),
+    RemoveCaption(CommonStrings.action_remove_caption, CompoundDrawables.ic_compound_close, destructive = true),
+    ViewSource(CommonStrings.action_view_source, CompoundDrawables.ic_compound_code),
+    ReportContent(CommonStrings.action_report_content, CompoundDrawables.ic_compound_chat_problem, destructive = true),
+    EndPoll(CommonStrings.action_end_poll, CompoundDrawables.ic_compound_polls_end),
+    Pin(CommonStrings.action_pin, CompoundDrawables.ic_compound_pin),
+    Unpin(CommonStrings.action_unpin, CompoundDrawables.ic_compound_unpin),
 }

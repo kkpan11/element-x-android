@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.login.impl.accountprovider
@@ -23,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,8 +37,8 @@ import io.element.android.libraries.designsystem.theme.components.Text
 @Composable
 fun AccountProviderView(
     item: AccountProvider,
-    modifier: Modifier = Modifier,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
@@ -77,7 +67,7 @@ fun AccountProviderView(
                     RoundedIconAtom(
                         size = RoundedIconAtomSize.Medium,
                         imageVector = CompoundIcons.Search(),
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = ElementTheme.colors.iconPrimary,
                     )
                 }
                 Text(
@@ -86,16 +76,16 @@ fun AccountProviderView(
                         .weight(1f),
                     text = item.title,
                     style = ElementTheme.typography.fontBodyLgMedium,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = ElementTheme.colors.textPrimary,
                 )
                 if (item.isPublic) {
                     Icon(
                         modifier = Modifier
                             .padding(start = 10.dp)
                             .size(16.dp),
-                        resourceId = R.drawable.ic_public,
+                        imageVector = CompoundIcons.Public(),
                         contentDescription = null,
-                        tint = Color.Unspecified,
+                        tint = ElementTheme.colors.iconSecondary,
                     )
                 }
             }
@@ -105,7 +95,7 @@ fun AccountProviderView(
                         .padding(start = 46.dp, bottom = 12.dp, end = 26.dp),
                     text = item.subtitle,
                     style = ElementTheme.typography.fontBodyMdRegular,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = ElementTheme.colors.textSecondary,
                 )
             }
         }

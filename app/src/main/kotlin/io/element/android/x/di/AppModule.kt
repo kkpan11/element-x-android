@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.x.di
@@ -23,8 +14,11 @@ import androidx.preference.PreferenceManager
 import com.squareup.anvil.annotations.ContributesTo
 import dagger.Module
 import dagger.Provides
+import io.element.android.appconfig.ApplicationConfig
+import io.element.android.features.enterprise.api.EnterpriseService
 import io.element.android.features.messages.impl.timeline.components.customreaction.DefaultEmojibaseProvider
 import io.element.android.features.messages.impl.timeline.components.customreaction.EmojibaseProvider
+import io.element.android.libraries.androidutils.system.getVersionCodeFromManifest
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.core.meta.BuildType
@@ -32,7 +26,6 @@ import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatch
 import io.element.android.libraries.di.AppScope
 import io.element.android.libraries.di.ApplicationContext
 import io.element.android.libraries.di.CacheDirectory
-import io.element.android.libraries.di.DefaultPreferences
 import io.element.android.libraries.di.SingleIn
 import io.element.android.x.BuildConfig
 import io.element.android.x.R
@@ -76,25 +69,34 @@ object AppModule {
 
     @Provides
     @SingleIn(AppScope::class)
-    fun providesBuildMeta(@ApplicationContext context: Context, buildType: BuildType) = BuildMeta(
-        isDebuggable = BuildConfig.DEBUG,
-        buildType = buildType,
-        applicationName = context.getString(R.string.app_name),
-        applicationId = BuildConfig.APPLICATION_ID,
-        // TODO EAx Config.LOW_PRIVACY_LOG_ENABLE,
-        lowPrivacyLoggingEnabled = false,
-        versionName = BuildConfig.VERSION_NAME,
-        versionCode = BuildConfig.VERSION_CODE,
-        gitRevision = BuildConfig.GIT_REVISION,
-        gitBranchName = BuildConfig.GIT_BRANCH_NAME,
-        flavorDescription = BuildConfig.FLAVOR_DESCRIPTION,
-        flavorShortDescription = BuildConfig.SHORT_FLAVOR_DESCRIPTION,
-    )
+    fun providesBuildMeta(
+        @ApplicationContext context: Context,
+        buildType: BuildType,
+        enterpriseService: EnterpriseService,
+    ): BuildMeta {
+        val applicationName = ApplicationConfig.APPLICATION_NAME.takeIf { it.isNotEmpty() } ?: context.getString(R.string.app_name)
+        return BuildMeta(
+            isDebuggable = BuildConfig.DEBUG,
+            buildType = buildType,
+            applicationName = applicationName,
+            productionApplicationName = if (enterpriseService.isEnterpriseBuild) applicationName else ApplicationConfig.PRODUCTION_APPLICATION_NAME,
+            desktopApplicationName = if (enterpriseService.isEnterpriseBuild) applicationName else ApplicationConfig.DESKTOP_APPLICATION_NAME,
+            applicationId = BuildConfig.APPLICATION_ID,
+            isEnterpriseBuild = enterpriseService.isEnterpriseBuild,
+            // TODO EAx Config.LOW_PRIVACY_LOG_ENABLE,
+            lowPrivacyLoggingEnabled = false,
+            versionName = BuildConfig.VERSION_NAME,
+            versionCode = context.getVersionCodeFromManifest(),
+            gitRevision = BuildConfig.GIT_REVISION,
+            gitBranchName = BuildConfig.GIT_BRANCH_NAME,
+            flavorDescription = BuildConfig.FLAVOR_DESCRIPTION,
+            flavorShortDescription = BuildConfig.SHORT_FLAVOR_DESCRIPTION,
+        )
+    }
 
     @Provides
     @SingleIn(AppScope::class)
-    @DefaultPreferences
-    fun providesDefaultSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
+    fun providesSharedPreferences(@ApplicationContext context: Context): SharedPreferences {
         return PreferenceManager.getDefaultSharedPreferences(context)
     }
 

@@ -1,23 +1,15 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package io.element.android.features.login.impl.screens.searchaccountprovider
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -32,7 +24,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -57,16 +48,15 @@ import io.element.android.features.login.impl.changeserver.ChangeServerView
 import io.element.android.features.login.impl.resolver.HomeserverData
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.designsystem.atomic.molecules.IconTitleSubtitleMolecule
+import io.element.android.libraries.designsystem.components.BigIcon
 import io.element.android.libraries.designsystem.components.button.BackButton
 import io.element.android.libraries.designsystem.components.form.textFieldState
+import io.element.android.libraries.designsystem.modifiers.onTabOrEnterKeyFocusNext
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
 import io.element.android.libraries.designsystem.theme.components.Icon
-import io.element.android.libraries.designsystem.theme.components.IconButton
-import io.element.android.libraries.designsystem.theme.components.OutlinedTextField
-import io.element.android.libraries.designsystem.theme.components.Text
-import io.element.android.libraries.designsystem.theme.components.onTabOrEnterKeyFocusNext
+import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.testtags.TestTags
 import io.element.android.libraries.testtags.testTag
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -77,9 +67,9 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun SearchAccountProviderView(
     state: SearchAccountProviderState,
-    onBackPressed: () -> Unit,
-    onLearnMoreClicked: () -> Unit,
-    onDone: () -> Unit,
+    onBackClick: () -> Unit,
+    onLearnMoreClick: () -> Unit,
+    onSuccess: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val eventSink = state.eventSink
@@ -88,22 +78,22 @@ fun SearchAccountProviderView(
         topBar = {
             TopAppBar(
                 title = {},
-                navigationIcon = { BackButton(onClick = onBackPressed) }
+                navigationIcon = { BackButton(onClick = onBackClick) }
             )
         }
     ) { padding ->
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .imePadding()
-                .padding(padding)
-                .consumeWindowInsets(padding)
+                    .fillMaxSize()
+                    .imePadding()
+                    .padding(padding)
+                    .consumeWindowInsets(padding)
         ) {
             LazyColumn(modifier = Modifier.fillMaxWidth(), state = rememberLazyListState()) {
                 item {
                     IconTitleSubtitleMolecule(
                         modifier = Modifier.padding(top = 16.dp, bottom = 40.dp, start = 16.dp, end = 16.dp),
-                        iconImageVector = CompoundIcons.Search(),
+                        iconStyle = BigIcon.Style.Default(CompoundIcons.Search()),
                         title = stringResource(id = R.string.screen_account_provider_form_title),
                         subTitle = stringResource(id = R.string.screen_account_provider_form_subtitle),
                     )
@@ -112,7 +102,7 @@ fun SearchAccountProviderView(
                     // TextInput
                     var userInputState by textFieldState(stateValue = state.userInput)
                     val focusManager = LocalFocusManager.current
-                    OutlinedTextField(
+                    TextField(
                         value = userInputState,
                         // readOnly = isLoading,
                         modifier = Modifier
@@ -134,7 +124,7 @@ fun SearchAccountProviderView(
                         singleLine = true,
                         trailingIcon = if (userInputState.isNotEmpty()) {
                             {
-                                IconButton(onClick = {
+                                Box(Modifier.clickable {
                                     userInputState = ""
                                     eventSink(SearchAccountProviderEvents.UserInput(""))
                                 }) {
@@ -147,9 +137,7 @@ fun SearchAccountProviderView(
                         } else {
                             null
                         },
-                        supportingText = {
-                            Text(text = stringResource(id = R.string.screen_account_provider_form_notice), color = MaterialTheme.colorScheme.secondary)
-                        }
+                        supportingText = stringResource(id = R.string.screen_account_provider_form_notice),
                     )
                 }
 
@@ -188,8 +176,8 @@ fun SearchAccountProviderView(
             }
             ChangeServerView(
                 state = state.changeServerState,
-                onLearnMoreClicked = onLearnMoreClicked,
-                onDone = onDone,
+                onLearnMoreClick = onLearnMoreClick,
+                onSuccess = onSuccess,
             )
         }
     }
@@ -205,7 +193,6 @@ private fun HomeserverData.toAccountProvider(): AccountProvider {
         isPublic = isMatrixOrg,
         isMatrixOrg = isMatrixOrg,
         isValid = isWellknownValid,
-        supportSlidingSync = supportSlidingSync,
     )
 }
 
@@ -214,8 +201,8 @@ private fun HomeserverData.toAccountProvider(): AccountProvider {
 internal fun SearchAccountProviderViewPreview(@PreviewParameter(SearchAccountProviderStateProvider::class) state: SearchAccountProviderState) = ElementPreview {
     SearchAccountProviderView(
         state = state,
-        onBackPressed = {},
-        onLearnMoreClicked = {},
-        onDone = {},
+        onBackClick = {},
+        onLearnMoreClick = {},
+        onSuccess = {},
     )
 }

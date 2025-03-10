@@ -1,25 +1,16 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomlist.impl
 
 import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
@@ -29,6 +20,8 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import im.vector.app.features.analytics.plan.MobileScreen
 import io.element.android.anvilannotations.ContributesNode
+import io.element.android.features.invite.api.response.AcceptDeclineInviteView
+import io.element.android.features.logout.api.direct.DirectLogoutView
 import io.element.android.features.roomlist.api.RoomListEntryPoint
 import io.element.android.features.roomlist.impl.components.RoomListMenuAction
 import io.element.android.libraries.deeplink.usecase.InviteFriendsUseCase
@@ -43,6 +36,8 @@ class RoomListNode @AssistedInject constructor(
     private val presenter: RoomListPresenter,
     private val inviteFriendsUseCase: InviteFriendsUseCase,
     private val analyticsService: AnalyticsService,
+    private val acceptDeclineInviteView: AcceptDeclineInviteView,
+    private val directLogoutView: DirectLogoutView,
 ) : Node(buildContext, plugins = plugins) {
     init {
         lifecycle.subscribe(
@@ -52,41 +47,37 @@ class RoomListNode @AssistedInject constructor(
         )
     }
 
-    private fun onRoomClicked(roomId: RoomId) {
-        plugins<RoomListEntryPoint.Callback>().forEach { it.onRoomClicked(roomId) }
+    private fun onRoomClick(roomId: RoomId) {
+        plugins<RoomListEntryPoint.Callback>().forEach { it.onRoomClick(roomId) }
     }
 
     private fun onOpenSettings() {
-        plugins<RoomListEntryPoint.Callback>().forEach { it.onSettingsClicked() }
+        plugins<RoomListEntryPoint.Callback>().forEach { it.onSettingsClick() }
     }
 
-    private fun onCreateRoomClicked() {
-        plugins<RoomListEntryPoint.Callback>().forEach { it.onCreateRoomClicked() }
+    private fun onCreateRoomClick() {
+        plugins<RoomListEntryPoint.Callback>().forEach { it.onCreateRoomClick() }
     }
 
-    private fun onSessionVerificationClicked() {
-        plugins<RoomListEntryPoint.Callback>().forEach { it.onSessionVerificationClicked() }
+    private fun onSetUpRecoveryClick() {
+        plugins<RoomListEntryPoint.Callback>().forEach { it.onSetUpRecoveryClick() }
     }
 
-    private fun onSessionConfirmRecoveryKeyClicked() {
-        plugins<RoomListEntryPoint.Callback>().forEach { it.onSessionConfirmRecoveryKeyClicked() }
+    private fun onSessionConfirmRecoveryKeyClick() {
+        plugins<RoomListEntryPoint.Callback>().forEach { it.onSessionConfirmRecoveryKeyClick() }
     }
 
-    private fun onInvitesClicked() {
-        plugins<RoomListEntryPoint.Callback>().forEach { it.onInvitesClicked() }
+    private fun onRoomSettingsClick(roomId: RoomId) {
+        plugins<RoomListEntryPoint.Callback>().forEach { it.onRoomSettingsClick(roomId) }
     }
 
-    private fun onRoomSettingsClicked(roomId: RoomId) {
-        plugins<RoomListEntryPoint.Callback>().forEach { it.onRoomSettingsClicked(roomId) }
-    }
-
-    private fun onMenuActionClicked(activity: Activity, roomListMenuAction: RoomListMenuAction) {
+    private fun onMenuActionClick(activity: Activity, roomListMenuAction: RoomListMenuAction) {
         when (roomListMenuAction) {
             RoomListMenuAction.InviteFriends -> {
                 inviteFriendsUseCase.execute(activity)
             }
             RoomListMenuAction.ReportBug -> {
-                plugins<RoomListEntryPoint.Callback>().forEach { it.onReportBugClicked() }
+                plugins<RoomListEntryPoint.Callback>().forEach { it.onReportBugClick() }
             }
         }
     }
@@ -94,18 +85,27 @@ class RoomListNode @AssistedInject constructor(
     @Composable
     override fun View(modifier: Modifier) {
         val state = presenter.present()
-        val activity = LocalContext.current as Activity
+        val activity = requireNotNull(LocalActivity.current)
+
         RoomListView(
             state = state,
-            onRoomClicked = this::onRoomClicked,
-            onSettingsClicked = this::onOpenSettings,
-            onCreateRoomClicked = this::onCreateRoomClicked,
-            onVerifyClicked = this::onSessionVerificationClicked,
-            onConfirmRecoveryKeyClicked = this::onSessionConfirmRecoveryKeyClicked,
-            onInvitesClicked = this::onInvitesClicked,
-            onRoomSettingsClicked = this::onRoomSettingsClicked,
-            onMenuActionClicked = { onMenuActionClicked(activity, it) },
+            onRoomClick = this::onRoomClick,
+            onSettingsClick = this::onOpenSettings,
+            onCreateRoomClick = this::onCreateRoomClick,
+            onSetUpRecoveryClick = this::onSetUpRecoveryClick,
+            onConfirmRecoveryKeyClick = this::onSessionConfirmRecoveryKeyClick,
+            onRoomSettingsClick = this::onRoomSettingsClick,
+            onMenuActionClick = { onMenuActionClick(activity, it) },
             modifier = modifier,
-        )
+        ) {
+            acceptDeclineInviteView.Render(
+                state = state.acceptDeclineInviteState,
+                onAcceptInvite = this::onRoomClick,
+                onDeclineInvite = { },
+                modifier = Modifier
+            )
+        }
+
+        directLogoutView.Render(state.directLogoutState)
     }
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.root
@@ -24,10 +15,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import io.element.android.features.logout.api.direct.DirectLogoutPresenter
+import androidx.compose.runtime.setValue
+import io.element.android.features.logout.api.direct.DirectLogoutState
+import io.element.android.features.preferences.impl.utils.ShowDeveloperSettingsProvider
 import io.element.android.libraries.architecture.Presenter
-import io.element.android.libraries.core.meta.BuildType
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.collectSnackbarMessageAsState
 import io.element.android.libraries.featureflag.api.FeatureFlagService
@@ -35,8 +26,6 @@ import io.element.android.libraries.featureflag.api.FeatureFlags
 import io.element.android.libraries.indicator.api.IndicatorService
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.oidc.AccountManagementAction
-import io.element.android.libraries.matrix.api.user.MatrixUser
-import io.element.android.libraries.matrix.api.user.getCurrentUser
 import io.element.android.libraries.matrix.api.verification.SessionVerificationService
 import io.element.android.services.analytics.api.AnalyticsService
 import kotlinx.coroutines.CoroutineScope
@@ -49,20 +38,19 @@ class PreferencesRootPresenter @Inject constructor(
     private val matrixClient: MatrixClient,
     private val sessionVerificationService: SessionVerificationService,
     private val analyticsService: AnalyticsService,
-    private val buildType: BuildType,
     private val versionFormatter: VersionFormatter,
     private val snackbarDispatcher: SnackbarDispatcher,
     private val featureFlagService: FeatureFlagService,
     private val indicatorService: IndicatorService,
-    private val directLogoutPresenter: DirectLogoutPresenter,
+    private val directLogoutPresenter: Presenter<DirectLogoutState>,
+    private val showDeveloperSettingsProvider: ShowDeveloperSettingsProvider,
 ) : Presenter<PreferencesRootState> {
     @Composable
     override fun present(): PreferencesRootState {
-        val matrixUser: MutableState<MatrixUser?> = rememberSaveable {
-            mutableStateOf(null)
-        }
+        val matrixUser = matrixClient.userProfile.collectAsState()
         LaunchedEffect(Unit) {
-            initialLoad(matrixUser)
+            // Force a refresh of the profile
+            matrixClient.getUserProfile()
         }
 
         val snackbarMessage by snackbarDispatcher.collectSnackbarMessageAsState()
@@ -78,7 +66,7 @@ class PreferencesRootPresenter @Inject constructor(
         }
 
         // We should display the 'complete verification' option if the current session can be verified
-        val showCompleteVerification by sessionVerificationService.canVerifySessionFlow.collectAsState(false)
+        val canVerifyUserSession by sessionVerificationService.needsSessionVerification.collectAsState(false)
 
         val showSecureBackupIndicator by indicatorService.showSettingChatBackupIndicator()
 
@@ -87,6 +75,12 @@ class PreferencesRootPresenter @Inject constructor(
         }
         val devicesManagementUrl: MutableState<String?> = remember {
             mutableStateOf(null)
+        }
+        var canDeactivateAccount by remember {
+            mutableStateOf(false)
+        }
+        LaunchedEffect(Unit) {
+            canDeactivateAccount = matrixClient.canDeactivateAccount()
         }
 
         val showBlockedUsersItem by produceState(initialValue = false) {
@@ -101,28 +95,34 @@ class PreferencesRootPresenter @Inject constructor(
             initAccountManagementUrl(accountManagementUrl, devicesManagementUrl)
         }
 
-        val showDeveloperSettings = buildType != BuildType.RELEASE
+        val showDeveloperSettings by showDeveloperSettingsProvider.showDeveloperSettings.collectAsState()
+
+        fun handleEvent(event: PreferencesRootEvents) {
+            when (event) {
+                is PreferencesRootEvents.OnVersionInfoClick -> {
+                    showDeveloperSettingsProvider.unlockDeveloperSettings()
+                }
+            }
+        }
+
         return PreferencesRootState(
             myUser = matrixUser.value,
             version = versionFormatter.get(),
             deviceId = matrixClient.deviceId,
-            showCompleteVerification = showCompleteVerification,
-            showSecureBackup = !showCompleteVerification,
+            showSecureBackup = !canVerifyUserSession,
             showSecureBackupBadge = showSecureBackupIndicator,
             accountManagementUrl = accountManagementUrl.value,
             devicesManagementUrl = devicesManagementUrl.value,
             showAnalyticsSettings = hasAnalyticsProviders,
             showDeveloperSettings = showDeveloperSettings,
+            canDeactivateAccount = canDeactivateAccount,
             showNotificationSettings = showNotificationSettings.value,
             showLockScreenSettings = showLockScreenSettings.value,
             showBlockedUsersItem = showBlockedUsersItem,
             directLogoutState = directLogoutState,
             snackbarMessage = snackbarMessage,
+            eventSink = ::handleEvent,
         )
-    }
-
-    private fun CoroutineScope.initialLoad(matrixUser: MutableState<MatrixUser?>) = launch {
-        matrixUser.value = matrixClient.getCurrentUser()
     }
 
     private fun CoroutineScope.initAccountManagementUrl(

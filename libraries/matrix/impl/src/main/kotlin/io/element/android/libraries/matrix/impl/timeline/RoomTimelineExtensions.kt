@@ -1,25 +1,13 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.impl.timeline
 
-import io.element.android.libraries.core.data.tryOrNull
 import io.element.android.libraries.matrix.impl.util.cancelAndDestroy
-import io.element.android.libraries.matrix.impl.util.destroyAll
-import io.element.android.libraries.matrix.impl.util.mxCallbackFlow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
@@ -27,15 +15,28 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
-import org.matrix.rustcomponents.sdk.BackPaginationStatusListener
-import org.matrix.rustcomponents.sdk.Timeline
+import org.matrix.rustcomponents.sdk.PaginationStatusListener
 import org.matrix.rustcomponents.sdk.TimelineDiff
-import org.matrix.rustcomponents.sdk.TimelineItem
+import org.matrix.rustcomponents.sdk.TimelineInterface
 import org.matrix.rustcomponents.sdk.TimelineListener
 import timber.log.Timber
-import uniffi.matrix_sdk_ui.BackPaginationStatus
+import uniffi.matrix_sdk.RoomPaginationStatus
 
-internal fun Timeline.timelineDiffFlow(onInitialList: suspend (List<TimelineItem>) -> Unit): Flow<List<TimelineDiff>> =
+internal fun TimelineInterface.liveBackPaginationStatus(): Flow<RoomPaginationStatus> = callbackFlow {
+    val listener = object : PaginationStatusListener {
+        override fun onUpdate(status: RoomPaginationStatus) {
+            trySend(status)
+        }
+    }
+    val result = subscribeToBackPaginationStatus(listener)
+    awaitClose {
+        result.cancelAndDestroy()
+    }
+}.catch {
+    Timber.d(it, "liveBackPaginationStatus() failed")
+}.buffer(Channel.UNLIMITED)
+
+internal fun TimelineInterface.timelineDiffFlow(): Flow<List<TimelineDiff>> =
     callbackFlow {
         val listener = object : TimelineListener {
             override fun onUpdate(diff: List<TimelineDiff>) {
@@ -43,40 +44,21 @@ internal fun Timeline.timelineDiffFlow(onInitialList: suspend (List<TimelineItem
             }
         }
         Timber.d("Open timelineDiffFlow for TimelineInterface ${this@timelineDiffFlow}")
-        val result = addListener(listener)
-        try {
-            onInitialList(result.items)
-        } catch (exception: Exception) {
-            Timber.d(exception, "Catch failure in timelineDiffFlow of TimelineInterface ${this@timelineDiffFlow}")
-        }
+        val taskHandle = addListener(listener)
         awaitClose {
             Timber.d("Close timelineDiffFlow for TimelineInterface ${this@timelineDiffFlow}")
-            result.itemsStream.cancelAndDestroy()
-            result.items.destroyAll()
+            taskHandle.cancelAndDestroy()
         }
     }.catch {
         Timber.d(it, "timelineDiffFlow() failed")
     }.buffer(Channel.UNLIMITED)
 
-internal fun Timeline.backPaginationStatusFlow(): Flow<BackPaginationStatus> =
-    mxCallbackFlow {
-        val listener = object : BackPaginationStatusListener {
-            override fun onUpdate(status: BackPaginationStatus) {
-                trySendBlocking(status)
-            }
-        }
-        tryOrNull {
-            subscribeToBackPaginationStatus(listener)
-        }
-    }.buffer(Channel.UNLIMITED)
-
-internal suspend fun Timeline.runWithTimelineListenerRegistered(action: suspend () -> Unit) {
+internal suspend fun TimelineInterface.runWithTimelineListenerRegistered(action: suspend () -> Unit) {
     val result = addListener(NoOpTimelineListener)
     try {
         action()
     } finally {
-        result.itemsStream.cancelAndDestroy()
-        result.items.destroyAll()
+        result.cancelAndDestroy()
     }
 }
 

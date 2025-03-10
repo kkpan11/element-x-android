@@ -1,81 +1,64 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.pushproviders.unifiedpush
 
-import android.content.Context
 import com.squareup.anvil.annotations.ContributesMultibinding
-import io.element.android.libraries.androidutils.system.getApplicationLabel
-import io.element.android.libraries.core.log.logger.LoggerTag
 import io.element.android.libraries.di.AppScope
-import io.element.android.libraries.di.ApplicationContext
 import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.pushproviders.api.CurrentUserPushConfig
 import io.element.android.libraries.pushproviders.api.Distributor
 import io.element.android.libraries.pushproviders.api.PushProvider
 import io.element.android.libraries.pushstore.api.clientsecret.PushClientSecret
-import org.unifiedpush.android.connector.UnifiedPush
-import timber.log.Timber
 import javax.inject.Inject
-
-private val loggerTag = LoggerTag("UnifiedPushProvider", LoggerTag.PushLoggerTag)
 
 @ContributesMultibinding(AppScope::class)
 class UnifiedPushProvider @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val unifiedPushDistributorProvider: UnifiedPushDistributorProvider,
     private val registerUnifiedPushUseCase: RegisterUnifiedPushUseCase,
     private val unRegisterUnifiedPushUseCase: UnregisterUnifiedPushUseCase,
     private val pushClientSecret: PushClientSecret,
+    private val unifiedPushStore: UnifiedPushStore,
+    private val unifiedPushCurrentUserPushConfigProvider: UnifiedPushCurrentUserPushConfigProvider,
 ) : PushProvider {
     override val index = UnifiedPushConfig.INDEX
     override val name = UnifiedPushConfig.NAME
 
-    override fun isAvailable(): Boolean {
-        val isAvailable = getDistributors().isNotEmpty()
-        return if (isAvailable) {
-            Timber.tag(loggerTag.value).d("UnifiedPush is available")
-            true
-        } else {
-            Timber.tag(loggerTag.value).w("UnifiedPush is not available")
-            false
-        }
-    }
-
     override fun getDistributors(): List<Distributor> {
-        val distributors = UnifiedPush.getDistributors(context)
-        return distributors.mapNotNull {
-            if (it == context.packageName) {
-                // Exclude self
-                null
-            } else {
-                Distributor(it, context.getApplicationLabel(it))
+        return unifiedPushDistributorProvider.getDistributors()
+    }
+
+    override suspend fun registerWith(matrixClient: MatrixClient, distributor: Distributor): Result<Unit> {
+        val clientSecret = pushClientSecret.getSecretForUser(matrixClient.sessionId)
+        return registerUnifiedPushUseCase.execute(distributor, clientSecret)
+            .onSuccess {
+                unifiedPushStore.setDistributorValue(matrixClient.sessionId, distributor.value)
             }
-        }
     }
 
-    override suspend fun registerWith(matrixClient: MatrixClient, distributor: Distributor) {
+    override suspend fun getCurrentDistributor(sessionId: SessionId): Distributor? {
+        val distributorValue = unifiedPushStore.getDistributorValue(sessionId)
+        return getDistributors().find { it.value == distributorValue }
+    }
+
+    override suspend fun unregister(matrixClient: MatrixClient): Result<Unit> {
         val clientSecret = pushClientSecret.getSecretForUser(matrixClient.sessionId)
-        registerUnifiedPushUseCase.execute(matrixClient, distributor, clientSecret)
+        return unRegisterUnifiedPushUseCase.unregister(matrixClient, clientSecret)
     }
 
-    override suspend fun unregister(matrixClient: MatrixClient) {
-        val clientSecret = pushClientSecret.getSecretForUser(matrixClient.sessionId)
-        unRegisterUnifiedPushUseCase.execute(clientSecret)
+    override suspend fun onSessionDeleted(sessionId: SessionId) {
+        val clientSecret = pushClientSecret.getSecretForUser(sessionId)
+        unRegisterUnifiedPushUseCase.cleanup(clientSecret)
     }
 
-    override suspend fun troubleshoot(): Result<Unit> {
-        TODO("Not yet implemented")
+    override suspend fun getCurrentUserPushConfig(): CurrentUserPushConfig? {
+        return unifiedPushCurrentUserPushConfigProvider.provide()
     }
+
+    override fun canRotateToken(): Boolean = false
 }

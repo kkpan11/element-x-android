@@ -1,19 +1,9 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  * Copyright 2021 Google LLC
- * Copied and adapted from android-maps-compose (https://github.com/googlemaps/android-maps-compose)
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.maplibre.compose
@@ -28,11 +18,11 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import com.mapbox.mapboxsdk.camera.CameraPosition
-import com.mapbox.mapboxsdk.camera.CameraUpdateFactory
-import com.mapbox.mapboxsdk.maps.MapboxMap
-import com.mapbox.mapboxsdk.maps.Projection
 import kotlinx.parcelize.Parcelize
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.Projection
 
 /**
  * Create and [rememberSaveable] a [CameraPositionState] using [CameraPositionState.Saver].
@@ -49,7 +39,7 @@ public inline fun rememberCameraPositionState(
 
 /**
  * A state object that can be hoisted to control and observe the map's camera state.
- * A [CameraPositionState] may only be used by a single [MapboxMap] composable at a time
+ * A [CameraPositionState] may only be used by a single [MapLibreMap] composable at a time
  * as it reflects instance state for a single view of a map.
  *
  * @param position the initial camera position
@@ -143,15 +133,15 @@ public class CameraPositionState(
 
     // The map currently associated with this CameraPositionState.
     // Guarded by `lock`.
-    private var map: MapboxMap? by mutableStateOf(null)
+    private var map: MapLibreMap? by mutableStateOf(null)
 
     // The current map is set and cleared by side effect.
     // There can be only one associated at a time.
-    internal fun setMap(map: MapboxMap?) {
+    internal fun setMap(map: MapLibreMap?) {
         synchronized(lock) {
             if (this.map == null && map == null) return
             if (this.map != null && map != null) {
-                error("CameraPositionState may only be associated with one MapboxMap at a time")
+                error("CameraPositionState may only be associated with one MapLibreMap at a time")
             }
             this.map = map
             if (map == null) {
@@ -179,7 +169,7 @@ internal val LocalCameraPositionState = staticCompositionLocalOf { CameraPositio
 
 /** The current [CameraPositionState] used by the map. */
 public val currentCameraPositionState: CameraPositionState
-    @[MapboxMapComposable ReadOnlyComposable Composable]
+    @[MapLibreMapComposable ReadOnlyComposable Composable]
     get() = LocalCameraPositionState.current
 
 @Parcelize

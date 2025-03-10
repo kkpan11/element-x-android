@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.report
@@ -30,13 +21,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
@@ -48,9 +37,9 @@ import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.aliasScreenTitle
 import io.element.android.libraries.designsystem.theme.components.Button
-import io.element.android.libraries.designsystem.theme.components.OutlinedTextField
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.Text
+import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.ui.strings.CommonStrings
 
@@ -58,7 +47,7 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun ReportMessageView(
     state: ReportMessageState,
-    onBackClicked: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
@@ -66,7 +55,7 @@ fun ReportMessageView(
     AsyncActionView(
         async = state.result,
         progressDialog = {},
-        onSuccess = { onBackClicked() },
+        onSuccess = { onBackClick() },
         errorMessage = { stringResource(CommonStrings.error_unknown) },
         onErrorDismiss = { state.eventSink(ReportMessageEvents.ClearError) }
     )
@@ -81,7 +70,7 @@ fun ReportMessageView(
                     )
                 },
                 navigationIcon = {
-                    BackButton(onClick = onBackClicked)
+                    BackButton(onClick = onBackClick)
                 }
             )
         },
@@ -98,21 +87,16 @@ fun ReportMessageView(
         ) {
             Spacer(modifier = Modifier.height(20.dp))
 
-            OutlinedTextField(
+            TextField(
                 value = state.reason,
                 onValueChange = { state.eventSink(ReportMessageEvents.UpdateReason(it)) },
-                placeholder = { Text(stringResource(R.string.report_content_hint)) },
+                placeholder = stringResource(R.string.screen_report_content_hint),
+                minLines = 3,
                 enabled = !isSending,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 90.dp)
-            )
-            Text(
-                text = stringResource(R.string.report_content_explanation),
-                style = ElementTheme.typography.fontBodySmRegular,
-                color = MaterialTheme.colorScheme.secondary,
-                textAlign = TextAlign.Start,
-                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp, start = 16.dp, end = 16.dp)
+                    .heightIn(min = 90.dp),
+                supportingText = stringResource(R.string.screen_report_content_explanation),
             )
 
             Row(
@@ -128,7 +112,7 @@ fun ReportMessageView(
                     Text(
                         text = stringResource(R.string.screen_report_content_block_user_hint),
                         style = ElementTheme.typography.fontBodyMdRegular,
-                        color = MaterialTheme.colorScheme.secondary,
+                        color = ElementTheme.colors.textSecondary,
                     )
                 }
                 Switch(
@@ -160,7 +144,7 @@ fun ReportMessageView(
 @Composable
 internal fun ReportMessageViewPreview(@PreviewParameter(ReportMessageStateProvider::class) state: ReportMessageState) = ElementPreview {
     ReportMessageView(
-        onBackClicked = {},
+        onBackClick = {},
         state = state,
     )
 }

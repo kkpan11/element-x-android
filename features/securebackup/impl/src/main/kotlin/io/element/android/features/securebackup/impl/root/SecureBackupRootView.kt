@@ -1,43 +1,33 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.securebackup.impl.root
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.securebackup.impl.R
 import io.element.android.libraries.architecture.AsyncData
-import io.element.android.libraries.designsystem.components.async.AsyncLoading
+import io.element.android.libraries.designsystem.components.async.AsyncActionView
+import io.element.android.libraries.designsystem.components.dialogs.ErrorDialog
 import io.element.android.libraries.designsystem.components.list.ListItemContent
-import io.element.android.libraries.designsystem.components.preferences.PreferenceDivider
 import io.element.android.libraries.designsystem.components.preferences.PreferencePage
-import io.element.android.libraries.designsystem.components.preferences.PreferenceText
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.text.buildAnnotatedStringWithStyledPart
 import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
+import io.element.android.libraries.designsystem.theme.components.HorizontalDivider
 import io.element.android.libraries.designsystem.theme.components.ListItem
 import io.element.android.libraries.designsystem.theme.components.Text
-import io.element.android.libraries.designsystem.theme.components.TextButton
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarHost
 import io.element.android.libraries.designsystem.utils.snackbar.rememberSnackbarHostState
 import io.element.android.libraries.matrix.api.encryption.BackupState
@@ -47,136 +37,199 @@ import io.element.android.libraries.ui.strings.CommonStrings
 @Composable
 fun SecureBackupRootView(
     state: SecureBackupRootState,
-    onBackPressed: () -> Unit,
-    onSetupClicked: () -> Unit,
-    onChangeClicked: () -> Unit,
-    onEnableClicked: () -> Unit,
-    onDisableClicked: () -> Unit,
-    onConfirmRecoveryKeyClicked: () -> Unit,
-    onLearnMoreClicked: () -> Unit,
+    onBackClick: () -> Unit,
+    onSetupClick: () -> Unit,
+    onChangeClick: () -> Unit,
+    onDisableClick: () -> Unit,
+    onConfirmRecoveryKeyClick: () -> Unit,
+    onLearnMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val snackbarHostState = rememberSnackbarHostState(snackbarMessage = state.snackbarMessage)
 
     PreferencePage(
         modifier = modifier,
-        onBackPressed = onBackPressed,
-        title = stringResource(id = CommonStrings.common_chat_backup),
+        onBackClick = onBackClick,
+        title = stringResource(id = CommonStrings.common_encryption),
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) {
-        val text = buildAnnotatedStringWithStyledPart(
-            fullTextRes = R.string.screen_chat_backup_key_backup_description,
-            coloredTextRes = CommonStrings.action_learn_more,
-            color = ElementTheme.colors.textPrimary,
-            underline = false,
-            bold = true,
-        )
-        PreferenceText(
-            title = stringResource(id = R.string.screen_chat_backup_key_backup_title),
-            subtitleAnnotated = text,
-            onClick = onLearnMoreClicked,
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = stringResource(id = R.string.screen_chat_backup_key_backup_title),
+                )
+            },
+            supportingContent = {
+                Text(
+                    text = buildAnnotatedStringWithStyledPart(
+                        fullTextRes = R.string.screen_chat_backup_key_backup_description,
+                        coloredTextRes = CommonStrings.action_learn_more,
+                        color = ElementTheme.colors.textPrimary,
+                        underline = false,
+                        bold = true,
+                    ),
+                )
+            },
+            onClick = onLearnMoreClick,
         )
 
-        // Disable / Enable backup
-        when (state.backupState) {
-            BackupState.WAITING_FOR_SYNC -> Unit
-            BackupState.UNKNOWN -> {
-                when (state.doesBackupExistOnServer) {
-                    is AsyncData.Success -> when (state.doesBackupExistOnServer.data) {
-                        true -> {
-                            PreferenceText(
-                                title = stringResource(id = R.string.screen_chat_backup_key_backup_action_disable),
-                                tintColor = ElementTheme.colors.textCriticalPrimary,
-                                onClick = onDisableClicked,
+        // Disable / Enable key storage
+        ListItem(
+            headlineContent = {
+                Text(
+                    text = stringResource(id = R.string.screen_chat_backup_key_storage_toggle_title),
+                )
+            },
+            trailingContent = when (state.backupState) {
+                BackupState.WAITING_FOR_SYNC,
+                BackupState.DISABLING -> ListItemContent.Custom { LoadingView() }
+                BackupState.UNKNOWN -> {
+                    when (state.doesBackupExistOnServer) {
+                        is AsyncData.Success -> {
+                            ListItemContent.Switch(checked = state.doesBackupExistOnServer.data)
+                        }
+                        is AsyncData.Loading,
+                        AsyncData.Uninitialized -> ListItemContent.Custom { LoadingView() }
+                        is AsyncData.Failure -> ListItemContent.Custom {
+                            Text(
+                                text = stringResource(id = CommonStrings.action_retry)
                             )
                         }
-                        false -> {
-                            PreferenceText(
-                                title = stringResource(id = R.string.screen_chat_backup_key_backup_action_enable),
-                                onClick = onEnableClicked,
-                            )
-                        }
-                    }
-                    is AsyncData.Loading,
-                    AsyncData.Uninitialized -> {
-                        ListItem(headlineContent = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                            ) {
-                                CircularProgressIndicator()
-                            }
-                        })
-                    }
-                    is AsyncData.Failure -> {
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    text = stringResource(id = CommonStrings.error_unknown),
-                                )
-                            },
-                            trailingContent = ListItemContent.Custom {
-                                TextButton(
-                                    text = stringResource(
-                                        id = CommonStrings.action_retry
-                                    ),
-                                    onClick = { state.eventSink.invoke(SecureBackupRootEvents.RetryKeyBackupState) }
-                                )
-                            }
-                        )
-
-                        PreferenceText(
-                            title = stringResource(id = R.string.screen_chat_backup_key_backup_action_enable),
-                            onClick = onEnableClicked,
-                        )
                     }
                 }
-            }
-            BackupState.CREATING,
-            BackupState.ENABLING,
-            BackupState.RESUMING,
-            BackupState.ENABLED,
-            BackupState.DOWNLOADING -> {
-                PreferenceText(
-                    title = stringResource(id = R.string.screen_chat_backup_key_backup_action_disable),
-                    tintColor = ElementTheme.colors.textCriticalPrimary,
-                    onClick = onDisableClicked,
-                )
-            }
-            BackupState.DISABLING -> {
-                AsyncLoading()
-            }
-        }
-
-        PreferenceDivider()
-
+                BackupState.CREATING,
+                BackupState.ENABLING,
+                BackupState.RESUMING,
+                BackupState.ENABLED,
+                BackupState.DOWNLOADING -> ListItemContent.Switch(checked = true)
+            },
+            onClick = {
+                when (state.backupState) {
+                    BackupState.WAITING_FOR_SYNC,
+                    BackupState.DISABLING -> Unit
+                    BackupState.UNKNOWN -> {
+                        when (state.doesBackupExistOnServer) {
+                            is AsyncData.Success -> {
+                                if (state.doesBackupExistOnServer.data) {
+                                    onDisableClick()
+                                } else {
+                                    state.eventSink.invoke(SecureBackupRootEvents.EnableKeyStorage)
+                                }
+                            }
+                            is AsyncData.Loading,
+                            AsyncData.Uninitialized -> Unit
+                            is AsyncData.Failure -> state.eventSink.invoke(SecureBackupRootEvents.RetryKeyBackupState)
+                        }
+                    }
+                    BackupState.CREATING,
+                    BackupState.ENABLING,
+                    BackupState.RESUMING,
+                    BackupState.ENABLED,
+                    BackupState.DOWNLOADING -> onDisableClick()
+                }
+            },
+        )
+        HorizontalDivider()
         // Setup recovery
         when (state.recoveryState) {
-            RecoveryState.WAITING_FOR_SYNC -> Unit
             RecoveryState.UNKNOWN,
+            RecoveryState.WAITING_FOR_SYNC -> Unit
             RecoveryState.DISABLED -> {
-                PreferenceText(
-                    title = stringResource(id = R.string.screen_chat_backup_recovery_action_setup),
-                    subtitle = stringResource(id = R.string.screen_chat_backup_recovery_action_setup_description, state.appName),
-                    onClick = onSetupClicked,
-                    showEndBadge = true,
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_chat_backup_recovery_action_setup),
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_chat_backup_recovery_action_setup_description, state.appName),
+                        )
+                    },
+                    trailingContent = ListItemContent.Badge,
+                    enabled = state.isKeyStorageEnabled,
+                    alwaysClickable = true,
+                    onClick = {
+                        if (state.isKeyStorageEnabled) {
+                            onSetupClick()
+                        } else {
+                            state.eventSink.invoke(SecureBackupRootEvents.DisplayKeyStorageDisabledError)
+                        }
+                    },
                 )
             }
             RecoveryState.ENABLED -> {
-                PreferenceText(
-                    title = stringResource(id = R.string.screen_chat_backup_recovery_action_change),
-                    onClick = onChangeClicked,
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_chat_backup_recovery_action_change),
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_chat_backup_recovery_action_change_description),
+                        )
+                    },
+                    enabled = state.isKeyStorageEnabled,
+                    alwaysClickable = true,
+                    onClick = {
+                        if (state.isKeyStorageEnabled) {
+                            onChangeClick()
+                        } else {
+                            state.eventSink.invoke(SecureBackupRootEvents.DisplayKeyStorageDisabledError)
+                        }
+                    },
                 )
             }
             RecoveryState.INCOMPLETE ->
-                PreferenceText(
-                    title = stringResource(id = R.string.screen_chat_backup_recovery_action_confirm),
-                    subtitle = stringResource(id = R.string.screen_chat_backup_recovery_action_confirm_description),
-                    showEndBadge = true,
-                    onClick = onConfirmRecoveryKeyClicked,
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_chat_backup_recovery_action_confirm),
+                        )
+                    },
+                    supportingContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_chat_backup_recovery_action_confirm_description),
+                        )
+                    },
+                    trailingContent = ListItemContent.Badge,
+                    enabled = state.isKeyStorageEnabled,
+                    alwaysClickable = true,
+                    onClick = {
+                        if (state.isKeyStorageEnabled) {
+                            onConfirmRecoveryKeyClick()
+                        } else {
+                            state.eventSink.invoke(SecureBackupRootEvents.DisplayKeyStorageDisabledError)
+                        }
+                    },
                 )
         }
     }
+
+    AsyncActionView(
+        async = state.enableAction,
+        progressDialog = { },
+        onSuccess = { },
+        onErrorDismiss = { state.eventSink.invoke(SecureBackupRootEvents.DismissDialog) }
+    )
+    if (state.displayKeyStorageDisabledError) {
+        ErrorDialog(
+            title = null,
+            content = stringResource(id = R.string.screen_chat_backup_key_storage_disabled_error),
+            onSubmit = { state.eventSink.invoke(SecureBackupRootEvents.DismissDialog) },
+        )
+    }
+}
+
+@Composable
+private fun LoadingView() {
+    CircularProgressIndicator(
+        modifier = Modifier
+            .progressSemantics()
+            .size(24.dp),
+        strokeWidth = 2.dp
+    )
 }
 
 @PreviewsDayNight
@@ -186,12 +239,11 @@ internal fun SecureBackupRootViewPreview(
 ) = ElementPreview {
     SecureBackupRootView(
         state = state,
-        onBackPressed = {},
-        onSetupClicked = {},
-        onChangeClicked = {},
-        onEnableClicked = {},
-        onDisableClicked = {},
-        onConfirmRecoveryKeyClicked = {},
-        onLearnMoreClicked = {},
+        onBackClick = {},
+        onSetupClick = {},
+        onChangeClick = {},
+        onDisableClick = {},
+        onConfirmRecoveryKeyClick = {},
+        onLearnMoreClick = {},
     )
 }

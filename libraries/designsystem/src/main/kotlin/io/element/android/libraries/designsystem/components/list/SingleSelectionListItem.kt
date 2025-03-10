@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.list
@@ -42,7 +33,7 @@ import kotlin.time.Duration.Companion.seconds
 fun SingleSelectionListItem(
     headline: String,
     options: ImmutableList<ListOption>,
-    onSelectionChanged: (Int) -> Unit,
+    onSelectionChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
     supportingText: String? = null,
     leadingContent: ListItemContent? = null,
@@ -86,9 +77,9 @@ fun SingleSelectionListItem(
         SingleSelectionDialog(
             title = headline,
             options = options,
-            onOptionSelected = { index ->
+            onSelectOption = { index ->
                 if (index != selectedIndex) {
-                    onSelectionChanged(index)
+                    onSelectionChange(index)
                     selectedIndex = index
                 }
                 // Delay hiding the dialog for a bit so the new state is displayed in it before being dismissed
@@ -110,7 +101,7 @@ internal fun SingleSelectionListItemPreview() {
         SingleSelectionListItem(
             headline = "Headline",
             options = listOptionOf("Option 1", "Option 2", "Option 3"),
-            onSelectionChanged = {},
+            onSelectionChange = {},
         )
     }
 }
@@ -123,7 +114,7 @@ internal fun SingleSelectionListItemUnselectedWithSupportingTextPreview() {
             headline = "Headline",
             options = listOptionOf("Option 1", "Option 2", "Option 3"),
             supportingText = "Supporting text",
-            onSelectionChanged = {},
+            onSelectionChange = {},
         )
     }
 }
@@ -136,7 +127,7 @@ internal fun SingleSelectionListItemSelectedInSupportingTextPreview() {
             headline = "Headline",
             options = listOptionOf("Option 1", "Option 2", "Option 3"),
             supportingText = "Supporting text",
-            onSelectionChanged = {},
+            onSelectionChange = {},
             selected = 1,
         )
     }
@@ -150,7 +141,7 @@ internal fun SingleSelectionListItemSelectedInTrailingContentPreview() {
             headline = "Headline",
             options = listOptionOf("Option 1", "Option 2", "Option 3"),
             supportingText = "Supporting text",
-            onSelectionChanged = {},
+            onSelectionChange = {},
             selected = 1,
             displayResultInTrailingContent = true,
         )
@@ -165,7 +156,7 @@ internal fun SingleSelectionListItemCustomFormattertPreview() {
             headline = "Headline",
             options = listOptionOf("Option 1", "Option 2", "Option 3"),
             supportingText = "Supporting text",
-            onSelectionChanged = {},
+            onSelectionChange = {},
             resultFormatter = { "Selected index: $it" },
             selected = 1,
             displayResultInTrailingContent = true,

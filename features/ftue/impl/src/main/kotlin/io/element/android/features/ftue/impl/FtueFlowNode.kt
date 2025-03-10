@@ -1,28 +1,21 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.ftue.impl
 
 import android.os.Parcelable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
-import com.bumble.appyx.core.navigation.backpresshandlerstrategies.BaseBackPressHandlerStrategy
 import com.bumble.appyx.core.node.Node
 import com.bumble.appyx.core.plugin.Plugin
 import com.bumble.appyx.navmodel.backstack.BackStack
@@ -32,21 +25,20 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.element.android.anvilannotations.ContributesNode
 import io.element.android.features.analytics.api.AnalyticsEntryPoint
-import io.element.android.features.ftue.api.FtueEntryPoint
 import io.element.android.features.ftue.impl.notifications.NotificationsOptInNode
-import io.element.android.features.ftue.impl.state.DefaultFtueState
+import io.element.android.features.ftue.impl.sessionverification.FtueSessionVerificationFlowNode
+import io.element.android.features.ftue.impl.state.DefaultFtueService
 import io.element.android.features.ftue.impl.state.FtueStep
-import io.element.android.features.ftue.impl.welcome.WelcomeNode
 import io.element.android.features.lockscreen.api.LockScreenEntryPoint
 import io.element.android.libraries.architecture.BackstackView
 import io.element.android.libraries.architecture.BaseFlowNode
 import io.element.android.libraries.architecture.createNode
+import io.element.android.libraries.designsystem.theme.components.CircularProgressIndicator
 import io.element.android.libraries.di.AppScope
 import io.element.android.libraries.di.SessionScope
 import io.element.android.services.analytics.api.AnalyticsService
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -56,7 +48,7 @@ import kotlinx.parcelize.Parcelize
 class FtueFlowNode @AssistedInject constructor(
     @Assisted buildContext: BuildContext,
     @Assisted plugins: List<Plugin>,
-    private val ftueState: DefaultFtueState,
+    private val ftueState: DefaultFtueService,
     private val analyticsEntryPoint: AnalyticsEntryPoint,
     private val analyticsService: AnalyticsService,
     private val lockScreenEntryPoint: LockScreenEntryPoint,
@@ -64,7 +56,6 @@ class FtueFlowNode @AssistedInject constructor(
     backstack = BackStack(
         initialElement = NavTarget.Placeholder,
         savedStateMap = buildContext.savedStateMap,
-        backPressHandler = NoOpBackstackHandlerStrategy(),
     ),
     buildContext = buildContext,
     plugins = plugins,
@@ -74,7 +65,7 @@ class FtueFlowNode @AssistedInject constructor(
         data object Placeholder : NavTarget
 
         @Parcelize
-        data object WelcomeScreen : NavTarget
+        data object SessionVerification : NavTarget
 
         @Parcelize
         data object NotificationsOptIn : NavTarget
@@ -86,22 +77,21 @@ class FtueFlowNode @AssistedInject constructor(
         data object LockScreenSetup : NavTarget
     }
 
-    private val callback = plugins.filterIsInstance<FtueEntryPoint.Callback>().firstOrNull()
-
     override fun onBuilt() {
         super.onBuilt()
 
         lifecycle.subscribe(onCreate = {
-            lifecycleScope.launch { moveToNextStep() }
+            moveToNextStepIfNeeded()
         })
 
         analyticsService.didAskUserConsent()
-            .drop(1) // We only care about consent passing from not asked to asked state
-            .onEach { didAskUserConsent ->
-                if (didAskUserConsent) {
-                    lifecycleScope.launch { moveToNextStep() }
-                }
-            }
+            .distinctUntilChanged()
+            .onEach { moveToNextStepIfNeeded() }
+            .launchIn(lifecycleScope)
+
+        ftueState.isVerificationStatusKnown
+            .filter { it }
+            .onEach { moveToNextStepIfNeeded() }
             .launchIn(lifecycleScope)
     }
 
@@ -110,19 +100,18 @@ class FtueFlowNode @AssistedInject constructor(
             NavTarget.Placeholder -> {
                 createNode<PlaceholderNode>(buildContext)
             }
-            NavTarget.WelcomeScreen -> {
-                val callback = object : WelcomeNode.Callback {
-                    override fun onContinueClicked() {
-                        ftueState.setWelcomeScreenShown()
-                        lifecycleScope.launch { moveToNextStep() }
+            is NavTarget.SessionVerification -> {
+                val callback = object : FtueSessionVerificationFlowNode.Callback {
+                    override fun onDone() {
+                        moveToNextStepIfNeeded()
                     }
                 }
-                createNode<WelcomeNode>(buildContext, listOf(callback))
+                createNode<FtueSessionVerificationFlowNode>(buildContext, listOf(callback))
             }
             NavTarget.NotificationsOptIn -> {
                 val callback = object : NotificationsOptInNode.Callback {
                     override fun onNotificationsOptInFinished() {
-                        lifecycleScope.launch { moveToNextStep() }
+                        moveToNextStepIfNeeded()
                     }
                 }
                 createNode<NotificationsOptInNode>(buildContext, listOf(callback))
@@ -133,21 +122,23 @@ class FtueFlowNode @AssistedInject constructor(
             NavTarget.LockScreenSetup -> {
                 val callback = object : LockScreenEntryPoint.Callback {
                     override fun onSetupDone() {
-                        lifecycleScope.launch { moveToNextStep() }
+                        moveToNextStepIfNeeded()
                     }
                 }
-                lockScreenEntryPoint.nodeBuilder(this, buildContext)
+                lockScreenEntryPoint.nodeBuilder(this, buildContext, LockScreenEntryPoint.Target.Setup)
                     .callback(callback)
-                    .target(LockScreenEntryPoint.Target.Setup)
                     .build()
             }
         }
     }
 
-    private fun moveToNextStep() {
+    private fun moveToNextStepIfNeeded() = lifecycleScope.launch {
         when (ftueState.getNextStep()) {
-            FtueStep.WelcomeScreen -> {
-                backstack.newRoot(NavTarget.WelcomeScreen)
+            FtueStep.WaitingForInitialState -> {
+                backstack.newRoot(NavTarget.Placeholder)
+            }
+            FtueStep.SessionVerification -> {
+                backstack.newRoot(NavTarget.SessionVerification)
             }
             FtueStep.NotificationsOptIn -> {
                 backstack.newRoot(NavTarget.NotificationsOptIn)
@@ -158,7 +149,7 @@ class FtueFlowNode @AssistedInject constructor(
             FtueStep.LockscreenSetup -> {
                 backstack.newRoot(NavTarget.LockScreenSetup)
             }
-            null -> callback?.onFtueFlowFinished()
+            null -> Unit
         }
     }
 
@@ -171,13 +162,12 @@ class FtueFlowNode @AssistedInject constructor(
     class PlaceholderNode @AssistedInject constructor(
         @Assisted buildContext: BuildContext,
         @Assisted plugins: List<Plugin>,
-    ) : Node(buildContext, plugins = plugins)
-}
-
-private class NoOpBackstackHandlerStrategy<NavTarget : Any> : BaseBackPressHandlerStrategy<NavTarget, BackStack.State>() {
-    override val canHandleBackPressFlow: StateFlow<Boolean> = MutableStateFlow(true)
-
-    override fun onBackPressed() {
-        // No-op
+    ) : Node(buildContext, plugins = plugins) {
+        @Composable
+        override fun View(modifier: Modifier) {
+            Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
     }
 }

@@ -1,27 +1,19 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components.event
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,30 +33,34 @@ fun TimelineItemInformativeView(
     text: String,
     iconDescription: String,
     @DrawableRes iconResourceId: Int,
-    onContentLayoutChanged: (ContentAvoidingLayoutData) -> Unit,
+    onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier.onSizeChanged { size ->
-            onContentLayoutChanged(
+            onContentLayoutChange(
                 ContentAvoidingLayoutData(
                     contentWidth = size.width,
                     contentHeight = size.height,
                 )
             )
         },
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            resourceId = iconResourceId,
-            tint = MaterialTheme.colorScheme.secondary,
-            contentDescription = iconDescription,
-            modifier = Modifier.size(16.dp)
-        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.height(20.dp)
+        ) {
+            Icon(
+                resourceId = iconResourceId,
+                tint = ElementTheme.colors.iconSecondary,
+                contentDescription = iconDescription,
+                modifier = Modifier.size(16.dp)
+            )
+        }
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             fontStyle = FontStyle.Italic,
-            color = MaterialTheme.colorScheme.secondary,
+            color = ElementTheme.colors.textSecondary,
             style = ElementTheme.typography.fontBodyMdRegular,
             text = text
         )
@@ -78,6 +74,6 @@ internal fun TimelineItemInformativeViewPreview() = ElementPreview {
         text = "Info",
         iconDescription = "",
         iconResourceId = CompoundDrawables.ic_compound_delete,
-        onContentLayoutChanged = {},
+        onContentLayoutChange = {},
     )
 }

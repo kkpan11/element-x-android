@@ -1,58 +1,75 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.pushproviders.unifiedpush
 
+import com.squareup.anvil.annotations.ContributesBinding
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
-import io.element.android.libraries.network.RetrofitFactory
-import io.element.android.libraries.pushproviders.unifiedpush.network.UnifiedPushApi
+import io.element.android.libraries.core.data.tryOrNull
+import io.element.android.libraries.di.AppScope
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 import timber.log.Timber
+import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 
-class UnifiedPushGatewayResolver @Inject constructor(
-    private val retrofitFactory: RetrofitFactory,
+sealed interface UnifiedPushGatewayResolverResult {
+    data class Success(val gateway: String) : UnifiedPushGatewayResolverResult
+    data class Error(val gateway: String) : UnifiedPushGatewayResolverResult
+    data object NoMatrixGateway : UnifiedPushGatewayResolverResult
+    data object ErrorInvalidUrl : UnifiedPushGatewayResolverResult
+}
+
+interface UnifiedPushGatewayResolver {
+    suspend fun getGateway(endpoint: String): UnifiedPushGatewayResolverResult
+}
+
+@ContributesBinding(AppScope::class)
+class DefaultUnifiedPushGatewayResolver @Inject constructor(
+    private val unifiedPushApiFactory: UnifiedPushApiFactory,
     private val coroutineDispatchers: CoroutineDispatchers,
-) {
-    suspend fun getGateway(endpoint: String): String? {
-        val gateway = UnifiedPushConfig.DEFAULT_PUSH_GATEWAY_HTTP_URL
-        val url = URL(endpoint)
-        val port = if (url.port != -1) ":${url.port}" else ""
-        val customBase = "${url.protocol}://${url.host}$port"
-        val customUrl = "$customBase/_matrix/push/v1/notify"
-        Timber.i("Testing $customUrl")
-        try {
+) : UnifiedPushGatewayResolver {
+    override suspend fun getGateway(endpoint: String): UnifiedPushGatewayResolverResult {
+        val url = tryOrNull(
+            onError = { Timber.tag("DefaultUnifiedPushGatewayResolver").d(it, "Cannot parse endpoint as an URL") }
+        ) {
+            URL(endpoint)
+        }
+        return if (url == null) {
+            Timber.tag("DefaultUnifiedPushGatewayResolver").d("ErrorInvalidUrl")
+            UnifiedPushGatewayResolverResult.ErrorInvalidUrl
+        } else {
+            val port = if (url.port != -1) ":${url.port}" else ""
+            val customBase = "${url.protocol}://${url.host}$port"
+            val customUrl = "$customBase/_matrix/push/v1/notify"
+            Timber.tag("DefaultUnifiedPushGatewayResolver").i("Testing $customUrl")
             return withContext(coroutineDispatchers.io) {
-                val api = retrofitFactory.create(customBase)
-                    .create(UnifiedPushApi::class.java)
+                val api = unifiedPushApiFactory.create(customBase)
                 try {
                     val discoveryResponse = api.discover()
                     if (discoveryResponse.unifiedpush.gateway == "matrix") {
-                        Timber.d("Using custom gateway")
-                        return@withContext customUrl
+                        Timber.tag("DefaultUnifiedPushGatewayResolver").d("The endpoint seems to be a valid UnifiedPush gateway")
+                        UnifiedPushGatewayResolverResult.Success(customUrl)
+                    } else {
+                        // The endpoint returned a 200 OK but didn't promote an actual matrix gateway, which means it doesn't have any
+                        Timber.tag("DefaultUnifiedPushGatewayResolver").w("The endpoint does not seem to be a valid UnifiedPush gateway, using fallback")
+                        UnifiedPushGatewayResolverResult.NoMatrixGateway
                     }
                 } catch (throwable: Throwable) {
-                    Timber.tag("UnifiedPushHelper").e(throwable)
+                    if ((throwable as? HttpException)?.code() == HttpURLConnection.HTTP_NOT_FOUND) {
+                        Timber.tag("DefaultUnifiedPushGatewayResolver").i("Checking for UnifiedPush endpoint yielded 404, using fallback")
+                        UnifiedPushGatewayResolverResult.NoMatrixGateway
+                    } else {
+                        Timber.tag("DefaultUnifiedPushGatewayResolver").e(throwable, "Error checking for UnifiedPush endpoint")
+                        UnifiedPushGatewayResolverResult.Error(customUrl)
+                    }
                 }
-                return@withContext gateway
             }
-        } catch (e: Throwable) {
-            Timber.d(e, "Cannot try custom gateway")
         }
-        return gateway
     }
 }

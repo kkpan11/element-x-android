@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components.event
@@ -23,10 +14,12 @@ import io.element.android.features.messages.impl.timeline.components.layout.Cont
 import io.element.android.features.messages.impl.timeline.di.LocalTimelineItemPresenterFactories
 import io.element.android.features.messages.impl.timeline.di.rememberPresenter
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemAudioContent
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemCallNotifyContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemEncryptedContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemEventContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemFileContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemImageContent
+import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLegacyCallInviteContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemLocationContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemPollContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemRedactedContent
@@ -36,38 +29,44 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemUnknownContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVideoContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVoiceContent
-import io.element.android.features.messages.impl.voicemessages.timeline.VoiceMessageState
 import io.element.android.libraries.architecture.Presenter
+import io.element.android.libraries.voiceplayer.api.VoiceMessageState
 
 @Composable
 fun TimelineItemEventContentView(
     content: TimelineItemEventContent,
-    onLinkClicked: (url: String) -> Unit,
+    hideMediaContent: Boolean,
+    onContentClick: (() -> Unit)?,
+    onLongClick: (() -> Unit)?,
+    onShowContentClick: () -> Unit,
+    onLinkClick: (url: String) -> Unit,
+    onLinkLongClick: (String) -> Unit,
     eventSink: (TimelineEvents.EventFromTimelineItem) -> Unit,
     modifier: Modifier = Modifier,
-    onContentLayoutChanged: (ContentAvoidingLayoutData) -> Unit = {},
+    onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit = {},
 ) {
     val presenterFactories = LocalTimelineItemPresenterFactories.current
     when (content) {
         is TimelineItemEncryptedContent -> TimelineItemEncryptedView(
             content = content,
-            onContentLayoutChanged = onContentLayoutChanged,
+            onContentLayoutChange = onContentLayoutChange,
             modifier = modifier
         )
         is TimelineItemRedactedContent -> TimelineItemRedactedView(
             content = content,
-            onContentLayoutChanged = onContentLayoutChanged,
+            onContentLayoutChange = onContentLayoutChange,
             modifier = modifier
         )
         is TimelineItemTextBasedContent -> TimelineItemTextView(
             content = content,
             modifier = modifier,
-            onLinkClicked = onLinkClicked,
-            onContentLayoutChanged = onContentLayoutChanged
+            onLinkClick = onLinkClick,
+            onLinkLongClick = onLinkLongClick,
+            onContentLayoutChange = onContentLayoutChange
         )
         is TimelineItemUnknownContent -> TimelineItemUnknownView(
             content = content,
-            onContentLayoutChanged = onContentLayoutChanged,
+            onContentLayoutChange = onContentLayoutChange,
             modifier = modifier
         )
         is TimelineItemLocationContent -> TimelineItemLocationView(
@@ -76,26 +75,45 @@ fun TimelineItemEventContentView(
         )
         is TimelineItemImageContent -> TimelineItemImageView(
             content = content,
+            hideMediaContent = hideMediaContent,
+            onContentClick = onContentClick,
+            onLongClick = onLongClick,
+            onShowContentClick = onShowContentClick,
+            onLinkClick = onLinkClick,
+            onLinkLongClick = onLinkLongClick,
+            onContentLayoutChange = onContentLayoutChange,
             modifier = modifier,
         )
         is TimelineItemStickerContent -> TimelineItemStickerView(
             content = content,
+            hideMediaContent = hideMediaContent,
+            onContentClick = onContentClick,
+            onLongClick = onLongClick,
+            onShowClick = onShowContentClick,
             modifier = modifier,
         )
         is TimelineItemVideoContent -> TimelineItemVideoView(
             content = content,
+            hideMediaContent = hideMediaContent,
+            onContentClick = onContentClick,
+            onLongClick = onLongClick,
+            onShowContentClick = onShowContentClick,
+            onLinkClick = onLinkClick,
+            onLinkLongClick = onLinkLongClick,
+            onContentLayoutChange = onContentLayoutChange,
             modifier = modifier
         )
         is TimelineItemFileContent -> TimelineItemFileView(
             content = content,
-            onContentLayoutChanged = onContentLayoutChanged,
+            onContentLayoutChange = onContentLayoutChange,
             modifier = modifier
         )
         is TimelineItemAudioContent -> TimelineItemAudioView(
             content = content,
-            onContentLayoutChanged = onContentLayoutChanged,
+            onContentLayoutChange = onContentLayoutChange,
             modifier = modifier
         )
+        is TimelineItemLegacyCallInviteContent -> TimelineItemLegacyCallInviteView(modifier = modifier)
         is TimelineItemStateContent -> TimelineItemStateView(
             content = content,
             modifier = modifier
@@ -110,9 +128,10 @@ fun TimelineItemEventContentView(
             TimelineItemVoiceView(
                 state = presenter.present(),
                 content = content,
-                onContentLayoutChanged = onContentLayoutChanged,
+                onContentLayoutChange = onContentLayoutChange,
                 modifier = modifier
             )
         }
+        is TimelineItemCallNotifyContent -> error("This shouldn't be rendered as the content of a bubble")
     }
 }

@@ -1,21 +1,13 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.androidutils.system
 
+import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -25,14 +17,11 @@ import android.os.Build
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
-import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.RequiresApi
+import androidx.core.content.pm.PackageInfoCompat
 import io.element.android.libraries.androidutils.R
 import io.element.android.libraries.androidutils.compat.getApplicationInfoCompat
 import io.element.android.libraries.core.mimetype.MimeTypes
-
-@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.O)
-fun supportNotificationChannels() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
 
 /**
  * Return the application label of the provided package. If not found, the package is returned.
@@ -44,6 +33,19 @@ fun Context.getApplicationLabel(packageName: String): String {
     } catch (e: PackageManager.NameNotFoundException) {
         packageName
     }
+}
+
+/**
+ * Retrieve the versionCode from the Manifest.
+ * The value is more accurate than BuildConfig.VERSION_CODE, as it is correct according to the
+ * computation in the `androidComponents` block of the app build.gradle.kts file.
+ * In other words, the last digit (for the architecture) will be set, whereas BuildConfig.VERSION_CODE
+ * last digit will always be 0.
+ */
+fun Context.getVersionCodeFromManifest(): Long {
+    return PackageInfoCompat.getLongVersionCode(
+        packageManager.getPackageInfo(packageName, 0)
+    )
 }
 
 // ==============================================================================================================
@@ -69,10 +71,16 @@ fun Context.copyToClipboard(
  * Shows notification settings for the current app.
  * In android O will directly opens the notification settings, in lower version it will show the App settings
  */
-fun Context.startNotificationSettingsIntent(activityResultLauncher: ActivityResultLauncher<Intent>? = null) {
+fun Context.startNotificationSettingsIntent(
+    activityResultLauncher: ActivityResultLauncher<Intent>? = null,
+    noActivityFoundMessage: String = getString(R.string.error_no_compatible_app_found),
+) {
     val intent = Intent()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         intent.action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+        if (this !is Activity && activityResultLauncher == null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
         intent.putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
     } else {
         intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
@@ -80,10 +88,14 @@ fun Context.startNotificationSettingsIntent(activityResultLauncher: ActivityResu
         intent.data = Uri.fromParts("package", packageName, null)
     }
 
-    if (activityResultLauncher != null) {
-        activityResultLauncher.launch(intent)
-    } else {
-        startActivity(intent)
+    try {
+        if (activityResultLauncher != null) {
+            activityResultLauncher.launch(intent)
+        } else {
+            startActivity(intent)
+        }
+    } catch (activityNotFoundException: ActivityNotFoundException) {
+        toast(noActivityFoundMessage)
     }
 }
 
@@ -154,6 +166,9 @@ fun Context.openUrlInExternalApp(
     errorMessage: String = getString(R.string.error_no_compatible_app_found),
 ) {
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+    if (this !is Activity) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
     try {
         startActivity(intent)
     } catch (activityNotFoundException: ActivityNotFoundException) {

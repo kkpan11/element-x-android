@@ -1,21 +1,16 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.factories.event
 
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
+import io.element.android.features.messages.impl.timeline.factories.TimelineItemsFactoryConfig
 import io.element.android.features.messages.impl.timeline.groups.canBeDisplayedInBubbleBlock
 import io.element.android.features.messages.impl.timeline.model.AggregatedReaction
 import io.element.android.features.messages.impl.timeline.model.AggregatedReactionSender
@@ -24,26 +19,34 @@ import io.element.android.features.messages.impl.timeline.model.TimelineItem
 import io.element.android.features.messages.impl.timeline.model.TimelineItemGroupPosition
 import io.element.android.features.messages.impl.timeline.model.TimelineItemReactions
 import io.element.android.features.messages.impl.timeline.model.TimelineItemReadReceipts
-import io.element.android.features.messages.impl.timeline.model.map
 import io.element.android.libraries.core.bool.orTrue
-import io.element.android.libraries.dateformatter.api.LastMessageTimestampFormatter
+import io.element.android.libraries.dateformatter.api.DateFormatter
+import io.element.android.libraries.dateformatter.api.DateFormatterMode
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
 import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.matrix.api.permalink.PermalinkParser
 import io.element.android.libraries.matrix.api.room.RoomMember
 import io.element.android.libraries.matrix.api.timeline.MatrixTimelineItem
-import io.element.android.libraries.matrix.api.timeline.item.event.ProfileTimelineDetails
+import io.element.android.libraries.matrix.api.timeline.item.event.getAvatarUrl
 import io.element.android.libraries.matrix.api.timeline.item.event.getDisambiguatedDisplayName
+import io.element.android.libraries.matrix.ui.messages.reply.map
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import java.text.DateFormat
 import java.util.Date
-import javax.inject.Inject
 
-class TimelineItemEventFactory @Inject constructor(
+class TimelineItemEventFactory @AssistedInject constructor(
+    @Assisted private val config: TimelineItemsFactoryConfig,
     private val contentFactory: TimelineItemContentFactory,
     private val matrixClient: MatrixClient,
-    private val lastMessageTimestampFormatter: LastMessageTimestampFormatter,
+    private val dateFormatter: DateFormatter,
+    private val permalinkParser: PermalinkParser,
 ) {
+    @AssistedFactory
+    interface Creator {
+        fun create(config: TimelineItemsFactoryConfig): TimelineItemEventFactory
+    }
+
     suspend fun create(
         currentTimelineItem: MatrixTimelineItem.Event,
         index: Int,
@@ -53,15 +56,15 @@ class TimelineItemEventFactory @Inject constructor(
         val currentSender = currentTimelineItem.event.sender
         val groupPosition =
             computeGroupPosition(currentTimelineItem, timelineItems, index)
-        val (senderDisplayName, senderAvatarUrl) = currentTimelineItem.getSenderInfo()
-
-        val timeFormatter = DateFormat.getTimeInstance(DateFormat.SHORT)
-        val sentTime = timeFormatter.format(Date(currentTimelineItem.event.timestamp))
-
+        val senderProfile = currentTimelineItem.event.senderProfile
+        val sentTime = dateFormatter.format(
+            timestamp = currentTimelineItem.event.timestamp,
+            mode = DateFormatterMode.TimeOnly,
+        )
         val senderAvatarData = AvatarData(
             id = currentSender.value,
-            name = senderDisplayName ?: currentSender.value,
-            url = senderAvatarUrl,
+            name = senderProfile.getDisambiguatedDisplayName(currentSender),
+            url = senderProfile.getAvatarUrl(),
             size = AvatarSize.TimelineSender
         )
         currentTimelineItem.event
@@ -70,20 +73,24 @@ class TimelineItemEventFactory @Inject constructor(
             eventId = currentTimelineItem.eventId,
             transactionId = currentTimelineItem.transactionId,
             senderId = currentSender,
-            senderDisplayName = senderDisplayName,
+            senderProfile = senderProfile,
             senderAvatar = senderAvatarData,
             content = contentFactory.create(currentTimelineItem.event),
             isMine = currentTimelineItem.event.isOwn,
             isEditable = currentTimelineItem.event.isEditable,
+            canBeRepliedTo = currentTimelineItem.event.canBeRepliedTo,
+            sentTimeMillis = currentTimelineItem.event.timestamp,
             sentTime = sentTime,
             groupPosition = groupPosition,
             reactionsState = currentTimelineItem.computeReactionsState(),
             readReceiptState = currentTimelineItem.computeReadReceiptState(roomMembers),
             localSendState = currentTimelineItem.event.localSendState,
-            inReplyTo = currentTimelineItem.event.inReplyTo()?.map(),
+            inReplyTo = currentTimelineItem.event.inReplyTo()?.map(permalinkParser = permalinkParser),
             isThreaded = currentTimelineItem.event.isThreaded(),
-            debugInfo = currentTimelineItem.event.debugInfo,
             origin = currentTimelineItem.event.origin,
+            timelineItemDebugInfoProvider = currentTimelineItem.event.timelineItemDebugInfoProvider,
+            messageShieldProvider = currentTimelineItem.event.messageShieldProvider,
+            sendHandleProvider = currentTimelineItem.event.sendHandleProvider,
         )
     }
 
@@ -97,29 +104,11 @@ class TimelineItemEventFactory @Inject constructor(
         )
     }
 
-    private fun MatrixTimelineItem.Event.getSenderInfo(): Pair<String?, String?> {
-        val senderDisplayName: String?
-        val senderAvatarUrl: String?
-
-        when (val senderProfile = event.senderProfile) {
-            ProfileTimelineDetails.Unavailable,
-            ProfileTimelineDetails.Pending,
-            is ProfileTimelineDetails.Error -> {
-                senderDisplayName = null
-                senderAvatarUrl = null
-            }
-            is ProfileTimelineDetails.Ready -> {
-                senderDisplayName = senderProfile.getDisambiguatedDisplayName(event.sender)
-                senderAvatarUrl = senderProfile.avatarUrl
-            }
-        }
-
-        return senderDisplayName to senderAvatarUrl
-    }
-
     private fun MatrixTimelineItem.Event.computeReactionsState(): TimelineItemReactions {
-        val timeFormatter = DateFormat.getTimeInstance(DateFormat.SHORT)
-        var aggregatedReactions = event.reactions.map { reaction ->
+        if (!config.computeReactions) {
+            return TimelineItemReactions(reactions = persistentListOf())
+        }
+        var aggregatedReactions = this.event.reactions.map { reaction ->
             // Sort reactions within an aggregation by timestamp descending.
             // This puts the most recent at the top, useful in cases like the
             // reaction summary view or getting the most recent reaction.
@@ -133,9 +122,13 @@ class TimelineItemEventFactory @Inject constructor(
                         AggregatedReactionSender(
                             senderId = it.senderId,
                             timestamp = date,
-                            sentTime = timeFormatter.format(date),
+                            sentTime = dateFormatter.format(
+                                it.timestamp,
+                                DateFormatterMode.TimeOrDate,
+                            ),
                         )
                     }
+                    .toImmutableList()
             )
         }
         // Sort aggregated reactions by count and then timestamp ascending, using
@@ -146,12 +139,17 @@ class TimelineItemEventFactory @Inject constructor(
                 compareByDescending<AggregatedReaction> { it.count }
                     .thenBy { it.senders[0].timestamp }
             )
-        return TimelineItemReactions(aggregatedReactions.toImmutableList())
+        return TimelineItemReactions(
+            reactions = aggregatedReactions.toImmutableList()
+        )
     }
 
     private fun MatrixTimelineItem.Event.computeReadReceiptState(
         roomMembers: List<RoomMember>,
     ): TimelineItemReadReceipts {
+        if (!config.computeReadReceipts) {
+            return TimelineItemReadReceipts(receipts = persistentListOf())
+        }
         return TimelineItemReadReceipts(
             receipts = event.receipts
                 .map { receipt ->
@@ -163,7 +161,10 @@ class TimelineItemEventFactory @Inject constructor(
                             url = roomMember?.avatarUrl,
                             size = AvatarSize.TimelineReadReceipt,
                         ),
-                        formattedDate = lastMessageTimestampFormatter.format(receipt.timestamp)
+                        formattedDate = dateFormatter.format(
+                            receipt.timestamp,
+                            mode = DateFormatterMode.TimeOrDate,
+                        )
                     )
                 }
                 .toImmutableList()

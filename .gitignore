@@ -45,21 +45,28 @@ captures/
 .idea/assetWizardSettings.xml
 .idea/compiler.xml
 .idea/deploymentTargetDropDown.xml
+.idea/deploymentTargetSelector.xml
 .idea/gradle.xml
 .idea/jarRepositories.xml
 .idea/misc.xml
 .idea/modules.xml
 # Comment next line if keeping position of elements in Navigation Editor is relevant for you
 .idea/navEditor.xml
+.idea/other.xml
+.idea/runConfigurations.xml
 .idea/tasks.xml
 .idea/workspace.xml
 .idea/libraries
 # Android Studio 3 in .gitignore file.
 .idea/caches
+.idea/copilot
 .idea/inspectionProfiles
 # Shelved changes in the IDE
 .idea/shelf
 .idea/sonarlint
+
+# .kotlin folder
+.kotlin
 
 # Keystore files
 # Uncomment the following lines if you do not want to check your keystore files in.

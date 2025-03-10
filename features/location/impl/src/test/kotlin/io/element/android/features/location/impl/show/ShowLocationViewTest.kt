@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.location.impl.show
@@ -49,7 +40,7 @@ class ShowLocationViewTest {
                 state = aShowLocationState(
                     eventSink = eventsRecorder
                 ),
-                onBackPressed = callback,
+                onBackClick = callback,
             )
             rule.pressBack()
         }
@@ -62,7 +53,7 @@ class ShowLocationViewTest {
             aShowLocationState(
                 eventSink = eventsRecorder
             ),
-            onBackPressed = EnsureNeverCalled(),
+            onBackClick = EnsureNeverCalled(),
         )
         val shareContentDescription = rule.activity.getString(CommonStrings.action_share)
         rule.onNodeWithContentDescription(shareContentDescription).performClick()
@@ -76,7 +67,7 @@ class ShowLocationViewTest {
             aShowLocationState(
                 eventSink = eventsRecorder
             ),
-            onBackPressed = EnsureNeverCalled(),
+            onBackClick = EnsureNeverCalled(),
         )
         rule.onNodeWithTag(TestTags.floatingActionButton.value).performClick()
         eventsRecorder.assertSingle(ShowLocationEvents.TrackMyLocation(true))
@@ -90,7 +81,7 @@ class ShowLocationViewTest {
                 permissionDialog = ShowLocationState.Dialog.PermissionDenied,
                 eventSink = eventsRecorder
             ),
-            onBackPressed = EnsureNeverCalled(),
+            onBackClick = EnsureNeverCalled(),
         )
         rule.clickOn(CommonStrings.action_continue)
         eventsRecorder.assertSingle(ShowLocationEvents.OpenAppSettings)
@@ -104,7 +95,7 @@ class ShowLocationViewTest {
                 permissionDialog = ShowLocationState.Dialog.PermissionDenied,
                 eventSink = eventsRecorder
             ),
-            onBackPressed = EnsureNeverCalled(),
+            onBackClick = EnsureNeverCalled(),
         )
         rule.clickOn(CommonStrings.action_cancel)
         eventsRecorder.assertSingle(ShowLocationEvents.DismissDialog)
@@ -118,7 +109,7 @@ class ShowLocationViewTest {
                 permissionDialog = ShowLocationState.Dialog.PermissionRationale,
                 eventSink = eventsRecorder
             ),
-            onBackPressed = EnsureNeverCalled(),
+            onBackClick = EnsureNeverCalled(),
         )
         rule.clickOn(CommonStrings.action_continue)
         eventsRecorder.assertSingle(ShowLocationEvents.RequestPermissions)
@@ -132,7 +123,7 @@ class ShowLocationViewTest {
                 permissionDialog = ShowLocationState.Dialog.PermissionRationale,
                 eventSink = eventsRecorder
             ),
-            onBackPressed = EnsureNeverCalled(),
+            onBackClick = EnsureNeverCalled(),
         )
         rule.clickOn(CommonStrings.action_cancel)
         eventsRecorder.assertSingle(ShowLocationEvents.DismissDialog)
@@ -141,14 +132,14 @@ class ShowLocationViewTest {
 
 private fun <R : TestRule> AndroidComposeTestRule<R, ComponentActivity>.setShowLocationView(
     state: ShowLocationState,
-    onBackPressed: () -> Unit = EnsureNeverCalled(),
+    onBackClick: () -> Unit = EnsureNeverCalled(),
 ) {
     setContent {
-        // Simulate a LocalInspectionMode for MapboxMap
+        // Simulate a LocalInspectionMode for MapLibreMap
         CompositionLocalProvider(LocalInspectionMode provides true) {
             ShowLocationView(
                 state = state,
-                onBackPressed = onBackPressed,
+                onBackClick = onBackClick,
             )
         }
     }

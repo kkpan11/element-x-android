@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.rageshake.api.detection
@@ -50,16 +41,16 @@ fun RageshakeDetectionView(
     }
     when {
         state.takeScreenshot -> TakeScreenshot(
-            onScreenshotTaken = { eventSink(RageshakeDetectionEvents.ProcessScreenshot(it)) }
+            onScreenshot = { eventSink(RageshakeDetectionEvents.ProcessScreenshot(it)) }
         )
         state.showDialog -> {
             LaunchedEffect(Unit) {
                 context.vibrate()
             }
             RageshakeDialogContent(
-                onNoClicked = { eventSink(RageshakeDetectionEvents.Dismiss) },
-                onDisableClicked = { eventSink(RageshakeDetectionEvents.Disable) },
-                onYesClicked = onOpenBugReport
+                onNoClick = { eventSink(RageshakeDetectionEvents.Dismiss) },
+                onDisableClick = { eventSink(RageshakeDetectionEvents.Disable) },
+                onYesClick = onOpenBugReport
             )
         }
     }
@@ -67,22 +58,22 @@ fun RageshakeDetectionView(
 
 @Composable
 private fun TakeScreenshot(
-    onScreenshotTaken: (ImageResult) -> Unit
+    onScreenshot: (ImageResult) -> Unit
 ) {
     val view = LocalView.current
-    val latestOnScreenshotTaken by rememberUpdatedState(onScreenshotTaken)
+    val latestOnScreenshot by rememberUpdatedState(onScreenshot)
     LaunchedEffect(Unit) {
         view.screenshot {
-            latestOnScreenshotTaken(it)
+            latestOnScreenshot(it)
         }
     }
 }
 
 @Composable
 private fun RageshakeDialogContent(
-    onNoClicked: () -> Unit = { },
-    onDisableClicked: () -> Unit = { },
-    onYesClicked: () -> Unit = { },
+    onNoClick: () -> Unit = { },
+    onDisableClick: () -> Unit = { },
+    onYesClick: () -> Unit = { },
 ) {
     ConfirmationDialog(
         title = stringResource(id = CommonStrings.action_report_bug),
@@ -90,10 +81,10 @@ private fun RageshakeDialogContent(
         thirdButtonText = stringResource(id = CommonStrings.action_disable),
         submitText = stringResource(id = CommonStrings.action_yes),
         cancelText = stringResource(id = CommonStrings.action_no),
-        onCancelClicked = onNoClicked,
-        onThirdButtonClicked = onDisableClicked,
-        onSubmitClicked = onYesClicked,
-        onDismiss = onNoClicked,
+        onCancelClick = onNoClick,
+        onThirdButtonClick = onDisableClick,
+        onSubmitClick = onYesClick,
+        onDismiss = onNoClick,
     )
 }
 

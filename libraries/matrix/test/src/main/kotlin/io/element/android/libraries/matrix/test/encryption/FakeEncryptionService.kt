@@ -1,32 +1,31 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.test.encryption
 
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.encryption.BackupState
 import io.element.android.libraries.matrix.api.encryption.BackupUploadState
 import io.element.android.libraries.matrix.api.encryption.EnableRecoveryProgress
 import io.element.android.libraries.matrix.api.encryption.EncryptionService
+import io.element.android.libraries.matrix.api.encryption.IdentityResetHandle
 import io.element.android.libraries.matrix.api.encryption.RecoveryState
+import io.element.android.tests.testutils.lambda.lambdaError
 import io.element.android.tests.testutils.simulateLongTask
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 
-class FakeEncryptionService : EncryptionService {
+class FakeEncryptionService(
+    var startIdentityResetLambda: () -> Result<IdentityResetHandle?> = { lambdaError() },
+    private val pinUserIdentityResult: (UserId) -> Result<Unit> = { lambdaError() },
+    private val isUserVerifiedResult: (UserId) -> Result<Boolean> = { lambdaError() },
+    private val withdrawVerificationResult: (UserId) -> Result<Unit> = { lambdaError() },
+) : EncryptionService {
     private var disableRecoveryFailure: Exception? = null
     override val backupStateStateFlow: MutableStateFlow<BackupState> = MutableStateFlow(BackupState.UNKNOWN)
     override val recoveryStateStateFlow: MutableStateFlow<RecoveryState> = MutableStateFlow(RecoveryState.UNKNOWN)
@@ -38,6 +37,9 @@ class FakeEncryptionService : EncryptionService {
     private var doesBackupExistOnServerResult: Result<Boolean> = Result.success(true)
 
     private var enableBackupsFailure: Exception? = null
+
+    private var curve25519: String? = null
+    private var ed25519: String? = null
 
     fun givenEnableBackupsFailure(exception: Exception?) {
         enableBackupsFailure = exception
@@ -94,6 +96,15 @@ class FakeEncryptionService : EncryptionService {
         return waitForBackupUploadSteadyStateFlow
     }
 
+    fun givenDeviceKeys(curve25519: String?, ed25519: String?) {
+        this.curve25519 = curve25519
+        this.ed25519 = ed25519
+    }
+
+    override suspend fun deviceCurve25519(): String? = curve25519
+
+    override suspend fun deviceEd25519(): String? = ed25519
+
     suspend fun emitBackupState(state: BackupState) {
         backupStateStateFlow.emit(state)
     }
@@ -104,6 +115,22 @@ class FakeEncryptionService : EncryptionService {
 
     suspend fun emitEnableRecoveryProgress(state: EnableRecoveryProgress) {
         enableRecoveryProgressStateFlow.emit(state)
+    }
+
+    override suspend fun startIdentityReset(): Result<IdentityResetHandle?> {
+        return startIdentityResetLambda()
+    }
+
+    override suspend fun pinUserIdentity(userId: UserId): Result<Unit> {
+        return pinUserIdentityResult(userId)
+    }
+
+    override suspend fun withdrawVerification(userId: UserId): Result<Unit> {
+        return withdrawVerificationResult(userId)
+    }
+
+    override suspend fun isUserVerified(userId: UserId): Result<Boolean> = simulateLongTask {
+        isUserVerifiedResult(userId)
     }
 
     companion object {

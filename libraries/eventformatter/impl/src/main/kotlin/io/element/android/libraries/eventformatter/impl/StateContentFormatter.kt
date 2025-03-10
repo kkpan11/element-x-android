@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.eventformatter.impl
@@ -29,7 +20,7 @@ class StateContentFormatter @Inject constructor(
 ) {
     fun format(
         stateContent: StateContent,
-        senderDisplayName: String,
+        senderDisambiguatedDisplayName: String,
         senderIsYou: Boolean,
         renderingMode: RenderingMode,
     ): CharSequence? {
@@ -39,15 +30,15 @@ class StateContentFormatter @Inject constructor(
                 when {
                     senderIsYou && hasAvatarUrl -> sp.getString(R.string.state_event_room_avatar_changed_by_you)
                     senderIsYou && !hasAvatarUrl -> sp.getString(R.string.state_event_room_avatar_removed_by_you)
-                    !senderIsYou && hasAvatarUrl -> sp.getString(R.string.state_event_room_avatar_changed, senderDisplayName)
-                    else -> sp.getString(R.string.state_event_room_avatar_removed, senderDisplayName)
+                    !senderIsYou && hasAvatarUrl -> sp.getString(R.string.state_event_room_avatar_changed, senderDisambiguatedDisplayName)
+                    else -> sp.getString(R.string.state_event_room_avatar_removed, senderDisambiguatedDisplayName)
                 }
             }
             is OtherState.RoomCreate -> {
                 if (senderIsYou) {
                     sp.getString(R.string.state_event_room_created_by_you)
                 } else {
-                    sp.getString(R.string.state_event_room_created, senderDisplayName)
+                    sp.getString(R.string.state_event_room_created, senderDisambiguatedDisplayName)
                 }
             }
             is OtherState.RoomEncryption -> sp.getString(CommonStrings.common_encryption_enabled)
@@ -56,8 +47,8 @@ class StateContentFormatter @Inject constructor(
                 when {
                     senderIsYou && hasRoomName -> sp.getString(R.string.state_event_room_name_changed_by_you, content.name)
                     senderIsYou && !hasRoomName -> sp.getString(R.string.state_event_room_name_removed_by_you)
-                    !senderIsYou && hasRoomName -> sp.getString(R.string.state_event_room_name_changed, senderDisplayName, content.name)
-                    else -> sp.getString(R.string.state_event_room_name_removed, senderDisplayName)
+                    !senderIsYou && hasRoomName -> sp.getString(R.string.state_event_room_name_changed, senderDisambiguatedDisplayName, content.name)
+                    else -> sp.getString(R.string.state_event_room_name_removed, senderDisambiguatedDisplayName)
                 }
             }
             is OtherState.RoomThirdPartyInvite -> {
@@ -68,16 +59,25 @@ class StateContentFormatter @Inject constructor(
                 if (senderIsYou) {
                     sp.getString(R.string.state_event_room_third_party_invite_by_you, content.displayName)
                 } else {
-                    sp.getString(R.string.state_event_room_third_party_invite, senderDisplayName, content.displayName)
+                    sp.getString(R.string.state_event_room_third_party_invite, senderDisambiguatedDisplayName, content.displayName)
                 }
             }
             is OtherState.RoomTopic -> {
-                val hasRoomTopic = content.topic != null
+                val hasRoomTopic = content.topic?.isNotBlank() == true
                 when {
                     senderIsYou && hasRoomTopic -> sp.getString(R.string.state_event_room_topic_changed_by_you, content.topic)
                     senderIsYou && !hasRoomTopic -> sp.getString(R.string.state_event_room_topic_removed_by_you)
-                    !senderIsYou && hasRoomTopic -> sp.getString(R.string.state_event_room_topic_changed, senderDisplayName, content.topic)
-                    else -> sp.getString(R.string.state_event_room_topic_removed, senderDisplayName)
+                    !senderIsYou && hasRoomTopic -> sp.getString(R.string.state_event_room_topic_changed, senderDisambiguatedDisplayName, content.topic)
+                    else -> sp.getString(R.string.state_event_room_topic_removed, senderDisambiguatedDisplayName)
+                }
+            }
+            is OtherState.RoomPinnedEvents -> when (renderingMode) {
+                RenderingMode.RoomList -> {
+                    Timber.v("Filtering timeline item for room state change: $content")
+                    null
+                }
+                RenderingMode.Timeline -> {
+                    formatRoomPinnedEvents(content, senderIsYou, senderDisambiguatedDisplayName)
                 }
             }
             is OtherState.Custom -> when (renderingMode) {
@@ -161,16 +161,7 @@ class StateContentFormatter @Inject constructor(
                     "RoomJoinRules"
                 }
             }
-            OtherState.RoomPinnedEvents -> when (renderingMode) {
-                RenderingMode.RoomList -> {
-                    Timber.v("Filtering timeline item for room state change: $content")
-                    null
-                }
-                RenderingMode.Timeline -> {
-                    "RoomPinnedEvents"
-                }
-            }
-            is OtherState.RoomPowerLevels -> when (renderingMode) {
+            is OtherState.RoomUserPowerLevels -> when (renderingMode) {
                 RenderingMode.RoomList -> {
                     Timber.v("Filtering timeline item for room state change: $content")
                     null
@@ -215,6 +206,25 @@ class StateContentFormatter @Inject constructor(
                     "SpaceParent"
                 }
             }
+        }
+    }
+
+    private fun formatRoomPinnedEvents(
+        content: OtherState.RoomPinnedEvents,
+        senderIsYou: Boolean,
+        senderDisambiguatedDisplayName: String
+    ) = when (content.change) {
+        OtherState.RoomPinnedEvents.Change.ADDED -> when {
+            senderIsYou -> sp.getString(R.string.state_event_room_pinned_events_pinned_by_you)
+            else -> sp.getString(R.string.state_event_room_pinned_events_pinned, senderDisambiguatedDisplayName)
+        }
+        OtherState.RoomPinnedEvents.Change.REMOVED -> when {
+            senderIsYou -> sp.getString(R.string.state_event_room_pinned_events_unpinned_by_you)
+            else -> sp.getString(R.string.state_event_room_pinned_events_unpinned, senderDisambiguatedDisplayName)
+        }
+        OtherState.RoomPinnedEvents.Change.CHANGED -> when {
+            senderIsYou -> sp.getString(R.string.state_event_room_pinned_events_changed_by_you)
+            else -> sp.getString(R.string.state_event_room_pinned_events_changed, senderDisambiguatedDisplayName)
         }
     }
 }

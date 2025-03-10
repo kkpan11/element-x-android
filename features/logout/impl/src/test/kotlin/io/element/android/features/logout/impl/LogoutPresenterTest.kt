@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.logout.impl
@@ -116,7 +107,7 @@ class LogoutPresenterTest {
             val initialState = awaitFirstItem()
             initialState.eventSink.invoke(LogoutEvents.Logout(ignoreSdkError = false))
             val confirmationState = awaitItem()
-            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.Confirming)
+            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.ConfirmingNoParams)
             initialState.eventSink.invoke(LogoutEvents.CloseDialogs)
             val finalState = awaitItem()
             assertThat(finalState.logoutAction).isEqualTo(AsyncAction.Uninitialized)
@@ -132,7 +123,7 @@ class LogoutPresenterTest {
             val initialState = awaitFirstItem()
             initialState.eventSink.invoke(LogoutEvents.Logout(ignoreSdkError = false))
             val confirmationState = awaitItem()
-            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.Confirming)
+            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.ConfirmingNoParams)
             confirmationState.eventSink.invoke(LogoutEvents.Logout(ignoreSdkError = false))
             val loadingState = awaitItem()
             assertThat(loadingState.logoutAction).isInstanceOf(AsyncAction.Loading::class.java)
@@ -144,7 +135,9 @@ class LogoutPresenterTest {
     @Test
     fun `present - logout with error then cancel`() = runTest {
         val matrixClient = FakeMatrixClient().apply {
-            givenLogoutError(A_THROWABLE)
+            logoutLambda = { _, _ ->
+                throw A_THROWABLE
+            }
         }
         val presenter = createLogoutPresenter(
             matrixClient,
@@ -155,7 +148,7 @@ class LogoutPresenterTest {
             val initialState = awaitFirstItem()
             initialState.eventSink.invoke(LogoutEvents.Logout(ignoreSdkError = false))
             val confirmationState = awaitItem()
-            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.Confirming)
+            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.ConfirmingNoParams)
             confirmationState.eventSink.invoke(LogoutEvents.Logout(ignoreSdkError = false))
             val loadingState = awaitItem()
             assertThat(loadingState.logoutAction).isInstanceOf(AsyncAction.Loading::class.java)
@@ -170,7 +163,13 @@ class LogoutPresenterTest {
     @Test
     fun `present - logout with error then force`() = runTest {
         val matrixClient = FakeMatrixClient().apply {
-            givenLogoutError(A_THROWABLE)
+            logoutLambda = { ignoreSdkError, _ ->
+                if (!ignoreSdkError) {
+                    throw A_THROWABLE
+                } else {
+                    null
+                }
+            }
         }
         val presenter = createLogoutPresenter(
             matrixClient,
@@ -181,7 +180,7 @@ class LogoutPresenterTest {
             val initialState = awaitFirstItem()
             initialState.eventSink.invoke(LogoutEvents.Logout(ignoreSdkError = false))
             val confirmationState = awaitItem()
-            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.Confirming)
+            assertThat(confirmationState.logoutAction).isEqualTo(AsyncAction.ConfirmingNoParams)
             confirmationState.eventSink.invoke(LogoutEvents.Logout(ignoreSdkError = false))
             val loadingState = awaitItem()
             assertThat(loadingState.logoutAction).isInstanceOf(AsyncAction.Loading::class.java)

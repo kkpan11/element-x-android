@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.poll.impl.history
@@ -33,24 +24,23 @@ import io.element.android.features.poll.impl.history.model.PollHistoryItems
 import io.element.android.features.poll.impl.history.model.PollHistoryItemsFactory
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.matrix.api.room.MatrixRoom
-import io.element.android.libraries.matrix.api.timeline.MatrixTimeline
+import io.element.android.libraries.matrix.api.timeline.Timeline
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class PollHistoryPresenter @Inject constructor(
-    private val room: MatrixRoom,
     private val appCoroutineScope: CoroutineScope,
     private val sendPollResponseAction: SendPollResponseAction,
     private val endPollAction: EndPollAction,
     private val pollHistoryItemFactory: PollHistoryItemsFactory,
+    private val room: MatrixRoom,
 ) : Presenter<PollHistoryState> {
     @Composable
     override fun present(): PollHistoryState {
-        // TODO use room.rememberPollHistory() when working properly?
-        val timeline = room.timeline
-        val paginationState by timeline.paginationState.collectAsState()
+        val timeline = room.liveTimeline
+        val paginationState by timeline.paginationStatus(Timeline.PaginationDirection.BACKWARDS).collectAsState()
         val pollHistoryItemsFlow = remember {
             timeline.timelineItems.map { items ->
                 pollHistoryItemFactory.create(items)
@@ -61,11 +51,11 @@ class PollHistoryPresenter @Inject constructor(
         }
         val pollHistoryItems by pollHistoryItemsFlow.collectAsState(initial = PollHistoryItems())
         LaunchedEffect(paginationState, pollHistoryItems.size) {
-            if (pollHistoryItems.size == 0 && paginationState.canBackPaginate) loadMore(timeline)
+            if (pollHistoryItems.size == 0 && paginationState.canPaginate) loadMore(timeline)
         }
         val isLoading by remember {
             derivedStateOf {
-                pollHistoryItems.size == 0 || paginationState.isBackPaginating
+                pollHistoryItems.size == 0 || paginationState.isPaginating
             }
         }
         val coroutineScope = rememberCoroutineScope()
@@ -74,13 +64,13 @@ class PollHistoryPresenter @Inject constructor(
                 is PollHistoryEvents.LoadMore -> {
                     coroutineScope.loadMore(timeline)
                 }
-                is PollHistoryEvents.PollAnswerSelected -> appCoroutineScope.launch {
+                is PollHistoryEvents.SelectPollAnswer -> appCoroutineScope.launch {
                     sendPollResponseAction.execute(pollStartId = event.pollStartId, answerId = event.answerId)
                 }
-                is PollHistoryEvents.PollEndClicked -> appCoroutineScope.launch {
+                is PollHistoryEvents.EndPoll -> appCoroutineScope.launch {
                     endPollAction.execute(pollStartId = event.pollStartId)
                 }
-                is PollHistoryEvents.OnFilterSelected -> {
+                is PollHistoryEvents.SelectFilter -> {
                     activeFilter = event.filter
                 }
             }
@@ -88,14 +78,14 @@ class PollHistoryPresenter @Inject constructor(
 
         return PollHistoryState(
             isLoading = isLoading,
-            hasMoreToLoad = paginationState.hasMoreToLoadBackwards,
+            hasMoreToLoad = paginationState.hasMoreToLoad,
             pollHistoryItems = pollHistoryItems,
             activeFilter = activeFilter,
             eventSink = ::handleEvents,
         )
     }
 
-    private fun CoroutineScope.loadMore(pollHistory: MatrixTimeline) = launch {
-        pollHistory.paginateBackwards(200)
+    private fun CoroutineScope.loadMore(pollHistory: Timeline) = launch {
+        pollHistory.paginate(Timeline.PaginationDirection.BACKWARDS)
     }
 }

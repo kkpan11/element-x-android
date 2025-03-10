@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomdetails.impl
@@ -20,6 +11,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.lifecycleScope
 import com.bumble.appyx.core.lifecycle.subscribe
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
@@ -31,10 +23,11 @@ import im.vector.app.features.analytics.plan.MobileScreen
 import io.element.android.anvilannotations.ContributesNode
 import io.element.android.libraries.androidutils.system.startSharePlainTextIntent
 import io.element.android.libraries.di.RoomScope
-import io.element.android.libraries.matrix.api.permalink.PermalinkBuilder
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.room.MatrixRoom
-import io.element.android.libraries.matrix.api.room.RoomMember
 import io.element.android.services.analytics.api.AnalyticsService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import io.element.android.libraries.androidutils.R as AndroidUtilsR
 
@@ -53,7 +46,13 @@ class RoomDetailsNode @AssistedInject constructor(
         fun openRoomNotificationSettings()
         fun openAvatarPreview(name: String, url: String)
         fun openPollHistory()
+        fun openMediaGallery()
         fun openAdminSettings()
+        fun openPinnedMessagesList()
+        fun openKnockRequestsList()
+        fun openSecurityAndPrivacy()
+        fun openDmUserProfile(userId: UserId)
+        fun onJoinCall()
     }
 
     private val callbacks = plugins<Callback>()
@@ -82,34 +81,27 @@ class RoomDetailsNode @AssistedInject constructor(
         callbacks.forEach { it.openPollHistory() }
     }
 
-    private fun onShareRoom(context: Context) {
-        val alias = room.alias ?: room.alternativeAliases.firstOrNull()
-        val permalinkResult = alias?.let { PermalinkBuilder.permalinkForRoomAlias(it) }
-            ?: PermalinkBuilder.permalinkForRoomId(room.roomId)
-        permalinkResult.onSuccess { permalink ->
-            context.startSharePlainTextIntent(
-                activityResultLauncher = null,
-                chooserTitle = context.getString(R.string.screen_room_details_share_room_title),
-                text = permalink,
-                noActivityFoundMessage = context.getString(AndroidUtilsR.string.error_no_compatible_app_found)
-            )
-        }.onFailure {
-            Timber.e(it)
-        }
+    private fun openMediaGallery() {
+        callbacks.forEach { it.openMediaGallery() }
     }
 
-    private fun onShareMember(context: Context, member: RoomMember) {
-        val permalinkResult = PermalinkBuilder.permalinkForUser(member.userId)
-        permalinkResult.onSuccess { permalink ->
-            context.startSharePlainTextIntent(
-                activityResultLauncher = null,
-                chooserTitle = context.getString(R.string.screen_room_details_share_room_title),
-                text = permalink,
-                noActivityFoundMessage = context.getString(AndroidUtilsR.string.error_no_compatible_app_found)
-            )
-        }.onFailure {
-            Timber.e(it)
-        }
+    private fun onJoinCall() {
+        callbacks.forEach { it.onJoinCall() }
+    }
+
+    private fun CoroutineScope.onShareRoom(context: Context) = launch {
+        room.getPermalink()
+            .onSuccess { permalink ->
+                context.startSharePlainTextIntent(
+                    activityResultLauncher = null,
+                    chooserTitle = context.getString(R.string.screen_room_details_share_room_title),
+                    text = permalink,
+                    noActivityFoundMessage = context.getString(AndroidUtilsR.string.error_no_compatible_app_found)
+                )
+            }
+            .onFailure {
+                Timber.e(it)
+            }
     }
 
     private fun onEditRoomDetails() {
@@ -124,20 +116,32 @@ class RoomDetailsNode @AssistedInject constructor(
         callbacks.forEach { it.openAdminSettings() }
     }
 
+    private fun openPinnedMessages() {
+        callbacks.forEach { it.openPinnedMessagesList() }
+    }
+
+    private fun openKnockRequestsLists() {
+        callbacks.forEach { it.openKnockRequestsList() }
+    }
+
+    private fun openSecurityAndPrivacy() {
+        callbacks.forEach { it.openSecurityAndPrivacy() }
+    }
+
+    private fun onProfileClick(userId: UserId) {
+        callbacks.forEach { it.openDmUserProfile(userId) }
+    }
+
     @Composable
     override fun View(modifier: Modifier) {
         val context = LocalContext.current
         val state = presenter.present()
 
         fun onShareRoom() {
-            this.onShareRoom(context)
+            lifecycleScope.onShareRoom(context)
         }
 
-        fun onShareMember(roomMember: RoomMember) {
-            this.onShareMember(context, roomMember)
-        }
-
-        fun onActionClicked(action: RoomDetailsAction) {
+        fun onActionClick(action: RoomDetailsAction) {
             when (action) {
                 RoomDetailsAction.Edit -> onEditRoomDetails()
                 RoomDetailsAction.AddTopic -> onEditRoomDetails()
@@ -148,15 +152,20 @@ class RoomDetailsNode @AssistedInject constructor(
             state = state,
             modifier = modifier,
             goBack = this::navigateUp,
-            onActionClicked = ::onActionClicked,
+            onActionClick = ::onActionClick,
             onShareRoom = ::onShareRoom,
-            onShareMember = ::onShareMember,
             openRoomMemberList = ::openRoomMemberList,
             openRoomNotificationSettings = ::openRoomNotificationSettings,
             invitePeople = ::invitePeople,
             openAvatarPreview = ::openAvatarPreview,
             openPollHistory = ::openPollHistory,
+            openMediaGallery = ::openMediaGallery,
             openAdminSettings = this::openAdminSettings,
+            onJoinCallClick = ::onJoinCall,
+            onPinnedMessagesClick = ::openPinnedMessages,
+            onKnockRequestsClick = ::openKnockRequestsLists,
+            onSecurityAndPrivacyClick = ::openSecurityAndPrivacy,
+            onProfileClick = ::onProfileClick,
         )
     }
 }

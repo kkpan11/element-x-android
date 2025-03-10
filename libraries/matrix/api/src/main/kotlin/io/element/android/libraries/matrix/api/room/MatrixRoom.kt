@@ -1,69 +1,72 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.room
 
+import io.element.android.libraries.matrix.api.core.DeviceId
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.ProgressCallback
+import io.element.android.libraries.matrix.api.core.RoomAlias
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.SendHandle
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.core.TransactionId
 import io.element.android.libraries.matrix.api.core.UserId
+import io.element.android.libraries.matrix.api.encryption.identity.IdentityStateChange
 import io.element.android.libraries.matrix.api.media.AudioInfo
 import io.element.android.libraries.matrix.api.media.FileInfo
 import io.element.android.libraries.matrix.api.media.ImageInfo
 import io.element.android.libraries.matrix.api.media.MediaUploadHandler
 import io.element.android.libraries.matrix.api.media.VideoInfo
 import io.element.android.libraries.matrix.api.poll.PollKind
+import io.element.android.libraries.matrix.api.room.draft.ComposerDraft
+import io.element.android.libraries.matrix.api.room.history.RoomHistoryVisibility
+import io.element.android.libraries.matrix.api.room.join.JoinRule
+import io.element.android.libraries.matrix.api.room.knock.KnockRequest
 import io.element.android.libraries.matrix.api.room.location.AssetType
+import io.element.android.libraries.matrix.api.room.powerlevels.MatrixRoomPowerLevels
 import io.element.android.libraries.matrix.api.room.powerlevels.UserRoleChange
-import io.element.android.libraries.matrix.api.timeline.MatrixTimeline
+import io.element.android.libraries.matrix.api.roomdirectory.RoomVisibility
 import io.element.android.libraries.matrix.api.timeline.ReceiptType
+import io.element.android.libraries.matrix.api.timeline.Timeline
+import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 import io.element.android.libraries.matrix.api.widget.MatrixWidgetDriver
 import io.element.android.libraries.matrix.api.widget.MatrixWidgetSettings
-import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.toPersistentList
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import java.io.Closeable
 import java.io.File
 
 interface MatrixRoom : Closeable {
     val sessionId: SessionId
     val roomId: RoomId
-    val name: String?
     val displayName: String
-    val alias: String?
-    val alternativeAliases: List<String>
+    val canonicalAlias: RoomAlias?
+    val alternativeAliases: List<RoomAlias>
     val topic: String?
     val avatarUrl: String?
     val isEncrypted: Boolean
+    val isSpace: Boolean
     val isDirect: Boolean
     val isPublic: Boolean
     val activeMemberCount: Long
     val joinedMemberCount: Long
 
-    /** Whether the room is a direct message. */
-    val isDm: Boolean get() = isDirect && isOneToOne
+    val roomCoroutineScope: CoroutineScope
 
     val roomInfoFlow: Flow<MatrixRoomInfo>
     val roomTypingMembersFlow: Flow<List<UserId>>
+    val identityStateChangesFlow: Flow<List<IdentityStateChange>>
+
+    /**
+     * The current knock requests in the room as a Flow.
+     */
+    val knockRequestsFlow: Flow<List<KnockRequest>>
 
     /**
      * A one-to-one is a room with exactly 2 members.
@@ -85,17 +88,43 @@ interface MatrixRoom : Closeable {
      */
     suspend fun updateMembers()
 
+    /**
+     * Get the members of the room. Note: generally this should not be used, please use
+     * [membersStateFlow] and [updateMembers] instead.
+     */
+    suspend fun getMembers(limit: Int = 5): Result<List<RoomMember>>
+
+    /**
+     * Will return an updated member or an error.
+     */
+    suspend fun getUpdatedMember(userId: UserId): Result<RoomMember>
+
     suspend fun updateRoomNotificationSettings(): Result<Unit>
 
     val syncUpdateFlow: StateFlow<Long>
 
-    val timeline: MatrixTimeline
+    /**
+     * The live timeline of the room. Must be used to send Event to a room.
+     */
+    val liveTimeline: Timeline
+
+    /**
+     * Create a new timeline.
+     * @param createTimelineParams contains parameters about how to filter the timeline. Will also configure the date separators.
+     */
+    suspend fun createTimeline(
+        createTimelineParams: CreateTimelineParams,
+    ): Result<Timeline>
 
     fun destroy()
 
     suspend fun subscribeToSync()
 
-    suspend fun unsubscribeFromSync()
+    suspend fun powerLevels(): Result<MatrixRoomPowerLevels>
+
+    suspend fun updatePowerLevels(matrixRoomPowerLevels: MatrixRoomPowerLevels): Result<Unit>
+
+    suspend fun resetPowerLevels(): Result<MatrixRoomPowerLevels>
 
     suspend fun userRole(userId: UserId): Result<RoomMember.Role>
 
@@ -105,29 +134,47 @@ interface MatrixRoom : Closeable {
 
     suspend fun userAvatarUrl(userId: UserId): Result<String?>
 
-    suspend fun sendMessage(body: String, htmlBody: String?, mentions: List<Mention>): Result<Unit>
+    suspend fun sendMessage(body: String, htmlBody: String?, intentionalMentions: List<IntentionalMention>): Result<Unit>
 
-    suspend fun editMessage(originalEventId: EventId?, transactionId: TransactionId?, body: String, htmlBody: String?, mentions: List<Mention>): Result<Unit>
+    suspend fun editMessage(eventId: EventId, body: String, htmlBody: String?, intentionalMentions: List<IntentionalMention>): Result<Unit>
 
-    suspend fun enterSpecialMode(eventId: EventId?): Result<Unit>
+    suspend fun sendImage(
+        file: File,
+        thumbnailFile: File?,
+        imageInfo: ImageInfo,
+        caption: String?,
+        formattedCaption: String?,
+        progressCallback: ProgressCallback?
+    ): Result<MediaUploadHandler>
 
-    suspend fun replyMessage(eventId: EventId, body: String, htmlBody: String?, mentions: List<Mention>): Result<Unit>
+    suspend fun sendVideo(
+        file: File,
+        thumbnailFile: File?,
+        videoInfo: VideoInfo,
+        caption: String?,
+        formattedCaption: String?,
+        progressCallback: ProgressCallback?
+    ): Result<MediaUploadHandler>
 
-    suspend fun redactEvent(eventId: EventId, reason: String? = null): Result<Unit>
+    suspend fun sendAudio(
+        file: File,
+        audioInfo: AudioInfo,
+        caption: String?,
+        formattedCaption: String?,
+        progressCallback: ProgressCallback?,
+    ): Result<MediaUploadHandler>
 
-    suspend fun sendImage(file: File, thumbnailFile: File?, imageInfo: ImageInfo, progressCallback: ProgressCallback?): Result<MediaUploadHandler>
+    suspend fun sendFile(
+        file: File,
+        fileInfo: FileInfo,
+        caption: String?,
+        formattedCaption: String?,
+        progressCallback: ProgressCallback?,
+    ): Result<MediaUploadHandler>
 
-    suspend fun sendVideo(file: File, thumbnailFile: File?, videoInfo: VideoInfo, progressCallback: ProgressCallback?): Result<MediaUploadHandler>
-
-    suspend fun sendAudio(file: File, audioInfo: AudioInfo, progressCallback: ProgressCallback?): Result<MediaUploadHandler>
-
-    suspend fun sendFile(file: File, fileInfo: FileInfo, progressCallback: ProgressCallback?): Result<MediaUploadHandler>
-
-    suspend fun toggleReaction(emoji: String, eventId: EventId): Result<Unit>
+    suspend fun toggleReaction(emoji: String, eventOrTransactionId: EventOrTransactionId): Result<Unit>
 
     suspend fun forwardEvent(eventId: EventId, roomIds: List<RoomId>): Result<Unit>
-
-    suspend fun retrySendMessage(transactionId: TransactionId): Result<Unit>
 
     suspend fun cancelSend(transactionId: TransactionId): Result<Unit>
 
@@ -153,20 +200,10 @@ interface MatrixRoom : Closeable {
 
     suspend fun canUserTriggerRoomNotification(userId: UserId): Result<Boolean>
 
+    suspend fun canUserPinUnpin(userId: UserId): Result<Boolean>
+
     suspend fun canUserJoinCall(userId: UserId): Result<Boolean> =
         canUserSendState(userId, StateEventType.CALL_MEMBER)
-
-    fun usersWithRole(role: RoomMember.Role): Flow<ImmutableList<RoomMember>> {
-        return roomInfoFlow
-            .map { it.userPowerLevels.filter { (_, powerLevel) -> RoomMember.Role.forPowerLevel(powerLevel) == role } }
-            .distinctUntilChanged()
-            .combine(membersStateFlow) { powerLevels, membersState ->
-                membersState.roomMembers()
-                    .orEmpty()
-                    .filter { powerLevels.containsKey(it.userId) }
-                    .toPersistentList()
-            }
-    }
 
     suspend fun updateAvatar(mimeType: String, data: ByteArray): Result<Unit>
 
@@ -198,6 +235,11 @@ interface MatrixRoom : Closeable {
      *
      */
     suspend fun setUnreadFlag(isUnread: Boolean): Result<Unit>
+
+    /**
+     * Clear the event cache storage for the current room.
+     */
+    suspend fun clearEventCacheStorage(): Result<Unit>
 
     /**
      * Share a location message in the room.
@@ -290,8 +332,8 @@ interface MatrixRoom : Closeable {
     suspend fun generateWidgetWebViewUrl(
         widgetSettings: MatrixWidgetSettings,
         clientId: String,
-        languageTag: String? = null,
-        theme: String? = null,
+        languageTag: String?,
+        theme: String?,
     ): Result<String>
 
     /**
@@ -301,5 +343,114 @@ interface MatrixRoom : Closeable {
      */
     fun getWidgetDriver(widgetSettings: MatrixWidgetSettings): Result<MatrixWidgetDriver>
 
+    /**
+     * Get the permalink for the room.
+     */
+    suspend fun getPermalink(): Result<String>
+
+    /**
+     * Get the permalink for the provided [eventId].
+     * @param eventId The event id to get the permalink for.
+     * @return The permalink, or a failure.
+     */
+    suspend fun getPermalinkFor(eventId: EventId): Result<String>
+
+    /**
+     * Send an Element Call started notification if needed.
+     */
+    suspend fun sendCallNotificationIfNeeded(): Result<Unit>
+
+    suspend fun setSendQueueEnabled(enabled: Boolean)
+
+    /**
+     * Store the given `ComposerDraft` in the state store of this room.
+     */
+    suspend fun saveComposerDraft(composerDraft: ComposerDraft): Result<Unit>
+
+    /**
+     * Retrieve the `ComposerDraft` stored in the state store for this room.
+     */
+    suspend fun loadComposerDraft(): Result<ComposerDraft?>
+
+    /**
+     * Clear the `ComposerDraft` stored in the state store for this room.
+     */
+    suspend fun clearComposerDraft(): Result<Unit>
+
+    /**
+     * Ignore the local trust for the given devices and resend messages that failed to send because said devices are unverified.
+     *
+     * @param devices The map of users identifiers to device identifiers received in the error
+     * @param sendHandle The send queue handle of the local echo the send error applies to. It can be used to retry the upload.
+     *
+     */
+    suspend fun ignoreDeviceTrustAndResend(devices: Map<UserId, List<DeviceId>>, sendHandle: SendHandle): Result<Unit>
+
+    /**
+     * Remove verification requirements for the given users and
+     * resend messages that failed to send because their identities were no longer verified.
+     *
+     * @param userIds The list of users identifiers received in the error.
+     * @param sendHandle The send queue handle of the local echo the send error applies to. It can be used to retry the upload.
+     *
+     */
+    suspend fun withdrawVerificationAndResend(userIds: List<UserId>, sendHandle: SendHandle): Result<Unit>
+
     override fun close() = destroy()
+
+    /**
+     * Update the canonical alias of the room.
+     *
+     * Note that publishing the alias in the room directory is done separately.
+     */
+    suspend fun updateCanonicalAlias(
+        canonicalAlias: RoomAlias?,
+        alternativeAliases: List<RoomAlias>
+    ): Result<Unit>
+
+    /**
+     * Update the room's visibility in the room directory.
+     */
+    suspend fun updateRoomVisibility(roomVisibility: RoomVisibility): Result<Unit>
+
+    /**
+     * Update room history visibility for this room.
+     */
+    suspend fun updateHistoryVisibility(historyVisibility: RoomHistoryVisibility): Result<Unit>
+
+    /**
+     * Returns the visibility for this room in the room directory.
+     * If the room is not published, the result will be [RoomVisibility.Private].
+     */
+    suspend fun getRoomVisibility(): Result<RoomVisibility>
+
+    /**
+     * Publish a new room alias for this room in the room directory.
+     *
+     * Returns:
+     * - `true` if the room alias didn't exist and it's now published.
+     * - `false` if the room alias was already present so it couldn't be
+     * published.
+     */
+    suspend fun publishRoomAliasInRoomDirectory(roomAlias: RoomAlias): Result<Boolean>
+
+    /**
+     * Remove an existing room alias for this room in the room directory.
+     *
+     * Returns:
+     * - `true` if the room alias was present and it's now removed from the
+     * room directory.
+     * - `false` if the room alias didn't exist so it couldn't be removed.
+     */
+    suspend fun removeRoomAliasFromRoomDirectory(roomAlias: RoomAlias): Result<Boolean>
+
+    /**
+     * Enable End-to-end encryption in this room.
+     */
+    suspend fun enableEncryption(): Result<Unit>
+
+    /**
+     * Update the join rule for this room.
+     */
+    suspend fun updateJoinRule(joinRule: JoinRule): Result<Unit>
 }

@@ -1,37 +1,31 @@
+import extension.setupAnvil
+import org.gradle.kotlin.dsl.test
+
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 plugins {
     id("io.element.android-compose-library")
-    alias(libs.plugins.anvil)
-    alias(libs.plugins.ksp)
     id("kotlin-parcelize")
 }
 
 android {
     namespace = "io.element.android.features.ftue.impl"
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
-anvil {
-    generateDaggerFactories.set(true)
-}
+setupAnvil()
 
 dependencies {
-    implementation(projects.anvilannotations)
-    anvil(projects.anvilcodegen)
     api(projects.features.ftue.api)
     implementation(projects.libraries.androidutils)
     implementation(projects.libraries.core)
@@ -39,27 +33,35 @@ dependencies {
     implementation(projects.libraries.matrix.api)
     implementation(projects.libraries.matrixui)
     implementation(projects.libraries.designsystem)
+    implementation(projects.libraries.preferences.api)
     implementation(projects.libraries.uiStrings)
     implementation(projects.libraries.testtags)
     implementation(projects.features.analytics.api)
+    implementation(projects.features.logout.api)
+    implementation(projects.features.securebackup.api)
+    implementation(projects.features.verifysession.api)
     implementation(projects.services.analytics.api)
     implementation(projects.features.lockscreen.api)
     implementation(projects.libraries.permissions.api)
     implementation(projects.libraries.permissions.noop)
     implementation(projects.services.toolbox.api)
-    implementation(projects.services.toolbox.test)
+    implementation(projects.appconfig)
 
     testImplementation(libs.test.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.molecule.runtime)
     testImplementation(libs.test.truth)
     testImplementation(libs.test.turbine)
+    testImplementation(libs.test.robolectric)
+    testImplementation(libs.androidx.compose.ui.test.junit)
+    testReleaseImplementation(libs.androidx.compose.ui.test.manifest)
     testImplementation(projects.libraries.matrix.test)
     testImplementation(projects.services.analytics.test)
+    testImplementation(projects.services.analytics.noop)
     testImplementation(projects.libraries.permissions.impl)
     testImplementation(projects.libraries.permissions.test)
+    testImplementation(projects.libraries.preferences.test)
     testImplementation(projects.features.lockscreen.test)
+    testImplementation(projects.services.toolbox.test)
     testImplementation(projects.tests.testutils)
-
-    ksp(libs.showkase.processor)
 }

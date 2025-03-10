@@ -1,38 +1,29 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.impl.auth
 
 import io.element.android.libraries.matrix.api.auth.AuthenticationException
-import org.matrix.rustcomponents.sdk.AuthenticationException as RustAuthenticationException
+import org.matrix.rustcomponents.sdk.ClientBuildException
 
 fun Throwable.mapAuthenticationException(): AuthenticationException {
     val message = this.message ?: "Unknown error"
     return when (this) {
-        is RustAuthenticationException.ClientMissing -> AuthenticationException.ClientMissing(message)
-        is RustAuthenticationException.Generic -> AuthenticationException.Generic(message)
-        is RustAuthenticationException.InvalidServerName -> AuthenticationException.InvalidServerName(message)
-        is RustAuthenticationException.SessionMissing -> AuthenticationException.SessionMissing(message)
-        is RustAuthenticationException.SlidingSyncNotAvailable -> AuthenticationException.SlidingSyncNotAvailable(message)
-        is RustAuthenticationException.OidcException -> AuthenticationException.OidcError("OidcException", message)
-        is RustAuthenticationException.OidcMetadataInvalid -> AuthenticationException.OidcError("OidcMetadataInvalid", message)
-        is RustAuthenticationException.OidcMetadataMissing -> AuthenticationException.OidcError("OidcMetadataMissing", message)
-        is RustAuthenticationException.OidcNotSupported -> AuthenticationException.OidcError("OidcNotSupported", message)
-        is RustAuthenticationException.OidcCancelled -> AuthenticationException.OidcError("OidcCancelled", message)
-        is RustAuthenticationException.OidcCallbackUrlInvalid -> AuthenticationException.OidcError("OidcCallbackUrlInvalid", message)
+        is ClientBuildException -> when (this) {
+            is ClientBuildException.Generic -> AuthenticationException.Generic(message)
+            is ClientBuildException.InvalidServerName -> AuthenticationException.InvalidServerName(message)
+            is ClientBuildException.SlidingSyncVersion -> AuthenticationException.SlidingSyncVersion(message)
+            is ClientBuildException.Sdk -> AuthenticationException.Generic(message)
+            is ClientBuildException.ServerUnreachable -> AuthenticationException.Generic(message)
+            is ClientBuildException.SlidingSync -> AuthenticationException.Generic(message)
+            is ClientBuildException.WellKnownDeserializationException -> AuthenticationException.Generic(message)
+            is ClientBuildException.WellKnownLookupFailed -> AuthenticationException.Generic(message)
+            is ClientBuildException.EventCache -> AuthenticationException.Generic(message)
+        }
         else -> AuthenticationException.Generic(message)
     }
 }

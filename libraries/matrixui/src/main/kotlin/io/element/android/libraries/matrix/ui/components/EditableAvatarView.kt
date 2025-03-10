@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.ui.components
@@ -26,47 +17,55 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.ripple.rememberRipple
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
+import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.libraries.designsystem.components.avatar.Avatar
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
+import io.element.android.libraries.designsystem.preview.ElementPreview
+import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Icon
+import io.element.android.libraries.testtags.TestTags
+import io.element.android.libraries.testtags.testTag
 
 @Composable
 fun EditableAvatarView(
-    userId: String?,
+    matrixId: String,
     displayName: String?,
     avatarUrl: Uri?,
     avatarSize: AvatarSize,
-    onAvatarClicked: () -> Unit,
+    onAvatarClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Box(
             modifier = Modifier
                 .size(avatarSize.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
-                    onClick = onAvatarClicked,
-                    indication = rememberRipple(bounded = false),
+                    onClick = onAvatarClick,
+                    indication = ripple(bounded = false),
                 )
+                .testTag(TestTags.editAvatar)
         ) {
             when (avatarUrl?.scheme) {
                 null, "mxc" -> {
-                    userId?.let {
-                        Avatar(
-                            avatarData = AvatarData(it, displayName, avatarUrl?.toString(), size = avatarSize),
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                    Avatar(
+                        avatarData = AvatarData(matrixId, displayName, avatarUrl?.toString(), size = avatarSize),
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 else -> {
                     UnsavedAvatar(
@@ -80,7 +79,7 @@ fun EditableAvatarView(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(ElementTheme.colors.iconPrimary)
                     .size(24.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -88,9 +87,32 @@ fun EditableAvatarView(
                     modifier = Modifier.size(16.dp),
                     imageVector = CompoundIcons.EditSolid(),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = ElementTheme.colors.iconOnSolidPrimary,
                 )
             }
         }
     }
+}
+
+@PreviewsDayNight
+@Composable
+internal fun EditableAvatarViewPreview(
+    @PreviewParameter(EditableAvatarViewUriProvider::class) uri: Uri?
+) = ElementPreview {
+    EditableAvatarView(
+        matrixId = "id",
+        displayName = "A room",
+        avatarUrl = uri,
+        avatarSize = AvatarSize.EditRoomDetails,
+        onAvatarClick = {},
+    )
+}
+
+open class EditableAvatarViewUriProvider : PreviewParameterProvider<Uri?> {
+    override val values: Sequence<Uri?>
+        get() = sequenceOf(
+            null,
+            Uri.parse("mxc://matrix.org/123456"),
+            Uri.parse("https://example.com/avatar.jpg"),
+        )
 }

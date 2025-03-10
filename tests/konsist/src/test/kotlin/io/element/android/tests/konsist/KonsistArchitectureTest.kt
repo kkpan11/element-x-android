@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.tests.konsist
@@ -31,6 +22,7 @@ import com.lemonappdev.konsist.api.ext.list.withoutName
 import com.lemonappdev.konsist.api.ext.list.withoutParents
 import com.lemonappdev.konsist.api.verify.assertEmpty
 import com.lemonappdev.konsist.api.verify.assertTrue
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KonsistArchitectureTest {
@@ -75,20 +67,44 @@ class KonsistArchitectureTest {
 
     @Test
     fun `Sealed interface used in Composable MUST be Immutable or Stable`() {
+        var failingTestFound = false
         // List all sealed interface without Immutable nor Stable annotation in the project
         val forbiddenInterfacesForComposableParameter = Konsist.scopeFromProject()
             .interfaces()
             .withSealedModifier()
             .withoutAnnotationOf(Immutable::class, Stable::class)
             .map { it.fullyQualifiedName }
-
         Konsist.scopeFromProject()
             .functions()
             .withAnnotationOf(Composable::class)
             .assertTrue(additionalMessage = "Consider adding the @Immutable or @Stable annotation to the sealed interface") {
-                it.parameters.all { param ->
-                    param.type.fullyQualifiedName !in forbiddenInterfacesForComposableParameter
+                val result = it.parameters.all { param ->
+                    val type = param.type.text
+                    return@all if (type.startsWith("@") || type.contains("->") || type.startsWith("suspend")) {
+                        true
+                    } else {
+                        val typePackage = param.type.sourceDeclaration?.let { declaration ->
+                            declaration.asTypeParameterDeclaration()?.packagee
+                                ?: declaration.asExternalDeclaration()?.packagee
+                                ?: declaration.asClassOrInterfaceDeclaration()?.packagee
+                                ?: declaration.asKotlinTypeDeclaration()?.packagee
+                                ?: declaration.asObjectDeclaration()?.packagee
+                        }?.name
+                        if (typePackage == null) {
+                            false
+                        } else {
+                            val fullyQualifiedName = "$typePackage.$type"
+                            fullyQualifiedName !in forbiddenInterfacesForComposableParameter
+                        }
+                    }
+                }
+                if (!result && !failingTestFound && it.name == "FailingComposableWithNonImmutableSealedInterface") {
+                    failingTestFound = true
+                    true
+                } else {
+                    result
                 }
             }
+        assertTrue("FailingComposableWithNonImmutableSealedInterface should make this test fail.", failingTestFound)
     }
 }

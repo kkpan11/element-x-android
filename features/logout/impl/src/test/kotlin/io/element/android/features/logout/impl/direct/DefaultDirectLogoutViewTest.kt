@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.logout.impl.direct
@@ -25,10 +16,8 @@ import io.element.android.features.logout.api.direct.DirectLogoutState
 import io.element.android.features.logout.api.direct.aDirectLogoutState
 import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.ui.strings.CommonStrings
-import io.element.android.tests.testutils.EnsureNeverCalledWithParam
 import io.element.android.tests.testutils.EventsRecorder
 import io.element.android.tests.testutils.clickOn
-import io.element.android.tests.testutils.ensureCalledOnceWithParam
 import io.element.android.tests.testutils.pressBackKey
 import org.junit.Ignore
 import org.junit.Rule
@@ -45,7 +34,7 @@ class DefaultDirectLogoutViewTest {
         val eventsRecorder = EventsRecorder<DirectLogoutEvents>()
         rule.setDefaultDirectLogoutView(
             state = aDirectLogoutState(
-                logoutAction = AsyncAction.Confirming,
+                logoutAction = AsyncAction.ConfirmingNoParams,
                 eventSink = eventsRecorder,
             )
         )
@@ -58,7 +47,7 @@ class DefaultDirectLogoutViewTest {
         val eventsRecorder = EventsRecorder<DirectLogoutEvents>()
         rule.setDefaultDirectLogoutView(
             state = aDirectLogoutState(
-                logoutAction = AsyncAction.Confirming,
+                logoutAction = AsyncAction.ConfirmingNoParams,
                 eventSink = eventsRecorder,
             )
         )
@@ -72,7 +61,7 @@ class DefaultDirectLogoutViewTest {
         val eventsRecorder = EventsRecorder<DirectLogoutEvents>()
         rule.setDefaultDirectLogoutView(
             state = aDirectLogoutState(
-                logoutAction = AsyncAction.Confirming,
+                logoutAction = AsyncAction.ConfirmingNoParams,
                 eventSink = eventsRecorder,
             )
         )
@@ -105,45 +94,12 @@ class DefaultDirectLogoutViewTest {
         rule.clickOn(CommonStrings.action_cancel)
         eventsRecorder.assertSingle(DirectLogoutEvents.CloseDialogs)
     }
-
-    @Test
-    fun `success logout invoke expected callback and sends expected Event`() {
-        val eventsRecorder = EventsRecorder<DirectLogoutEvents>(expectEvents = false)
-        ensureCalledOnceWithParam<String?>(null) { callback ->
-            rule.setDefaultDirectLogoutView(
-                state = aDirectLogoutState(
-                    logoutAction = AsyncAction.Success(null),
-                    eventSink = eventsRecorder,
-                ),
-                onSuccessLogout = callback
-            )
-        }
-    }
-
-    @Test
-    fun `success logout invoke expected callback and sends expected Event with data`() {
-        val eventsRecorder = EventsRecorder<DirectLogoutEvents>(expectEvents = false)
-        val data = "data"
-        ensureCalledOnceWithParam<String?>(data) { callback ->
-            rule.setDefaultDirectLogoutView(
-                state = aDirectLogoutState(
-                    logoutAction = AsyncAction.Success(data),
-                    eventSink = eventsRecorder,
-                ),
-                onSuccessLogout = callback
-            )
-        }
-    }
 }
 
 private fun <R : TestRule> AndroidComposeTestRule<R, ComponentActivity>.setDefaultDirectLogoutView(
     state: DirectLogoutState,
-    onSuccessLogout: (String?) -> Unit = EnsureNeverCalledWithParam(),
 ) {
     setContent {
-        DefaultDirectLogoutView().Render(
-            state,
-            onSuccessLogout = onSuccessLogout,
-        )
+        DefaultDirectLogoutView().Render(state)
     }
 }

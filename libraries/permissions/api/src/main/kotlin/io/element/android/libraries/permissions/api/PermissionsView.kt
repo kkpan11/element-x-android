@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.permissions.api
@@ -30,18 +21,22 @@ import io.element.android.libraries.ui.strings.CommonStrings
 fun PermissionsView(
     state: PermissionsState,
     modifier: Modifier = Modifier,
+    title: String = stringResource(id = CommonStrings.common_permission),
+    content: String? = null,
+    icon: @Composable (() -> Unit)? = null,
 ) {
     if (state.showDialog.not()) return
 
     ConfirmationDialog(
         modifier = modifier,
-        title = stringResource(id = CommonStrings.common_permission),
-        content = state.permission.toDialogContent(),
+        title = title,
+        content = content ?: state.permission.toDialogContent(),
         submitText = stringResource(id = CommonStrings.action_open_settings),
-        onSubmitClicked = {
+        onSubmitClick = {
             state.eventSink.invoke(PermissionsEvents.OpenSystemSettingAndCloseDialog)
         },
         onDismiss = { state.eventSink.invoke(PermissionsEvents.CloseDialog) },
+        icon = icon,
     )
 }
 

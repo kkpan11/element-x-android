@@ -1,25 +1,20 @@
 /*
- * Copyright (c) 2022 New Vector Ltd
+ * Copyright 2022-2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.permalink
 
 import android.net.Uri
 import androidx.compose.runtime.Immutable
+import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.RoomIdOrAlias
+import io.element.android.libraries.matrix.api.core.UserId
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * This sealed class represents all the permalink cases.
@@ -28,19 +23,10 @@ import kotlinx.collections.immutable.ImmutableList
 @Immutable
 sealed interface PermalinkData {
     data class RoomLink(
-        val roomIdOrAlias: String,
-        val isRoomAlias: Boolean,
-        val eventId: String?,
-        val viaParameters: ImmutableList<String>
-    ) : PermalinkData {
-        fun getRoomId(): RoomId? {
-            return roomIdOrAlias.takeIf { !isRoomAlias }?.let(::RoomId)
-        }
-
-        fun getRoomAlias(): String? {
-            return roomIdOrAlias.takeIf { isRoomAlias }
-        }
-    }
+        val roomIdOrAlias: RoomIdOrAlias,
+        val eventId: EventId? = null,
+        val viaParameters: ImmutableList<String> = persistentListOf()
+    ) : PermalinkData
 
     /*
      * &room_name=Team2
@@ -48,7 +34,7 @@ sealed interface PermalinkData {
      * &inviter_name=bob
      */
     data class RoomEmailInviteLink(
-        val roomId: String,
+        val roomId: RoomId,
         val email: String,
         val signUrl: String,
         val roomName: String?,
@@ -60,7 +46,7 @@ sealed interface PermalinkData {
         val roomType: String?
     ) : PermalinkData
 
-    data class UserLink(val userId: String) : PermalinkData
+    data class UserLink(val userId: UserId) : PermalinkData
 
     data class FallbackLink(val uri: Uri, val isLegacyGroupLink: Boolean = false) : PermalinkData
 }

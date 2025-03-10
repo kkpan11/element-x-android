@@ -1,20 +1,9 @@
 #! /bin/bash
 
+# Copyright 2023-2024 New Vector Ltd.
 #
-# Copyright (c) 2023 New Vector Ltd
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+# SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+# Please see LICENSE files in the repository root for full details.
 
 set -e
 
@@ -40,6 +29,9 @@ fi
 echo "Importing the strings..."
 localazy download --config ./tools/localazy/localazy.json
 
+echo "Removing the generated config"
+rm ./tools/localazy/localazy.json
+
 echo "Formatting the resources files..."
 find . -name 'localazy.xml' -exec ./tools/localazy/formatXmlResourcesFile.py {} \;
 if [[ $allFiles == 1 ]]; then
@@ -48,13 +40,16 @@ fi
 
 set +e
 echo "Moving files from values-id to values-in..."
-find . -type d -name 'values-id' -execdir mv {}/translations.xml {}/../values-in/translations.xml \;
+find . -type d -name 'values-id' -execdir mv {}/translations.xml {}/../values-in/translations.xml \; 2> /dev/null
 
 echo "Deleting all the folders values-id..."
-find . -type d -name 'values-id' -exec rm -rf {} \;
+find . -type d -name 'values-id' -exec rm -rf {} \; 2> /dev/null
 set -e
 
-echo "Removing the generated config"
-rm ./tools/localazy/localazy.json
+echo "Checking forbidden terms..."
+find . -name 'localazy.xml' -exec ./tools/localazy/checkForbiddenTerms.py {} \;
+if [[ $allFiles == 1 ]]; then
+  find . -name 'translations.xml' -exec ./tools/localazy/checkForbiddenTerms.py {} \;
+fi
 
 echo "Success!"

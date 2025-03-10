@@ -1,6 +1,14 @@
 {
   "modules" : [
     {
+      "name" : ":appnav",
+      "includeRegex" : [
+        "banner\\.migrate_to_native_sliding_sync\\.force_logout.title",
+        "banner\\.migrate_to_native_sliding_sync\\.action",
+        "banner\\.migrate_to_native_sliding_sync\\.app_force_logout\\.title"
+      ]
+    },
+    {
       "name" : ":features:rageshake:impl",
       "includeRegex" : [
         "screen_bug_report_.*"
@@ -21,6 +29,19 @@
       ]
     },
     {
+      "name" : ":features:deactivation:impl",
+      "includeRegex" : [
+        "screen_deactivate_account_.*"
+      ]
+    },
+    {
+      "name" : ":features:roomaliasresolver:impl",
+      "includeRegex" : [
+        "screen_room_alias_resolver_.*",
+        "screen.join_room.loading_alert_title"
+      ]
+    },
+    {
       "name" : ":features:onboarding:impl",
       "includeRegex" : [
         "screen_onboarding_.*"
@@ -33,22 +54,28 @@
       ]
     },
     {
-      "name" : ":features:invitelist:impl",
+      "name" : ":features:invite:impl",
       "includeRegex" : [
-        "screen_invites_.*"
+        "screen_invites_.*",
+        "screen\\.join_room\\.decline_and_block_.*"
       ]
     },
     {
       "name" : ":features:createroom:impl",
       "includeRegex" : [
         "screen_create_room_.*",
-        "screen_start_chat_.*"
+        "screen\\.create_room\\..*",
+        "screen_start_chat_.*",
+        "screen\\.start_chat\\..*",
+        "screen_room_directory_search_title*"
       ]
     },
     {
       "name" : ":features:verifysession:impl",
       "includeRegex" : [
-        "screen_session_verification_.*"
+        "screen_session_verification_.*",
+        "screen_signout_in_progress_dialog_content",
+        "screen_identity_.*"
       ]
     },
     {
@@ -56,6 +83,12 @@
       "includeRegex" : [
         "rich_text_editor.*",
         ".*voice_message_tooltip"
+      ]
+    },
+    {
+      "name" : ":libraries:dateformatter:impl",
+      "includeRegex" : [
+        "common\\.date\\..*"
       ]
     },
     {
@@ -71,6 +104,13 @@
       ]
     },
     {
+      "name" : ":libraries:mediaviewer:impl",
+      "includeRegex" : [
+        "screen\\.media_details\\..*",
+        "screen_media_browser_.*"
+      ]
+    },
+    {
       "name" : ":libraries:eventformatter:impl",
       "includeRegex" : [
         "state_event_.*"
@@ -80,7 +120,29 @@
       "name" : ":libraries:push:impl",
       "includeRegex" : [
         "push_.*",
-        "notification_.*"
+        "notification_.*",
+        "troubleshoot_notifications_test_current_push_provider.*",
+        "troubleshoot_notifications_test_detect_push_provider.*",
+        "troubleshoot_notifications_test_display_notification_.*",
+        "troubleshoot_notifications_test_push_loop_back_.*"
+      ]
+    },
+    {
+      "name" : ":libraries:permissions:impl",
+      "includeRegex" : [
+        "troubleshoot_notifications_test_check_permission_.*"
+      ]
+    },
+    {
+      "name" : ":libraries:pushproviders:firebase",
+      "includeRegex" : [
+        "troubleshoot_notifications_test_firebase_.*"
+      ]
+    },
+    {
+      "name" : ":libraries:pushproviders:unifiedpush",
+      "includeRegex" : [
+        "troubleshoot_notifications_test_unified_push_.*"
       ]
     },
     {
@@ -90,8 +152,10 @@
         "screen_server_confirmation_.*",
         "screen_change_server_.*",
         "screen_change_account_provider_.*",
+        "screen_create_account_.*",
         "screen_account_provider_.*",
-        "screen_waitlist_.*"
+        "screen_waitlist_.*",
+        "screen_qr_code_login_.*"
       ]
     },
     {
@@ -107,38 +171,50 @@
         "screen_roomlist_.*",
         "session_verification_banner_.*",
         "confirm_recovery_key_banner_.*",
-        "screen_migration_.*"
+        "banner\\.set_up_recovery\\..*",
+        "full_screen_intent_banner_.*",
+        "screen_migration_.*",
+        "screen_invites_.*",
+        "screen\\.join_room\\.knock_sent_title"
       ]
     },
     {
       "name" : ":features:roomdetails:impl",
       "includeRegex" : [
         "screen_room_details_.*",
+        "screen\\.room_details\\..*",
         "screen_room_member_list_.*",
-        "screen_dm_details_.*",
         "screen_room_notification_settings_.*",
         "screen_notification_settings_edit_failed_updating_default_mode",
         "screen_polls_history_title",
         "screen_notification_settings_mentions_only_disclaimer",
-        "screen_start_chat_error_starting_chat",
         "screen_room_change_.*",
-        "screen_room_roles_.*"
+        "screen_room_roles_.*",
+        "screen\\.edit_room_address\\..*",
+        "screen\\.security_and_privacy\\..*"
+      ]
+    },
+    {
+      "name" : ":features:userprofile:shared",
+      "includeRegex" : [
+        "screen_start_chat_error_starting_chat",
+        "screen_dm_details_.*",
+        "screen_room_member_details_.*"
       ]
     },
     {
       "name" : ":features:messages:impl",
       "includeRegex" : [
-        "room_timeline_.*",
-        "screen_room_.*",
-        "screen\\.room\\..*",
-        "screen_dm_details_.*",
         "emoji_picker_category_.*",
-        ".*report_content_.*"
-      ],
-      "excludeRegex" : [
-        "screen_room_details_.*",
-        "screen_room_member.*",
-        "screen_dm_.*"
+        "screen_report_content_.*",
+        "screen_room_attachment.*",
+        "screen_room_encrypted.*",
+        "screen_room_invite.*",
+        "screen\\.room\\.mention.*",
+        "screen_room_message.*",
+        "screen_room_retry.*",
+        "screen_room_timeline.*",
+        "screen_room_typing.*"
       ]
     },
     {
@@ -157,7 +233,9 @@
       "name" : ":features:ftue:impl",
       "includeRegex" : [
         "screen_welcome_.*",
-        "screen_notification_optin_.*"
+        "screen_notification_optin_.*",
+        "screen_identity_.*",
+        "screen_session_verification_enter_recovery_key"
       ]
     },
     {
@@ -173,7 +251,11 @@
       "includeRegex" : [
         "screen_chat_backup_.*",
         "screen_key_backup_disable_.*",
-        "screen_recovery_key_.*"
+        "screen_recovery_key_.*",
+        "screen_create_new_recovery_key_.*",
+        "screen_encryption_reset.*",
+        "screen_reset_encryption.*",
+        "screen\\.reset_encryption.*"
       ]
     },
     {
@@ -183,13 +265,29 @@
         "screen\\.advanced_settings\\..*",
         "screen_edit_profile_.*",
         "screen_notification_settings_.*",
-        "screen_blocked_users_.*"
+        "screen_blocked_users_.*",
+        "full_screen_intent_banner_.*",
+        "troubleshoot_notifications_entry_point_.*"
       ]
     },
     {
-      "name" : ":features:call",
+      "name" : ":libraries:troubleshoot:impl",
       "includeRegex" : [
-        "call_.*"
+        "troubleshoot_notifications_screen_.*"
+      ]
+    },
+    {
+      "name" : ":libraries:matrixui",
+      "includeRegex" : [
+        "screen_invites_invited_you",
+        "screen\\.bottom_sheet\\.create_dm\\..*"
+      ]
+    },
+    {
+      "name" : ":features:call:impl",
+      "includeRegex" : [
+        "call_.*",
+        "screen_incoming_call.*"
       ]
     },
     {
@@ -197,6 +295,27 @@
       "includeRegex" : [
         "screen_app_lock_.*",
         "screen_signout_in_progress_dialog_content"
+      ]
+    },
+    {
+      "name" : ":features:roomdirectory:impl",
+      "includeRegex" : [
+        "screen_room_directory_.*"
+      ]
+    },
+    {
+      "name" : ":features:joinroom:impl",
+      "includeRegex" : [
+        "screen_join_room_.*",
+        "screen\\.join_room\\..*"
+      ]
+    },
+    {
+      "name" : ":features:knockrequests:impl",
+      "includeRegex" : [
+        "screen\\.knock_requests_list\\..*",
+        "screen\\.room\\.single_knock_request.*",
+        "screen\\.room\\.multiple_knock_requests.*"
       ]
     }
   ]

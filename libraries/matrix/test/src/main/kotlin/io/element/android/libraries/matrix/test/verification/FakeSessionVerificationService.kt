@@ -1,91 +1,96 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.test.verification
 
-import io.element.android.libraries.matrix.api.verification.SessionVerificationData
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.verification.SessionVerificationService
+import io.element.android.libraries.matrix.api.verification.SessionVerificationServiceListener
 import io.element.android.libraries.matrix.api.verification.SessionVerifiedStatus
 import io.element.android.libraries.matrix.api.verification.VerificationFlowState
+import io.element.android.libraries.matrix.api.verification.VerificationRequest
+import io.element.android.tests.testutils.lambda.lambdaError
+import io.element.android.tests.testutils.simulateLongTask
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class FakeSessionVerificationService : SessionVerificationService {
-    private val _isReady = MutableStateFlow(false)
-    private val _sessionVerifiedStatus = MutableStateFlow<SessionVerifiedStatus>(SessionVerifiedStatus.Unknown)
+class FakeSessionVerificationService(
+    initialSessionVerifiedStatus: SessionVerifiedStatus = SessionVerifiedStatus.Unknown,
+    private val requestCurrentSessionVerificationLambda: () -> Unit = { lambdaError() },
+    private val requestUserVerificationLambda: (UserId) -> Unit = { lambdaError() },
+    private val cancelVerificationLambda: () -> Unit = { lambdaError() },
+    private val approveVerificationLambda: () -> Unit = { lambdaError() },
+    private val declineVerificationLambda: () -> Unit = { lambdaError() },
+    private val startVerificationLambda: () -> Unit = { lambdaError() },
+    private val resetLambda: (Boolean) -> Unit = { lambdaError() },
+    private val acknowledgeVerificationRequestLambda: (VerificationRequest.Incoming) -> Unit = { lambdaError() },
+    private val acceptVerificationRequestLambda: () -> Unit = { lambdaError() },
+) : SessionVerificationService {
+    private val _sessionVerifiedStatus = MutableStateFlow(initialSessionVerifiedStatus)
     private var _verificationFlowState = MutableStateFlow<VerificationFlowState>(VerificationFlowState.Initial)
-    private var _canVerifySessionFlow = MutableStateFlow(true)
-    var shouldFail = false
+    private var _needsSessionVerification = MutableStateFlow(true)
 
     override val verificationFlowState: StateFlow<VerificationFlowState> = _verificationFlowState
     override val sessionVerifiedStatus: StateFlow<SessionVerifiedStatus> = _sessionVerifiedStatus
-    override val canVerifySessionFlow: Flow<Boolean> = _canVerifySessionFlow
+    override val needsSessionVerification: Flow<Boolean> = _needsSessionVerification
 
-    override val isReady: StateFlow<Boolean> = _isReady
+    override suspend fun requestCurrentSessionVerification() {
+        requestCurrentSessionVerificationLambda()
+    }
 
-    override suspend fun requestVerification() {
-        _verificationFlowState.value = VerificationFlowState.AcceptedVerificationRequest
+    override suspend fun requestUserVerification(userId: UserId) {
+        requestUserVerificationLambda(userId)
     }
 
     override suspend fun cancelVerification() {
-        _verificationFlowState.value = VerificationFlowState.Canceled
+        cancelVerificationLambda()
     }
 
     override suspend fun approveVerification() {
-        if (!shouldFail) {
-            _verificationFlowState.value = VerificationFlowState.Finished
-        } else {
-            _verificationFlowState.value = VerificationFlowState.Failed
-        }
+        approveVerificationLambda()
     }
 
     override suspend fun declineVerification() {
-        if (!shouldFail) {
-            _verificationFlowState.value = VerificationFlowState.Canceled
-        } else {
-            _verificationFlowState.value = VerificationFlowState.Failed
-        }
-    }
-
-    fun triggerReceiveVerificationData(sessionVerificationData: SessionVerificationData) {
-        _verificationFlowState.value = VerificationFlowState.ReceivedVerificationData(sessionVerificationData)
+        declineVerificationLambda()
     }
 
     override suspend fun startVerification() {
-        _verificationFlowState.value = VerificationFlowState.StartedSasVerification
+        startVerificationLambda()
     }
 
-    fun givenVerifiedStatus(status: SessionVerifiedStatus) {
-        _sessionVerifiedStatus.value = status
+    override suspend fun reset(cancelAnyPendingVerificationAttempt: Boolean) {
+        resetLambda(cancelAnyPendingVerificationAttempt)
     }
 
-    fun givenVerificationFlowState(state: VerificationFlowState) {
-        _verificationFlowState.value = state
+    var listener: SessionVerificationServiceListener? = null
+        private set
+
+    override fun setListener(listener: SessionVerificationServiceListener?) {
+        this.listener = listener
     }
 
-    fun givenCanVerifySession(canVerify: Boolean) {
-        _canVerifySessionFlow.value = canVerify
+    override suspend fun acknowledgeVerificationRequest(verificationRequest: VerificationRequest.Incoming) {
+        acknowledgeVerificationRequestLambda(verificationRequest)
     }
 
-    fun givenIsReady(value: Boolean) {
-        _isReady.value = value
+    override suspend fun acceptVerificationRequest() = simulateLongTask {
+        acceptVerificationRequestLambda()
     }
 
-    override suspend fun reset() {
-        _verificationFlowState.value = VerificationFlowState.Initial
+    suspend fun emitVerificationFlowState(state: VerificationFlowState) {
+        _verificationFlowState.emit(state)
+    }
+
+    suspend fun emitVerifiedStatus(status: SessionVerifiedStatus) {
+        _sessionVerifiedStatus.emit(status)
+    }
+
+    suspend fun emitNeedsSessionVerification(needsVerification: Boolean) {
+        _needsSessionVerification.emit(needsVerification)
     }
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.avatar
@@ -22,6 +13,7 @@ import androidx.compose.ui.unit.dp
 enum class AvatarSize(val dp: Dp) {
     CurrentUserTopBar(32.dp),
 
+    IncomingCall(140.dp),
     RoomHeader(96.dp),
     RoomListItem(52.dp),
 
@@ -35,9 +27,13 @@ enum class AvatarSize(val dp: Dp) {
     SelectedUser(56.dp),
     SelectedRoom(56.dp),
 
+    DmCluster(75.dp),
+
     TimelineRoom(32.dp),
     TimelineSender(32.dp),
     TimelineReadReceipt(16.dp),
+
+    ComposerAlert(32.dp),
 
     ReadReceiptList(32.dp),
 
@@ -51,5 +47,20 @@ enum class AvatarSize(val dp: Dp) {
 
     NotificationsOptIn(32.dp),
 
-    CustomRoomNotificationSetting(36.dp)
+    CustomRoomNotificationSetting(36.dp),
+
+    RoomDirectoryItem(36.dp),
+
+    EditProfileDetails(96.dp),
+
+    Suggestion(32.dp),
+
+    KnockRequestItem(52.dp),
+    KnockRequestBanner(32.dp),
+
+    MediaSender(32.dp),
+
+    DmCreationConfirmation(64.dp),
+
+    UserVerification(52.dp),
 }

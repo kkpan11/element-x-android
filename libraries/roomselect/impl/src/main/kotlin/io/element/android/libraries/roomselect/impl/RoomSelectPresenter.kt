@@ -1,24 +1,17 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.roomselect.impl
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,17 +21,15 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.designsystem.theme.components.SearchBarResultState
-import io.element.android.libraries.matrix.api.MatrixClient
-import io.element.android.libraries.matrix.api.roomlist.RoomSummary
-import io.element.android.libraries.matrix.api.roomlist.RoomSummaryDetails
+import io.element.android.libraries.matrix.ui.model.SelectRoomInfo
 import io.element.android.libraries.roomselect.api.RoomSelectMode
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toImmutableList
 
 class RoomSelectPresenter @AssistedInject constructor(
     @Assisted private val mode: RoomSelectMode,
-    private val client: MatrixClient,
+    private val dataSource: RoomSelectSearchDataSource,
 ) : Presenter<RoomSelectState> {
     @AssistedFactory
     interface Factory {
@@ -47,23 +38,27 @@ class RoomSelectPresenter @AssistedInject constructor(
 
     @Composable
     override fun present(): RoomSelectState {
-        var selectedRooms by remember { mutableStateOf(persistentListOf<RoomSummaryDetails>()) }
-        var query by remember { mutableStateOf("") }
+        var selectedRooms by remember { mutableStateOf(persistentListOf<SelectRoomInfo>()) }
+        var searchQuery by remember { mutableStateOf("") }
         var isSearchActive by remember { mutableStateOf(false) }
-        var results: SearchBarResultState<ImmutableList<RoomSummaryDetails>> by remember { mutableStateOf(SearchBarResultState.Initial()) }
 
-        val summaries by client.roomListService.allRooms.summaries.collectAsState(initial = emptyList())
+        LaunchedEffect(Unit) {
+            dataSource.load()
+        }
 
-        LaunchedEffect(query, summaries) {
-            val filteredSummaries = summaries.filterIsInstance<RoomSummary.Filled>()
-                .map { it.details }
-                .filter { it.name.contains(query, ignoreCase = true) }
-                .distinctBy { it.roomId } // This should be removed once we're sure no duplicate Rooms can be received
-                .toPersistentList()
-            results = if (filteredSummaries.isNotEmpty()) {
-                SearchBarResultState.Results(filteredSummaries)
-            } else {
-                SearchBarResultState.NoResultsFound()
+        LaunchedEffect(searchQuery) {
+            dataSource.setSearchQuery(searchQuery)
+        }
+
+        val roomSummaryDetailsList by dataSource.roomInfoList.collectAsState(initial = persistentListOf())
+
+        val searchResults by remember<State<SearchBarResultState<ImmutableList<SelectRoomInfo>>>> {
+            derivedStateOf {
+                when {
+                    roomSummaryDetailsList.isNotEmpty() -> SearchBarResultState.Results(roomSummaryDetailsList.toImmutableList())
+                    isSearchActive -> SearchBarResultState.NoResultsFound()
+                    else -> SearchBarResultState.Initial()
+                }
             }
         }
 
@@ -80,15 +75,15 @@ class RoomSelectPresenter @AssistedInject constructor(
 //                    }
                 }
                 RoomSelectEvents.RemoveSelectedRoom -> selectedRooms = persistentListOf()
-                is RoomSelectEvents.UpdateQuery -> query = event.query
+                is RoomSelectEvents.UpdateQuery -> searchQuery = event.query
                 RoomSelectEvents.ToggleSearchActive -> isSearchActive = !isSearchActive
             }
         }
 
         return RoomSelectState(
             mode = mode,
-            resultState = results,
-            query = query,
+            resultState = searchResults,
+            query = searchQuery,
             isSearchActive = isSearchActive,
             selectedRooms = selectedRooms,
             eventSink = { handleEvents(it) }

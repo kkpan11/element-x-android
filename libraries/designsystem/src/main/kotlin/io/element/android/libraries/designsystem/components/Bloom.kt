@@ -1,24 +1,14 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components
 
 import android.graphics.Bitmap
 import android.graphics.Typeface
-import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.text.TextPaint
 import androidx.annotation.FloatRange
@@ -94,9 +84,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.toOffset
 import androidx.compose.ui.unit.toSize
-import coil.imageLoader
-import coil.request.DefaultRequestOptions
-import coil.request.ImageRequest
+import coil3.SingletonImageLoader
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.toBitmap
 import com.airbnb.android.showkase.annotation.ShowkaseComposable
 import com.vanniktech.blurhash.BlurHash
 import io.element.android.compound.theme.ElementTheme
@@ -168,6 +159,7 @@ data class BloomLayer(
  * @param bottomSoftEdgeAlpha The alpha value to apply to the bottom soft edge.
  * @param alpha The alpha value to apply to the bloom effect.
  */
+@SuppressWarnings("ModifierComposed")
 fun Modifier.bloom(
     hash: String?,
     background: Color,
@@ -302,7 +294,7 @@ fun Modifier.bloom(
 /**
  * Bloom effect modifier for avatars. Applies a bloom effect to the component.
  * @param avatarData The avatar data to use as the bloom source.
- *  If the avatar data has a URL it will be used as the bloom source, otherwise the initials will be used. If `null` is passed, no bloom effect will be applied.
+ *  If the avatar data has a URL it will be used as the bloom source, otherwise the initials will be used.
  * @param background The background color to use for the bloom effect. Since we use blend modes it must be non-transparent.
  * @param blurSize The size of the bloom effect. If not specified the bloom effect will be the size of the component.
  * @param offset The offset to use for the bloom effect. If not specified the bloom effect will be centered on the component.
@@ -312,8 +304,9 @@ fun Modifier.bloom(
  * @param bottomSoftEdgeAlpha The alpha value to apply to the bottom soft edge.
  * @param alpha The alpha value to apply to the bloom effect.
  */
+@SuppressWarnings("ModifierComposed")
 fun Modifier.avatarBloom(
-    avatarData: AvatarData?,
+    avatarData: AvatarData,
     background: Color,
     blurSize: DpSize = DpSize.Unspecified,
     offset: DpOffset = DpOffset.Unspecified,
@@ -327,7 +320,6 @@ fun Modifier.avatarBloom(
 ) = composed {
     // Bloom only works on API 29+
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return@composed this
-    avatarData ?: return@composed this
 
     // Request the avatar contents to use as the bloom source
     val context = LocalContext.current
@@ -336,7 +328,7 @@ fun Modifier.avatarBloom(
             ImageRequest.Builder(context)
                 .data(avatarData)
                 // Allow cache and default dispatchers
-                .defaults(DefaultRequestOptions())
+                .defaults(ImageRequest.Defaults())
                 // Needed to be able to read pixels from the Bitmap for the hash
                 .allowHardware(false)
                 // Reduce size so it loads faster for large avatars
@@ -348,9 +340,11 @@ fun Modifier.avatarBloom(
         var blurHash by rememberSaveable(avatarData) { mutableStateOf<String?>(null) }
         LaunchedEffect(avatarData) {
             withContext(Dispatchers.IO) {
-                val drawable =
-                    context.imageLoader.execute(painterRequest).drawable ?: return@withContext
-                val bitmap = (drawable as? BitmapDrawable)?.bitmap ?: return@withContext
+                val bitmap = SingletonImageLoader.get(context)
+                    .execute(painterRequest)
+                    .image
+                    ?.toBitmap()
+                    ?: return@withContext
                 blurHash = BlurHash.encode(
                     bitmap = bitmap,
                     componentX = BloomDefaults.HASH_COMPONENTS,
@@ -372,7 +366,7 @@ fun Modifier.avatarBloom(
         )
     } else {
         // There is no URL so we'll generate an avatar with the initials and use that as the bloom source
-        val avatarColors = AvatarColorsProvider.provide(avatarData.id, ElementTheme.isLightTheme)
+        val avatarColors = AvatarColorsProvider.provide(avatarData.id)
         val initialsBitmap = initialsBitmap(
             width = BloomDefaults.ENCODE_SIZE_PX.toDp(),
             height = BloomDefaults.ENCODE_SIZE_PX.toDp(),
@@ -485,7 +479,7 @@ internal fun BloomPreview() {
                             }
                             .bloom(
                                 hash = blurhash,
-                                background = ElementTheme.materialColors.background,
+                                background = ElementTheme.colors.bgCanvasDefault,
                                 blurSize = DpSize(430.dp, 430.dp),
                                 offset = DpOffset(24.dp, 24.dp),
                                 clipToSize = if (topAppBarHeight > 0) DpSize(430.dp, topAppBarHeight.toDp()) else DpSize.Zero,
@@ -546,7 +540,7 @@ class InitialsColorIntProvider : PreviewParameterProvider<Int> {
 @ShowkaseComposable(group = PreviewGroup.Bloom)
 internal fun BloomInitialsPreview(@PreviewParameter(InitialsColorIntProvider::class) color: Int) {
     ElementPreview {
-        val avatarColors = AvatarColorsProvider.provide("$color", ElementTheme.isLightTheme)
+        val avatarColors = AvatarColorsProvider.provide("$color")
         val bitmap = initialsBitmap(text = "F", backgroundColor = avatarColors.background, textColor = avatarColors.foreground)
         val hash = BlurHash.encode(
             bitmap = bitmap.asAndroidBitmap(),
@@ -562,9 +556,9 @@ internal fun BloomInitialsPreview(@PreviewParameter(InitialsColorIntProvider::cl
                         // Workaround to display a very subtle bloom for avatars with very soft colors
                         Color(0xFFF9F9F9)
                     } else {
-                        ElementTheme.materialColors.background
+                        ElementTheme.colors.bgCanvasDefault
                     },
-                    bottomSoftEdgeColor = ElementTheme.materialColors.background,
+                    bottomSoftEdgeColor = ElementTheme.colors.bgCanvasDefault,
                     blurSize = DpSize(256.dp, 256.dp),
                 ),
             contentAlignment = Alignment.Center

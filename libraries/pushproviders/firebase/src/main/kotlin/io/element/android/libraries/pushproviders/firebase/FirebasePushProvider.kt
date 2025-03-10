@@ -1,29 +1,18 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.pushproviders.firebase
 
-import android.content.Context
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GoogleApiAvailability
 import com.squareup.anvil.annotations.ContributesMultibinding
 import io.element.android.libraries.core.log.logger.LoggerTag
 import io.element.android.libraries.di.AppScope
-import io.element.android.libraries.di.ApplicationContext
 import io.element.android.libraries.matrix.api.MatrixClient
+import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.pushproviders.api.CurrentUserPushConfig
 import io.element.android.libraries.pushproviders.api.Distributor
 import io.element.android.libraries.pushproviders.api.PushProvider
 import io.element.android.libraries.pushproviders.api.PusherSubscriber
@@ -34,46 +23,68 @@ private val loggerTag = LoggerTag("FirebasePushProvider", LoggerTag.PushLoggerTa
 
 @ContributesMultibinding(AppScope::class)
 class FirebasePushProvider @Inject constructor(
-    @ApplicationContext private val context: Context,
     private val firebaseStore: FirebaseStore,
-    private val firebaseTroubleshooter: FirebaseTroubleshooter,
     private val pusherSubscriber: PusherSubscriber,
+    private val isPlayServiceAvailable: IsPlayServiceAvailable,
+    private val firebaseTokenRotator: FirebaseTokenRotator,
 ) : PushProvider {
     override val index = FirebaseConfig.INDEX
     override val name = FirebaseConfig.NAME
 
-    override fun isAvailable(): Boolean {
-        // The PlayServices has to be available
-        val apiAvailability = GoogleApiAvailability.getInstance()
-        val resultCode = apiAvailability.isGooglePlayServicesAvailable(context)
-        return if (resultCode == ConnectionResult.SUCCESS) {
-            Timber.tag(loggerTag.value).d("Google Play Services is available")
-            true
-        } else {
-            Timber.tag(loggerTag.value).w("Google Play Services is not available")
-            false
-        }
-    }
-
     override fun getDistributors(): List<Distributor> {
-        return listOf(Distributor("Firebase", "Firebase"))
+        return listOfNotNull(
+            firebaseDistributor.takeIf { isPlayServiceAvailable.isAvailable() }
+        )
     }
 
-    override suspend fun registerWith(matrixClient: MatrixClient, distributor: Distributor) {
-        val pushKey = firebaseStore.getFcmToken() ?: return Unit.also {
+    override suspend fun registerWith(matrixClient: MatrixClient, distributor: Distributor): Result<Unit> {
+        val pushKey = firebaseStore.getFcmToken() ?: return Result.failure<Unit>(
+            IllegalStateException(
+                "Unable to register pusher, Firebase token is not known."
+            )
+        ).also {
             Timber.tag(loggerTag.value).w("Unable to register pusher, Firebase token is not known.")
         }
-        pusherSubscriber.registerPusher(matrixClient, pushKey, FirebaseConfig.PUSHER_HTTP_URL)
+        return pusherSubscriber.registerPusher(
+            matrixClient = matrixClient,
+            pushKey = pushKey,
+            gateway = FirebaseConfig.PUSHER_HTTP_URL,
+        )
     }
 
-    override suspend fun unregister(matrixClient: MatrixClient) {
-        val pushKey = firebaseStore.getFcmToken() ?: return Unit.also {
+    override suspend fun getCurrentDistributor(sessionId: SessionId) = firebaseDistributor
+
+    override suspend fun unregister(matrixClient: MatrixClient): Result<Unit> {
+        val pushKey = firebaseStore.getFcmToken()
+        return if (pushKey == null) {
             Timber.tag(loggerTag.value).w("Unable to unregister pusher, Firebase token is not known.")
+            Result.success(Unit)
+        } else {
+            pusherSubscriber.unregisterPusher(matrixClient, pushKey, FirebaseConfig.PUSHER_HTTP_URL)
         }
-        pusherSubscriber.unregisterPusher(matrixClient, pushKey, FirebaseConfig.PUSHER_HTTP_URL)
     }
 
-    override suspend fun troubleshoot(): Result<Unit> {
-        return firebaseTroubleshooter.troubleshoot()
+    /**
+     * Nothing to clean up here.
+     */
+    override suspend fun onSessionDeleted(sessionId: SessionId) = Unit
+
+    override suspend fun getCurrentUserPushConfig(): CurrentUserPushConfig? {
+        return firebaseStore.getFcmToken()?.let { fcmToken ->
+            CurrentUserPushConfig(
+                url = FirebaseConfig.PUSHER_HTTP_URL,
+                pushKey = fcmToken
+            )
+        }
+    }
+
+    override fun canRotateToken(): Boolean = true
+
+    override suspend fun rotateToken(): Result<Unit> {
+        return firebaseTokenRotator.rotate()
+    }
+
+    companion object {
+        private val firebaseDistributor = Distributor("Firebase", "Firebase")
     }
 }

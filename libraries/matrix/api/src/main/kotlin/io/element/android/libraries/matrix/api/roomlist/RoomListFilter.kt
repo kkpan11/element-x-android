@@ -1,25 +1,19 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.roomlist
+
+import io.element.android.libraries.core.extensions.withoutAccents
 
 sealed interface RoomListFilter {
     companion object {
         /**
          * Create a filter that matches all the given filters.
+         * If no filters are provided, all the rooms will match.
          */
         fun all(vararg filters: RoomListFilter): RoomListFilter {
             return All(filters.toList())
@@ -35,6 +29,7 @@ sealed interface RoomListFilter {
 
     /**
      * A filter that matches all the given filters.
+     * If [filters] is empty, all the room will match.
      */
     data class All(
         val filters: List<RoomListFilter>
@@ -58,6 +53,11 @@ sealed interface RoomListFilter {
     data object Favorite : RoomListFilter
 
     /**
+     * A filter that matches rooms with Invited membership.
+     */
+    data object Invite : RoomListFilter
+
+    /**
      * A filter that matches either Group or People rooms.
      */
     sealed interface Category : RoomListFilter {
@@ -75,5 +75,7 @@ sealed interface RoomListFilter {
      */
     data class NormalizedMatchRoomName(
         val pattern: String
-    ) : RoomListFilter
+    ) : RoomListFilter {
+        val normalizedPattern: String = pattern.withoutAccents()
+    }
 }

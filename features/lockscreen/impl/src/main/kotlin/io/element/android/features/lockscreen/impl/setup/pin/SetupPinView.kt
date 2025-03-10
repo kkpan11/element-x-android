@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 @file:OptIn(ExperimentalMaterial3Api::class)
@@ -25,8 +16,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,10 +27,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.lockscreen.impl.R
 import io.element.android.features.lockscreen.impl.components.PinEntryTextField
 import io.element.android.features.lockscreen.impl.setup.pin.validation.SetupPinFailure
 import io.element.android.libraries.designsystem.atomic.molecules.IconTitleSubtitleMolecule
+import io.element.android.libraries.designsystem.components.BigIcon
 import io.element.android.libraries.designsystem.components.button.BackButton
 import io.element.android.libraries.designsystem.components.dialogs.ErrorDialog
 import io.element.android.libraries.designsystem.preview.ElementPreview
@@ -52,7 +43,7 @@ import io.element.android.libraries.designsystem.theme.components.TopAppBar
 @Composable
 fun SetupPinView(
     state: SetupPinState,
-    onBackClicked: () -> Unit,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -60,7 +51,7 @@ fun SetupPinView(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    BackButton(onClick = onBackClicked)
+                    BackButton(onClick = onBackClick)
                 },
                 title = {}
             )
@@ -97,7 +88,7 @@ private fun SetupPinHeader(
                 stringResource(id = R.string.screen_app_lock_setup_choose_pin)
             },
             subTitle = stringResource(id = R.string.screen_app_lock_setup_pin_context, appName),
-            iconImageVector = Icons.Filled.Lock,
+            iconStyle = BigIcon.Style.Default(CompoundIcons.LockSolid()),
         )
     }
 }
@@ -125,7 +116,7 @@ private fun SetupPinContent(
         ErrorDialog(
             title = state.setupPinFailure.title(),
             content = state.setupPinFailure.content(),
-            onDismiss = {
+            onSubmit = {
                 state.eventSink(SetupPinEvents.ClearFailure)
             }
         )
@@ -135,16 +126,16 @@ private fun SetupPinContent(
 @Composable
 private fun SetupPinFailure.content(): String {
     return when (this) {
-        SetupPinFailure.PinBlacklisted -> stringResource(id = R.string.screen_app_lock_setup_pin_blacklisted_dialog_content)
-        SetupPinFailure.PinsDontMatch -> stringResource(id = R.string.screen_app_lock_setup_pin_mismatch_dialog_content)
+        SetupPinFailure.ForbiddenPin -> stringResource(id = R.string.screen_app_lock_setup_pin_forbidden_dialog_content)
+        SetupPinFailure.PinsDoNotMatch -> stringResource(id = R.string.screen_app_lock_setup_pin_mismatch_dialog_content)
     }
 }
 
 @Composable
 private fun SetupPinFailure.title(): String {
     return when (this) {
-        SetupPinFailure.PinBlacklisted -> stringResource(id = R.string.screen_app_lock_setup_pin_blacklisted_dialog_title)
-        SetupPinFailure.PinsDontMatch -> stringResource(id = R.string.screen_app_lock_setup_pin_mismatch_dialog_title)
+        SetupPinFailure.ForbiddenPin -> stringResource(id = R.string.screen_app_lock_setup_pin_forbidden_dialog_title)
+        SetupPinFailure.PinsDoNotMatch -> stringResource(id = R.string.screen_app_lock_setup_pin_mismatch_dialog_title)
     }
 }
 
@@ -154,7 +145,7 @@ internal fun SetupPinViewPreview(@PreviewParameter(SetupPinStateProvider::class)
     ElementPreview {
         SetupPinView(
             state = state,
-            onBackClicked = {},
+            onBackClick = {},
         )
     }
 }

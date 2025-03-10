@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl
@@ -24,10 +15,13 @@ import com.bumble.appyx.core.node.Node
 import com.bumble.appyx.core.plugin.Plugin
 import com.bumble.appyx.core.plugin.plugins
 import com.bumble.appyx.navmodel.backstack.BackStack
+import com.bumble.appyx.navmodel.backstack.operation.pop
 import com.bumble.appyx.navmodel.backstack.operation.push
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import io.element.android.anvilannotations.ContributesNode
+import io.element.android.features.deactivation.api.AccountDeactivationEntryPoint
+import io.element.android.features.licenses.api.OpenSourceLicensesEntryPoint
 import io.element.android.features.lockscreen.api.LockScreenEntryPoint
 import io.element.android.features.logout.api.LogoutEntryPoint
 import io.element.android.features.preferences.api.PreferencesEntryPoint
@@ -36,17 +30,18 @@ import io.element.android.features.preferences.impl.advanced.AdvancedSettingsNod
 import io.element.android.features.preferences.impl.analytics.AnalyticsSettingsNode
 import io.element.android.features.preferences.impl.blockedusers.BlockedUsersNode
 import io.element.android.features.preferences.impl.developer.DeveloperSettingsNode
-import io.element.android.features.preferences.impl.developer.tracing.ConfigureTracingNode
 import io.element.android.features.preferences.impl.notifications.NotificationSettingsNode
 import io.element.android.features.preferences.impl.notifications.edit.EditDefaultNotificationSettingNode
 import io.element.android.features.preferences.impl.root.PreferencesRootNode
 import io.element.android.features.preferences.impl.user.editprofile.EditUserProfileNode
 import io.element.android.libraries.architecture.BackstackView
 import io.element.android.libraries.architecture.BaseFlowNode
+import io.element.android.libraries.architecture.appyx.canPop
 import io.element.android.libraries.architecture.createNode
 import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.user.MatrixUser
+import io.element.android.libraries.troubleshoot.api.NotificationTroubleShootEntryPoint
 import kotlinx.parcelize.Parcelize
 
 @ContributesNode(SessionScope::class)
@@ -54,7 +49,10 @@ class PreferencesFlowNode @AssistedInject constructor(
     @Assisted buildContext: BuildContext,
     @Assisted plugins: List<Plugin>,
     private val lockScreenEntryPoint: LockScreenEntryPoint,
+    private val notificationTroubleShootEntryPoint: NotificationTroubleShootEntryPoint,
     private val logoutEntryPoint: LogoutEntryPoint,
+    private val openSourceLicensesEntryPoint: OpenSourceLicensesEntryPoint,
+    private val accountDeactivationEntryPoint: AccountDeactivationEntryPoint,
 ) : BaseFlowNode<PreferencesFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = plugins.filterIsInstance<PreferencesEntryPoint.Params>().first().initialElement.toNavTarget(),
@@ -74,9 +72,6 @@ class PreferencesFlowNode @AssistedInject constructor(
         data object AdvancedSettings : NavTarget
 
         @Parcelize
-        data object ConfigureTracing : NavTarget
-
-        @Parcelize
         data object AnalyticsSettings : NavTarget
 
         @Parcelize
@@ -84,6 +79,9 @@ class PreferencesFlowNode @AssistedInject constructor(
 
         @Parcelize
         data object NotificationSettings : NavTarget
+
+        @Parcelize
+        data object TroubleshootNotifications : NavTarget
 
         @Parcelize
         data object LockScreenSettings : NavTarget
@@ -99,6 +97,12 @@ class PreferencesFlowNode @AssistedInject constructor(
 
         @Parcelize
         data object SignOut : NavTarget
+
+        @Parcelize
+        data object AccountDeactivation : NavTarget
+
+        @Parcelize
+        data object OssLicenses : NavTarget
     }
 
     override fun resolve(navTarget: NavTarget, buildContext: BuildContext): Node {
@@ -109,12 +113,8 @@ class PreferencesFlowNode @AssistedInject constructor(
                         plugins<PreferencesEntryPoint.Callback>().forEach { it.onOpenBugReport() }
                     }
 
-                    override fun onVerifyClicked() {
-                        plugins<PreferencesEntryPoint.Callback>().forEach { it.onVerifyClicked() }
-                    }
-
-                    override fun onSecureBackupClicked() {
-                        plugins<PreferencesEntryPoint.Callback>().forEach { it.onSecureBackupClicked() }
+                    override fun onSecureBackupClick() {
+                        plugins<PreferencesEntryPoint.Callback>().forEach { it.onSecureBackupClick() }
                     }
 
                     override fun onOpenAnalytics() {
@@ -149,25 +149,26 @@ class PreferencesFlowNode @AssistedInject constructor(
                         backstack.push(NavTarget.BlockedUsers)
                     }
 
-                    override fun onSignOutClicked() {
+                    override fun onSignOutClick() {
                         backstack.push(NavTarget.SignOut)
+                    }
+
+                    override fun onOpenAccountDeactivation() {
+                        backstack.push(NavTarget.AccountDeactivation)
                     }
                 }
                 createNode<PreferencesRootNode>(buildContext, plugins = listOf(callback))
             }
             NavTarget.DeveloperSettings -> {
-                val callback = object : DeveloperSettingsNode.Callback {
-                    override fun openConfigureTracing() {
-                        backstack.push(NavTarget.ConfigureTracing)
-                    }
-                }
-                createNode<DeveloperSettingsNode>(buildContext, listOf(callback))
-            }
-            NavTarget.ConfigureTracing -> {
-                createNode<ConfigureTracingNode>(buildContext)
+                createNode<DeveloperSettingsNode>(buildContext)
             }
             NavTarget.About -> {
-                createNode<AboutNode>(buildContext)
+                val callback = object : AboutNode.Callback {
+                    override fun openOssLicenses() {
+                        backstack.push(NavTarget.OssLicenses)
+                    }
+                }
+                createNode<AboutNode>(buildContext, listOf(callback))
             }
             NavTarget.AnalyticsSettings -> {
                 createNode<AnalyticsSettingsNode>(buildContext)
@@ -177,8 +178,25 @@ class PreferencesFlowNode @AssistedInject constructor(
                     override fun editDefaultNotificationMode(isOneToOne: Boolean) {
                         backstack.push(NavTarget.EditDefaultNotificationSetting(isOneToOne))
                     }
+
+                    override fun onTroubleshootNotificationsClick() {
+                        backstack.push(NavTarget.TroubleshootNotifications)
+                    }
                 }
                 createNode<NotificationSettingsNode>(buildContext, listOf(notificationSettingsCallback))
+            }
+            NavTarget.TroubleshootNotifications -> {
+                notificationTroubleShootEntryPoint.nodeBuilder(this, buildContext)
+                    .callback(object : NotificationTroubleShootEntryPoint.Callback {
+                        override fun onDone() {
+                            if (backstack.canPop()) {
+                                backstack.pop()
+                            } else {
+                                navigateUp()
+                            }
+                        }
+                    })
+                    .build()
             }
             is NavTarget.EditDefaultNotificationSetting -> {
                 val callback = object : EditDefaultNotificationSettingNode.Callback {
@@ -197,22 +215,26 @@ class PreferencesFlowNode @AssistedInject constructor(
                 createNode<EditUserProfileNode>(buildContext, listOf(inputs))
             }
             NavTarget.LockScreenSettings -> {
-                lockScreenEntryPoint.nodeBuilder(this, buildContext)
-                    .target(LockScreenEntryPoint.Target.Settings)
-                    .build()
+                lockScreenEntryPoint.nodeBuilder(this, buildContext, LockScreenEntryPoint.Target.Settings).build()
             }
             NavTarget.BlockedUsers -> {
                 createNode<BlockedUsersNode>(buildContext)
             }
             NavTarget.SignOut -> {
                 val callBack: LogoutEntryPoint.Callback = object : LogoutEntryPoint.Callback {
-                    override fun onChangeRecoveryKeyClicked() {
-                        plugins<PreferencesEntryPoint.Callback>().forEach { it.onSecureBackupClicked() }
+                    override fun onChangeRecoveryKeyClick() {
+                        plugins<PreferencesEntryPoint.Callback>().forEach { it.onSecureBackupClick() }
                     }
                 }
                 logoutEntryPoint.nodeBuilder(this, buildContext)
                     .callback(callBack)
                     .build()
+            }
+            is NavTarget.OssLicenses -> {
+                openSourceLicensesEntryPoint.getNode(this, buildContext)
+            }
+            NavTarget.AccountDeactivation -> {
+                accountDeactivationEntryPoint.createNode(this, buildContext)
             }
         }
     }

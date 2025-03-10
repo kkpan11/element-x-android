@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components.layout
@@ -136,26 +127,26 @@ interface ContentAvoidingLayoutScope {
     /**
      * It should be called when the content layout changes, so it can update the [ContentAvoidingLayoutData] and measure and layout the content properly.
      */
-    fun onContentLayoutChanged(data: ContentAvoidingLayoutData)
+    fun onContentLayoutChange(data: ContentAvoidingLayoutData)
 }
 
 private class ContentAvoidingLayoutScopeInstance(
     val data: MutableState<ContentAvoidingLayoutData> = mutableStateOf(ContentAvoidingLayoutData()),
 ) : ContentAvoidingLayoutScope {
-    override fun onContentLayoutChanged(data: ContentAvoidingLayoutData) {
+    override fun onContentLayoutChange(data: ContentAvoidingLayoutData) {
         this.data.value = data
     }
 }
 
 object ContentAvoidingLayout {
     /**
-     * Measures the last line of a [TextLayoutResult] and calls [onContentLayoutChanged] with the [ContentAvoidingLayoutData].
+     * Measures the last line of a [TextLayoutResult] and calls [onContentLayoutChange] with the [ContentAvoidingLayoutData].
      *
      * This is supposed to be used in the `onTextLayout` parameter of a Text based component.
      */
     @Composable
     internal fun measureLastTextLine(
-        onContentLayoutChanged: (ContentAvoidingLayoutData) -> Unit,
+        onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit,
         extraWidth: Dp = 0.dp,
     ): ((TextLayoutResult) -> Unit) {
         val layoutDirection = LocalLayoutDirection.current
@@ -167,7 +158,7 @@ object ContentAvoidingLayout {
                 LayoutDirection.Rtl -> textLayout.getLineLeft(textLayout.lineCount - 1).roundToInt()
             }
             val lastLineHeight = textLayout.getLineBottom(textLayout.lineCount - 1).roundToInt()
-            onContentLayoutChanged(
+            onContentLayoutChange(
                 ContentAvoidingLayoutData(
                     contentWidth = textLayout.size.width + extraWidthPx,
                     contentHeight = textLayout.size.height,
@@ -179,13 +170,13 @@ object ContentAvoidingLayout {
     }
 
     /**
-     * Measures the last line of a [Layout] and calls [onContentLayoutChanged] with the [ContentAvoidingLayoutData].
+     * Measures the last line of a [Layout] and calls [onContentLayoutChange] with the [ContentAvoidingLayoutData].
      *
      * This is supposed to be used in the `onTextLayout` parameter of an [EditorStyledText] component.
      */
     @Composable
     internal fun measureLegacyLastTextLine(
-        onContentLayoutChanged: (ContentAvoidingLayoutData) -> Unit,
+        onContentLayoutChange: (ContentAvoidingLayoutData) -> Unit,
         extraWidth: Dp = 0.dp,
     ): ((Layout) -> Unit) {
         val extraWidthPx = extraWidth.roundToPx()
@@ -193,7 +184,7 @@ object ContentAvoidingLayout {
             // We need to add the external extra width so it's not taken into account as 'free space'
             val lastLineWidth = textLayout.getLineWidth(textLayout.lineCount - 1).roundToInt()
             val lastLineHeight = textLayout.getLineBottom(textLayout.lineCount - 1)
-            onContentLayoutChanged(
+            onContentLayoutChange(
                 ContentAvoidingLayoutData(
                     contentWidth = textLayout.width + extraWidthPx,
                     contentHeight = textLayout.height,

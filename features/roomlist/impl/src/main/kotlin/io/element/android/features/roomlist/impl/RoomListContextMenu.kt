@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomlist.impl
@@ -24,6 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.tooling.preview.PreviewParameter
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.libraries.designsystem.components.list.ListItemContent
@@ -42,31 +35,35 @@ import io.element.android.libraries.ui.strings.CommonStrings
 fun RoomListContextMenu(
     contextMenu: RoomListState.ContextMenu.Shown,
     eventSink: (RoomListEvents.ContextMenuEvents) -> Unit,
-    onRoomSettingsClicked: (roomId: RoomId) -> Unit,
+    onRoomSettingsClick: (roomId: RoomId) -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = { eventSink(RoomListEvents.HideContextMenu) },
     ) {
         RoomListModalBottomSheetContent(
             contextMenu = contextMenu,
-            onRoomMarkReadClicked = {
+            onRoomMarkReadClick = {
                 eventSink(RoomListEvents.HideContextMenu)
                 eventSink(RoomListEvents.MarkAsRead(contextMenu.roomId))
             },
-            onRoomMarkUnreadClicked = {
+            onRoomMarkUnreadClick = {
                 eventSink(RoomListEvents.HideContextMenu)
                 eventSink(RoomListEvents.MarkAsUnread(contextMenu.roomId))
             },
-            onRoomSettingsClicked = {
+            onRoomSettingsClick = {
                 eventSink(RoomListEvents.HideContextMenu)
-                onRoomSettingsClicked(contextMenu.roomId)
+                onRoomSettingsClick(contextMenu.roomId)
             },
-            onLeaveRoomClicked = {
+            onLeaveRoomClick = {
                 eventSink(RoomListEvents.HideContextMenu)
                 eventSink(RoomListEvents.LeaveRoom(contextMenu.roomId))
             },
-            onFavoriteChanged = { isFavorite ->
+            onFavoriteChange = { isFavorite ->
                 eventSink(RoomListEvents.SetRoomIsFavorite(contextMenu.roomId, isFavorite))
+            },
+            onClearCacheRoomClick = {
+                eventSink(RoomListEvents.HideContextMenu)
+                eventSink(RoomListEvents.ClearCacheOfRoom(contextMenu.roomId))
             },
         )
     }
@@ -75,11 +72,12 @@ fun RoomListContextMenu(
 @Composable
 private fun RoomListModalBottomSheetContent(
     contextMenu: RoomListState.ContextMenu.Shown,
-    onRoomSettingsClicked: () -> Unit,
-    onLeaveRoomClicked: () -> Unit,
-    onFavoriteChanged: (isFavorite: Boolean) -> Unit,
-    onRoomMarkReadClicked: () -> Unit,
-    onRoomMarkUnreadClicked: () -> Unit,
+    onRoomSettingsClick: () -> Unit,
+    onLeaveRoomClick: () -> Unit,
+    onFavoriteChange: (isFavorite: Boolean) -> Unit,
+    onRoomMarkReadClick: () -> Unit,
+    onRoomMarkUnreadClick: () -> Unit,
+    onClearCacheRoomClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth()
@@ -87,42 +85,42 @@ private fun RoomListModalBottomSheetContent(
         ListItem(
             headlineContent = {
                 Text(
-                    text = contextMenu.roomName,
+                    text = contextMenu.roomName ?: stringResource(id = CommonStrings.common_no_room_name),
                     style = ElementTheme.typography.fontBodyLgMedium,
+                    fontStyle = FontStyle.Italic.takeIf { contextMenu.roomName == null }
                 )
             }
         )
         if (contextMenu.markAsUnreadFeatureFlagEnabled) {
-            ListItem(
-                headlineContent = {
-                    Text(
-                        text = stringResource(
-                            id = if (contextMenu.hasNewContent) {
-                                R.string.screen_roomlist_mark_as_read
-                            } else {
-                                R.string.screen_roomlist_mark_as_unread
-                            }
-                        ),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                },
-                modifier = Modifier.clickable {
-                    if (contextMenu.hasNewContent) {
-                        onRoomMarkReadClicked()
-                    } else {
-                        onRoomMarkUnreadClicked()
-                    }
-                },
-                /* TODO Design
-                leadingContent = ListItemContent.Icon(
-                    iconSource = IconSource.Vector(
-                        CompoundIcons.Settings,
-                        contentDescription = stringResource(id = CommonStrings.common_settings)
-                    )
-                ),
-                 */
-                style = ListItemStyle.Primary,
-            )
+            if (contextMenu.hasNewContent) {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_roomlist_mark_as_read),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    },
+                    onClick = onRoomMarkReadClick,
+                    leadingContent = ListItemContent.Icon(
+                        iconSource = IconSource.Vector(CompoundIcons.MarkAsRead())
+                    ),
+                    style = ListItemStyle.Primary,
+                )
+            } else {
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.screen_roomlist_mark_as_unread),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    },
+                    onClick = onRoomMarkUnreadClick,
+                    leadingContent = ListItemContent.Icon(
+                        iconSource = IconSource.Vector(CompoundIcons.MarkAsUnread())
+                    ),
+                    style = ListItemStyle.Primary,
+                )
+            }
         }
         ListItem(
             headlineContent = {
@@ -140,11 +138,11 @@ private fun RoomListModalBottomSheetContent(
             trailingContent = ListItemContent.Switch(
                 checked = contextMenu.isFavorite,
                 onChange = { isFavorite ->
-                    onFavoriteChanged(isFavorite)
+                    onFavoriteChange(isFavorite)
                 },
             ),
             onClick = {
-                onFavoriteChanged(!contextMenu.isFavorite)
+                onFavoriteChange(!contextMenu.isFavorite)
             },
             style = ListItemStyle.Primary,
         )
@@ -155,7 +153,7 @@ private fun RoomListModalBottomSheetContent(
                     style = MaterialTheme.typography.bodyLarge,
                 )
             },
-            modifier = Modifier.clickable { onRoomSettingsClicked() },
+            modifier = Modifier.clickable { onRoomSettingsClick() },
             leadingContent = ListItemContent.Icon(
                 iconSource = IconSource.Vector(
                     CompoundIcons.Settings(),
@@ -175,7 +173,7 @@ private fun RoomListModalBottomSheetContent(
                 )
                 Text(text = leaveText)
             },
-            modifier = Modifier.clickable { onLeaveRoomClicked() },
+            modifier = Modifier.clickable { onLeaveRoomClick() },
             leadingContent = ListItemContent.Icon(
                 iconSource = IconSource.Vector(
                     CompoundIcons.Leave(),
@@ -184,6 +182,18 @@ private fun RoomListModalBottomSheetContent(
             ),
             style = ListItemStyle.Destructive,
         )
+        if (contextMenu.eventCacheFeatureFlagEnabled) {
+            ListItem(
+                headlineContent = {
+                    Text(text = "Clear cache for this room")
+                },
+                modifier = Modifier.clickable { onClearCacheRoomClick() },
+                leadingContent = ListItemContent.Icon(
+                    iconSource = IconSource.Vector(CompoundIcons.Delete())
+                ),
+                style = ListItemStyle.Primary,
+            )
+        }
     }
 }
 
@@ -192,26 +202,16 @@ private fun RoomListModalBottomSheetContent(
 // Remove this preview when the issue is fixed.
 @PreviewsDayNight
 @Composable
-internal fun RoomListModalBottomSheetContentPreview() = ElementPreview {
+internal fun RoomListModalBottomSheetContentPreview(
+    @PreviewParameter(RoomListStateContextMenuShownProvider::class) contextMenu: RoomListState.ContextMenu.Shown
+) = ElementPreview {
     RoomListModalBottomSheetContent(
-        contextMenu = aContextMenuShown(hasNewContent = true),
-        onRoomMarkReadClicked = {},
-        onRoomMarkUnreadClicked = {},
-        onRoomSettingsClicked = {},
-        onLeaveRoomClicked = {},
-        onFavoriteChanged = {},
-    )
-}
-
-@PreviewsDayNight
-@Composable
-internal fun RoomListModalBottomSheetContentForDmPreview() = ElementPreview {
-    RoomListModalBottomSheetContent(
-        contextMenu = aContextMenuShown(isDm = true),
-        onRoomMarkReadClicked = {},
-        onRoomMarkUnreadClicked = {},
-        onRoomSettingsClicked = {},
-        onLeaveRoomClicked = {},
-        onFavoriteChanged = {},
+        contextMenu = contextMenu,
+        onRoomMarkReadClick = {},
+        onRoomMarkUnreadClick = {},
+        onRoomSettingsClick = {},
+        onLeaveRoomClick = {},
+        onFavoriteChange = {},
+        onClearCacheRoomClick = {},
     )
 }

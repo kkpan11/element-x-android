@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.theme.components
@@ -26,6 +17,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
@@ -57,6 +48,9 @@ import io.element.android.libraries.designsystem.preview.ElementThemedPreview
 import io.element.android.libraries.designsystem.preview.PreviewGroup
 
 // Designs: https://www.figma.com/file/G1xy0HDZKJf5TCRFmKb5d5/Compound-Android-Components?type=design&mode=design&t=U03tOFZz5FSLVUMa-1
+
+// Horizontal padding for button with low padding
+internal val lowHorizontalPaddingValue = 4.dp
 
 @Composable
 fun Button(
@@ -125,6 +119,14 @@ fun TextButton(
 )
 
 @Composable
+fun InvisibleButton(
+    modifier: Modifier = Modifier,
+    size: ButtonSize = ButtonSize.Large,
+) {
+    Spacer(modifier = modifier.height(size.toMinHeight()))
+}
+
+@Composable
 private fun ButtonInternal(
     text: String,
     onClick: () -> Unit,
@@ -137,14 +139,17 @@ private fun ButtonInternal(
     showProgress: Boolean = false,
     leadingIcon: IconSource? = null,
 ) {
-    val minHeight = when (size) {
-        ButtonSize.Medium -> 40.dp
-        ButtonSize.Large -> 48.dp
-    }
-
+    val minHeight = size.toMinHeight()
     val hasStartDrawable = showProgress || leadingIcon != null
 
     val contentPadding = when (size) {
+        ButtonSize.Small -> {
+            if (hasStartDrawable) {
+                PaddingValues(start = 8.dp, top = 5.dp, end = 16.dp, bottom = 5.dp)
+            } else {
+                PaddingValues(start = 16.dp, top = 5.dp, end = 16.dp, bottom = 5.dp)
+            }
+        }
         ButtonSize.Medium -> when (style) {
             ButtonStyle.Filled,
             ButtonStyle.Outlined -> if (hasStartDrawable) {
@@ -158,6 +163,7 @@ private fun ButtonInternal(
                 PaddingValues(start = 12.dp, top = 10.dp, end = 12.dp, bottom = 10.dp)
             }
         }
+        ButtonSize.MediumLowPadding -> PaddingValues(horizontal = lowHorizontalPaddingValue, vertical = 10.dp)
         ButtonSize.Large -> when (style) {
             ButtonStyle.Filled,
             ButtonStyle.Outlined -> if (hasStartDrawable) {
@@ -171,6 +177,7 @@ private fun ButtonInternal(
                 PaddingValues(start = 16.dp, top = 13.dp, end = 16.dp, bottom = 13.dp)
             }
         }
+        ButtonSize.LargeLowPadding -> PaddingValues(horizontal = lowHorizontalPaddingValue, vertical = 13.dp)
     }
 
     val shape = when (style) {
@@ -192,11 +199,6 @@ private fun ButtonInternal(
             }
         )
         ButtonStyle.Text -> null
-    }
-
-    val textStyle = when (size) {
-        ButtonSize.Medium -> MaterialTheme.typography.labelLarge
-        ButtonSize.Large -> ElementTheme.typography.fontBodyLgMedium
     }
 
     androidx.compose.material3.Button(
@@ -237,11 +239,19 @@ private fun ButtonInternal(
         }
         Text(
             text = text,
-            style = textStyle,
+            style = ElementTheme.typography.fontBodyLgMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+private fun ButtonSize.toMinHeight() = when (this) {
+    ButtonSize.Small -> 32.dp
+    ButtonSize.Medium,
+    ButtonSize.MediumLowPadding -> 40.dp
+    ButtonSize.Large,
+    ButtonSize.LargeLowPadding -> 48.dp
 }
 
 @Immutable
@@ -259,8 +269,21 @@ sealed interface IconSource {
 }
 
 enum class ButtonSize {
+    Small,
     Medium,
-    Large
+
+    /**
+     * Like [Medium] but with minimal horizontal padding, so that large texts have less risk to get truncated.
+     * To be used for instance for button with weight which ensures a maximal width.
+     */
+    MediumLowPadding,
+    Large,
+
+    /**
+     * Like [Large] but with minimal horizontal padding, so that large texts have less risk to get truncated.
+     * To be used for instance for button with weight which ensures a maximal width.
+     */
+    LargeLowPadding,
 }
 
 internal enum class ButtonStyle {
@@ -291,7 +314,7 @@ internal enum class ButtonStyle {
             contentColor = if (destructive) {
                 ElementTheme.colors.textCriticalPrimary
             } else {
-                if (LocalContentColor.current.isSpecified) LocalContentColor.current else ElementTheme.materialColors.primary
+                if (LocalContentColor.current.isSpecified) LocalContentColor.current else ElementTheme.colors.textPrimary
             },
             disabledContainerColor = Color.Transparent,
             disabledContentColor = getDisabledContentColor(destructive),
@@ -319,10 +342,28 @@ internal enum class ButtonStyle {
 
 @Preview(group = PreviewGroup.Buttons)
 @Composable
+internal fun FilledButtonSmallPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Filled,
+        size = ButtonSize.Small,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
 internal fun FilledButtonMediumPreview() {
     ButtonCombinationPreview(
         style = ButtonStyle.Filled,
         size = ButtonSize.Medium,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
+internal fun FilledButtonMediumLowPaddingPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Filled,
+        size = ButtonSize.MediumLowPadding,
     )
 }
 
@@ -337,10 +378,37 @@ internal fun FilledButtonLargePreview() {
 
 @Preview(group = PreviewGroup.Buttons)
 @Composable
+internal fun FilledButtonLargeLowPaddingPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Filled,
+        size = ButtonSize.LargeLowPadding,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
+internal fun OutlinedButtonSmallPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Outlined,
+        size = ButtonSize.Small,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
 internal fun OutlinedButtonMediumPreview() {
     ButtonCombinationPreview(
         style = ButtonStyle.Outlined,
         size = ButtonSize.Medium,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
+internal fun OutlinedButtonMediumLowPaddingPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Outlined,
+        size = ButtonSize.MediumLowPadding,
     )
 }
 
@@ -355,6 +423,24 @@ internal fun OutlinedButtonLargePreview() {
 
 @Preview(group = PreviewGroup.Buttons)
 @Composable
+internal fun OutlinedButtonLargeLowPaddingPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Outlined,
+        size = ButtonSize.LargeLowPadding,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
+internal fun TextButtonSmallPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Text,
+        size = ButtonSize.Small,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
 internal fun TextButtonMediumPreview() {
     ButtonCombinationPreview(
         style = ButtonStyle.Text,
@@ -364,10 +450,28 @@ internal fun TextButtonMediumPreview() {
 
 @Preview(group = PreviewGroup.Buttons)
 @Composable
+internal fun TextButtonMediumLowPaddingPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Text,
+        size = ButtonSize.MediumLowPadding,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
 internal fun TextButtonLargePreview() {
     ButtonCombinationPreview(
         style = ButtonStyle.Text,
         size = ButtonSize.Large,
+    )
+}
+
+@Preview(group = PreviewGroup.Buttons)
+@Composable
+internal fun TextButtonLargeLowPaddingPreview() {
+    ButtonCombinationPreview(
+        style = ButtonStyle.Text,
+        size = ButtonSize.LargeLowPadding,
     )
 }
 

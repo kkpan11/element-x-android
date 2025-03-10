@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.developer
@@ -28,20 +19,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import io.element.android.appconfig.ElementCallConfig
-import io.element.android.features.preferences.api.store.AppPreferencesStore
+import io.element.android.features.preferences.impl.developer.tracing.toLogLevel
+import io.element.android.features.preferences.impl.developer.tracing.toLogLevelItem
 import io.element.android.features.preferences.impl.tasks.ClearCacheUseCase
 import io.element.android.features.preferences.impl.tasks.ComputeCacheSizeUseCase
-import io.element.android.features.rageshake.api.preferences.RageshakePreferencesPresenter
+import io.element.android.features.rageshake.api.preferences.RageshakePreferencesState
+import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.architecture.runCatchingUpdatingState
 import io.element.android.libraries.core.bool.orFalse
+import io.element.android.libraries.core.meta.BuildMeta
+import io.element.android.libraries.core.meta.BuildType
 import io.element.android.libraries.featureflag.api.Feature
 import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.featureflag.api.FeatureFlags
 import io.element.android.libraries.featureflag.ui.model.FeatureUiModel
+import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.net.URL
 import javax.inject.Inject
@@ -50,8 +47,9 @@ class DeveloperSettingsPresenter @Inject constructor(
     private val featureFlagService: FeatureFlagService,
     private val computeCacheSizeUseCase: ComputeCacheSizeUseCase,
     private val clearCacheUseCase: ClearCacheUseCase,
-    private val rageshakePresenter: RageshakePreferencesPresenter,
+    private val rageshakePresenter: Presenter<RageshakePreferencesState>,
     private val appPreferencesStore: AppPreferencesStore,
+    private val buildMeta: BuildMeta,
 ) : Presenter<DeveloperSettingsState> {
     @Composable
     override fun present(): DeveloperSettingsState {
@@ -67,15 +65,31 @@ class DeveloperSettingsPresenter @Inject constructor(
             mutableStateOf<AsyncData<String>>(AsyncData.Uninitialized)
         }
         val clearCacheAction = remember {
-            mutableStateOf<AsyncData<Unit>>(AsyncData.Uninitialized)
+            mutableStateOf<AsyncAction<Unit>>(AsyncAction.Uninitialized)
         }
         val customElementCallBaseUrl by appPreferencesStore
             .getCustomElementCallBaseUrlFlow()
             .collectAsState(initial = null)
+        val hideImagesAndVideos by appPreferencesStore
+            .doesHideImagesAndVideosFlow()
+            .collectAsState(initial = false)
+
+        val tracingLogLevelFlow = remember {
+            appPreferencesStore.getTracingLogLevelFlow().map { AsyncData.Success(it.toLogLevelItem()) }
+        }
+        val tracingLogLevel by tracingLogLevelFlow.collectAsState(initial = AsyncData.Uninitialized)
 
         LaunchedEffect(Unit) {
             FeatureFlags.entries
                 .filter { it.isFinished.not() }
+                .run {
+                    // Never display room directory search in release builds for Play Store
+                    if (buildMeta.flavorDescription == "GooglePlay" && buildMeta.buildType == BuildType.RELEASE) {
+                        filterNot { it.key == FeatureFlags.RoomDirectorySearch.key }
+                    } else {
+                        this
+                    }
+                }
                 .forEach { feature ->
                     features[feature.key] = feature
                     enabledFeatures[feature.key] = featureFlagService.isFeatureEnabled(feature)
@@ -84,7 +98,7 @@ class DeveloperSettingsPresenter @Inject constructor(
         val featureUiModels = createUiModels(features, enabledFeatures)
         val coroutineScope = rememberCoroutineScope()
         // Compute cache size each time the clear cache action value is changed
-        LaunchedEffect(clearCacheAction.value) {
+        LaunchedEffect(clearCacheAction.value.isSuccess()) {
             computeCacheSize(cacheSize)
         }
 
@@ -103,6 +117,12 @@ class DeveloperSettingsPresenter @Inject constructor(
                     appPreferencesStore.setCustomElementCallBaseUrl(urlToSave)
                 }
                 DeveloperSettingsEvents.ClearCache -> coroutineScope.clearCache(clearCacheAction)
+                is DeveloperSettingsEvents.SetHideImagesAndVideos -> coroutineScope.launch {
+                    appPreferencesStore.setHideImagesAndVideos(event.value)
+                }
+                is DeveloperSettingsEvents.SetTracingLogLevel -> coroutineScope.launch {
+                    appPreferencesStore.setTracingLogLevel(event.logLevel.toLogLevel())
+                }
             }
         }
 
@@ -116,6 +136,8 @@ class DeveloperSettingsPresenter @Inject constructor(
                 defaultUrl = ElementCallConfig.DEFAULT_BASE_URL,
                 validator = ::customElementCallUrlValidator,
             ),
+            hideImagesAndVideos = hideImagesAndVideos,
+            tracingLogLevel = tracingLogLevel,
             eventSink = ::handleEvents
         )
     }
@@ -159,7 +181,7 @@ class DeveloperSettingsPresenter @Inject constructor(
         }.runCatchingUpdatingState(cacheSize)
     }
 
-    private fun CoroutineScope.clearCache(clearCacheAction: MutableState<AsyncData<Unit>>) = launch {
+    private fun CoroutineScope.clearCache(clearCacheAction: MutableState<AsyncAction<Unit>>) = launch {
         suspend {
             clearCacheUseCase()
         }.runCatchingUpdatingState(clearCacheAction)

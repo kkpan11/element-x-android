@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomlist.impl
@@ -26,7 +17,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.element.android.features.roomlist.impl.components.RoomListMenuAction
-import io.element.android.libraries.architecture.AsyncData
+import io.element.android.features.roomlist.impl.model.RoomSummaryDisplayType
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.tests.testutils.EnsureNeverCalled
@@ -35,7 +26,6 @@ import io.element.android.tests.testutils.EventsRecorder
 import io.element.android.tests.testutils.clickOn
 import io.element.android.tests.testutils.ensureCalledOnce
 import io.element.android.tests.testutils.ensureCalledOnceWithParam
-import kotlinx.collections.immutable.persistentListOf
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestRule
@@ -46,32 +36,21 @@ class RoomListViewTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun `clicking on close verification banner emits the expected Event`() {
+    fun `displaying the view automatically sends a couple of UpdateVisibleRangeEvents`() {
         val eventsRecorder = EventsRecorder<RoomListEvents>()
         rule.setRoomListView(
             state = aRoomListState(
-                securityBannerState = SecurityBannerState.SessionVerification,
+                contentState = aRoomsContentState(securityBannerState = SecurityBannerState.RecoveryKeyConfirmation),
                 eventSink = eventsRecorder,
             )
         )
-        val close = rule.activity.getString(CommonStrings.action_close)
-        rule.onNodeWithContentDescription(close).performClick()
-        eventsRecorder.assertSingle(RoomListEvents.DismissRequestVerificationPrompt)
-    }
 
-    @Test
-    fun `clicking on continue verification banner invokes the expected callback`() {
-        val eventsRecorder = EventsRecorder<RoomListEvents>(expectEvents = false)
-        ensureCalledOnce { callback ->
-            rule.setRoomListView(
-                state = aRoomListState(
-                    securityBannerState = SecurityBannerState.SessionVerification,
-                    eventSink = eventsRecorder,
-                ),
-                onVerifyClicked = callback,
+        eventsRecorder.assertList(
+            listOf(
+                RoomListEvents.UpdateVisibleRange(IntRange.EMPTY),
+                RoomListEvents.UpdateVisibleRange(0 until 2),
             )
-            rule.clickOn(CommonStrings.action_continue)
-        }
+        )
     }
 
     @Test
@@ -79,27 +58,73 @@ class RoomListViewTest {
         val eventsRecorder = EventsRecorder<RoomListEvents>()
         rule.setRoomListView(
             state = aRoomListState(
-                securityBannerState = SecurityBannerState.RecoveryKeyConfirmation,
+                contentState = aRoomsContentState(securityBannerState = SecurityBannerState.RecoveryKeyConfirmation),
                 eventSink = eventsRecorder,
             )
         )
+
+        // Remove automatic initial events
+        eventsRecorder.clear()
+
         val close = rule.activity.getString(CommonStrings.action_close)
         rule.onNodeWithContentDescription(close).performClick()
-        eventsRecorder.assertSingle(RoomListEvents.DismissRecoveryKeyPrompt)
+        eventsRecorder.assertSingle(RoomListEvents.DismissBanner)
+    }
+
+    @Test
+    fun `clicking on close setup key banner emits the expected Event`() {
+        val eventsRecorder = EventsRecorder<RoomListEvents>()
+        rule.setRoomListView(
+            state = aRoomListState(
+                contentState = aRoomsContentState(securityBannerState = SecurityBannerState.SetUpRecovery),
+                eventSink = eventsRecorder,
+            )
+        )
+
+        // Remove automatic initial events
+        eventsRecorder.clear()
+
+        val close = rule.activity.getString(CommonStrings.action_close)
+        rule.onNodeWithContentDescription(close).performClick()
+        eventsRecorder.assertSingle(RoomListEvents.DismissBanner)
     }
 
     @Test
     fun `clicking on continue recovery key banner invokes the expected callback`() {
-        val eventsRecorder = EventsRecorder<RoomListEvents>(expectEvents = false)
+        val eventsRecorder = EventsRecorder<RoomListEvents>()
         ensureCalledOnce { callback ->
             rule.setRoomListView(
                 state = aRoomListState(
-                    securityBannerState = SecurityBannerState.RecoveryKeyConfirmation,
+                    contentState = aRoomsContentState(securityBannerState = SecurityBannerState.RecoveryKeyConfirmation),
                     eventSink = eventsRecorder,
                 ),
-                onConfirmRecoveryKeyClicked = callback,
+                onConfirmRecoveryKeyClick = callback,
             )
+
+            // Remove automatic initial events
+            eventsRecorder.clear()
+
             rule.clickOn(CommonStrings.action_continue)
+
+            eventsRecorder.assertEmpty()
+        }
+    }
+
+    @Test
+    fun `clicking on continue setup key banner invokes the expected callback`() {
+        val eventsRecorder = EventsRecorder<RoomListEvents>()
+        ensureCalledOnce { callback ->
+            rule.setRoomListView(
+                state = aRoomListState(
+                    contentState = aRoomsContentState(securityBannerState = SecurityBannerState.SetUpRecovery),
+                    eventSink = eventsRecorder,
+                ),
+                onSetUpRecoveryClick = callback,
+            )
+            // Remove automatic initial events
+            eventsRecorder.clear()
+            rule.clickOn(R.string.banner_set_up_recovery_submit)
+            eventsRecorder.assertEmpty()
         }
     }
 
@@ -110,9 +135,9 @@ class RoomListViewTest {
             rule.setRoomListView(
                 state = aRoomListState(
                     eventSink = eventsRecorder,
-                    roomList = AsyncData.Success(persistentListOf()),
+                    contentState = anEmptyContentState(),
                 ),
-                onCreateRoomClicked = callback,
+                onCreateRoomClick = callback,
             )
             rule.clickOn(CommonStrings.action_start_chat)
         }
@@ -120,18 +145,26 @@ class RoomListViewTest {
 
     @Test
     fun `clicking on a room invokes the expected callback`() {
-        val eventsRecorder = EventsRecorder<RoomListEvents>(expectEvents = false)
+        val eventsRecorder = EventsRecorder<RoomListEvents>()
         val state = aRoomListState(
             eventSink = eventsRecorder,
         )
-        val room0 = state.roomList.dataOrNull()!!.first()
+        val room0 = state.contentAsRooms().summaries.first {
+            it.displayType == RoomSummaryDisplayType.ROOM
+        }
         ensureCalledOnceWithParam(room0.roomId) { callback ->
             rule.setRoomListView(
                 state = state,
-                onRoomClicked = callback,
+                onRoomClick = callback,
             )
+
+            // Remove automatic initial events
+            eventsRecorder.clear()
+
             rule.onNodeWithText(room0.lastMessage!!.toString()).performClick()
         }
+
+        eventsRecorder.assertEmpty()
     }
 
     @Test
@@ -140,10 +173,15 @@ class RoomListViewTest {
         val state = aRoomListState(
             eventSink = eventsRecorder,
         )
-        val room0 = state.roomList.dataOrNull()!!.first()
+        val room0 = state.contentAsRooms().summaries.first {
+            it.displayType == RoomSummaryDisplayType.ROOM
+        }
         rule.setRoomListView(
             state = state,
         )
+        // Remove automatic initial events
+        eventsRecorder.clear()
+
         rule.onNodeWithText(room0.lastMessage!!.toString()).performTouchInput { longClick() }
         eventsRecorder.assertSingle(RoomListEvents.ShowContextMenu(room0))
     }
@@ -159,52 +197,61 @@ class RoomListViewTest {
         ensureCalledOnceWithParam(room0) { callback ->
             rule.setRoomListView(
                 state = state,
-                onRoomSettingsClicked = callback,
+                onRoomSettingsClick = callback,
             )
+
+            // Remove automatic initial events
+            eventsRecorder.clear()
+
             rule.clickOn(CommonStrings.common_settings)
         }
+
         eventsRecorder.assertSingle(RoomListEvents.HideContextMenu)
     }
 
     @Test
-    fun `clicking on invites invokes the expected callback`() {
+    fun `clicking on accept and decline invite emits the expected Events`() {
         val eventsRecorder = EventsRecorder<RoomListEvents>()
         val state = aRoomListState(
-            invitesState = InvitesState.NewInvites,
             eventSink = eventsRecorder,
         )
-        ensureCalledOnce { callback ->
-            rule.setRoomListView(
-                state = state,
-                onInvitesClicked = callback,
-            )
-            rule.clickOn(CommonStrings.action_invites_list)
+        val invitedRoom = state.contentAsRooms().summaries.first {
+            it.displayType == RoomSummaryDisplayType.INVITE
         }
+        rule.setRoomListView(state = state)
+
+        // Remove automatic initial events
+        eventsRecorder.clear()
+
+        rule.clickOn(CommonStrings.action_accept)
+        rule.clickOn(CommonStrings.action_decline)
+        eventsRecorder.assertList(
+            listOf(RoomListEvents.AcceptInvite(invitedRoom), RoomListEvents.DeclineInvite(invitedRoom)),
+        )
     }
 }
 
 private fun <R : TestRule> AndroidComposeTestRule<R, ComponentActivity>.setRoomListView(
     state: RoomListState,
-    onRoomClicked: (RoomId) -> Unit = EnsureNeverCalledWithParam(),
-    onSettingsClicked: () -> Unit = EnsureNeverCalled(),
-    onVerifyClicked: () -> Unit = EnsureNeverCalled(),
-    onConfirmRecoveryKeyClicked: () -> Unit = EnsureNeverCalled(),
-    onCreateRoomClicked: () -> Unit = EnsureNeverCalled(),
-    onInvitesClicked: () -> Unit = EnsureNeverCalled(),
-    onRoomSettingsClicked: (RoomId) -> Unit = EnsureNeverCalledWithParam(),
-    onMenuActionClicked: (RoomListMenuAction) -> Unit = EnsureNeverCalledWithParam(),
+    onRoomClick: (RoomId) -> Unit = EnsureNeverCalledWithParam(),
+    onSettingsClick: () -> Unit = EnsureNeverCalled(),
+    onSetUpRecoveryClick: () -> Unit = EnsureNeverCalled(),
+    onConfirmRecoveryKeyClick: () -> Unit = EnsureNeverCalled(),
+    onCreateRoomClick: () -> Unit = EnsureNeverCalled(),
+    onRoomSettingsClick: (RoomId) -> Unit = EnsureNeverCalledWithParam(),
+    onMenuActionClick: (RoomListMenuAction) -> Unit = EnsureNeverCalledWithParam(),
 ) {
     setContent {
         RoomListView(
             state = state,
-            onRoomClicked = onRoomClicked,
-            onSettingsClicked = onSettingsClicked,
-            onVerifyClicked = onVerifyClicked,
-            onConfirmRecoveryKeyClicked = onConfirmRecoveryKeyClicked,
-            onCreateRoomClicked = onCreateRoomClicked,
-            onInvitesClicked = onInvitesClicked,
-            onRoomSettingsClicked = onRoomSettingsClicked,
-            onMenuActionClicked = onMenuActionClicked,
+            onRoomClick = onRoomClick,
+            onSettingsClick = onSettingsClick,
+            onSetUpRecoveryClick = onSetUpRecoveryClick,
+            onConfirmRecoveryKeyClick = onConfirmRecoveryKeyClick,
+            onCreateRoomClick = onCreateRoomClick,
+            onRoomSettingsClick = onRoomSettingsClick,
+            onMenuActionClick = onMenuActionClick,
+            acceptDeclineInviteView = { },
         )
     }
 }

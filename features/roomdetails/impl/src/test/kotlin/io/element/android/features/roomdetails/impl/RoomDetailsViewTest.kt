@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2024 New Vector Ltd
+ * Copyright 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.roomdetails.impl
@@ -23,8 +14,11 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.element.android.libraries.matrix.api.room.RoomMember
+import io.element.android.features.roomdetails.impl.members.aRoomMember
+import io.element.android.features.userprofile.shared.aUserProfileState
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.room.RoomNotificationMode
+import io.element.android.libraries.matrix.test.A_USER_ID
 import io.element.android.libraries.testtags.TestTags
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.tests.testutils.EnsureCalledOnceWithTwoParams
@@ -62,19 +56,6 @@ class RoomDetailsViewTest {
             rule.setRoomDetailView(
                 onShareRoom = callback,
             )
-            rule.clickOn(R.string.screen_room_details_share_room_title)
-        }
-    }
-
-    @Test
-    fun `click on share member invokes expected callback`() {
-        val state = aDmRoomDetailsState()
-        val roomMember = (state.roomType as RoomDetailsType.Dm).roomMember
-        ensureCalledOnceWithParam(roomMember) { callback ->
-            rule.setRoomDetailView(
-                state = aDmRoomDetailsState(),
-                onShareMember = callback,
-            )
             rule.clickOn(CommonStrings.action_share)
         }
     }
@@ -103,6 +84,17 @@ class RoomDetailsViewTest {
 
     @Config(qualifiers = "h1024dp")
     @Test
+    fun `click on media gallery invokes expected callback`() {
+        ensureCalledOnce { callback ->
+            rule.setRoomDetailView(
+                openMediaGallery = callback,
+            )
+            rule.clickOn(R.string.screen_room_details_media_gallery_title)
+        }
+    }
+
+    @Config(qualifiers = "h1024dp")
+    @Test
     fun `click on notification invokes expected callback`() {
         ensureCalledOnce { callback ->
             rule.setRoomDetailView(
@@ -112,9 +104,8 @@ class RoomDetailsViewTest {
         }
     }
 
-    @Config(qualifiers = "h1024dp")
     @Test
-    fun `click on invite people invokes expected callback`() {
+    fun `click on invite invokes expected callback`() {
         ensureCalledOnce { callback ->
             rule.setRoomDetailView(
                 state = aRoomDetailsState(
@@ -123,10 +114,55 @@ class RoomDetailsViewTest {
                 ),
                 invitePeople = callback,
             )
-            rule.clickOn(R.string.screen_room_details_invite_people_title)
+            rule.clickOn(CommonStrings.action_invite)
         }
     }
 
+    @Test
+    fun `click on call invokes expected callback`() {
+        ensureCalledOnce { callback ->
+            rule.setRoomDetailView(
+                state = aRoomDetailsState(
+                    eventSink = EventsRecorder(expectEvents = false),
+                    canInvite = true,
+                ),
+                onJoinCallClick = callback,
+            )
+            rule.clickOn(CommonStrings.action_call)
+        }
+    }
+
+    @Config(qualifiers = "h1024dp")
+    @Test
+    fun `click on pinned messages invokes expected callback`() {
+        ensureCalledOnce { callback ->
+            rule.setRoomDetailView(
+                state = aRoomDetailsState(
+                    eventSink = EventsRecorder(expectEvents = false),
+                    canInvite = true,
+                ),
+                onPinnedMessagesClick = callback,
+            )
+            rule.clickOn(R.string.screen_room_details_pinned_events_row_title)
+        }
+    }
+
+    @Config(qualifiers = "h1024dp")
+    @Test
+    fun `click on security and privacy invokes expected callback`() {
+        ensureCalledOnce { callback ->
+            rule.setRoomDetailView(
+                state = aRoomDetailsState(
+                    eventSink = EventsRecorder(expectEvents = false),
+                    canShowSecurityAndPrivacy = true,
+                ),
+                onSecurityAndPrivacyClick = callback,
+            )
+            rule.clickOn(R.string.screen_room_details_security_and_privacy_title)
+        }
+    }
+
+    @Config(qualifiers = "h1024dp")
     @Test
     fun `click on add topic emit expected event`() {
         ensureCalledOnceWithParam<RoomDetailsAction>(RoomDetailsAction.AddTopic) { callback ->
@@ -135,7 +171,7 @@ class RoomDetailsViewTest {
                     eventSink = EventsRecorder(expectEvents = false),
                     roomTopic = RoomTopicState.CanAddTopic,
                 ),
-                onActionClicked = callback,
+                onActionClick = callback,
             )
             rule.clickOn(R.string.screen_room_details_add_topic_title)
         }
@@ -149,7 +185,7 @@ class RoomDetailsViewTest {
                     eventSink = EventsRecorder(expectEvents = false),
                     canEdit = true,
                 ),
-                onActionClicked = callback,
+                onActionClick = callback,
             )
             val menuContentDescription = rule.activity.getString(CommonStrings.a11y_user_menu)
             rule.onNodeWithContentDescription(menuContentDescription).performClick()
@@ -177,7 +213,11 @@ class RoomDetailsViewTest {
     fun `click on avatar test on DM`() {
         val eventsRecorder = EventsRecorder<RoomDetailsEvent>(expectEvents = false)
         val state = aRoomDetailsState(
-            roomType = RoomDetailsType.Dm(aDmRoomMember(avatarUrl = "an_avatar_url")),
+            roomType = RoomDetailsType.Dm(
+                aRoomMember(),
+                aDmRoomMember(avatarUrl = "an_avatar_url"),
+            ),
+            roomName = "Daniel",
             eventSink = eventsRecorder,
         )
         val callback = EnsureCalledOnceWithTwoParams("Daniel", "an_avatar_url")
@@ -230,7 +270,7 @@ class RoomDetailsViewTest {
         eventsRecorder.assertSingle(RoomDetailsEvent.SetFavorite(true))
     }
 
-    @Config(qualifiers = "h1024dp")
+    @Config(qualifiers = "h1500dp")
     @Test
     fun `click on leave emit expected Event`() {
         val eventsRecorder = EventsRecorder<RoomDetailsEvent>()
@@ -242,6 +282,36 @@ class RoomDetailsViewTest {
         rule.clickOn(R.string.screen_room_details_leave_room_title)
         eventsRecorder.assertSingle(RoomDetailsEvent.LeaveRoom)
     }
+
+    @Config(qualifiers = "h1024dp")
+    @Test
+    fun `click on knock requests invokes expected callback`() {
+        ensureCalledOnce { callback ->
+            rule.setRoomDetailView(
+                state = aRoomDetailsState(
+                    eventSink = EventsRecorder(expectEvents = false),
+                    canShowKnockRequests = true,
+                ),
+                onKnockRequestsClick = callback,
+            )
+            rule.clickOn(R.string.screen_room_details_requests_to_join_title)
+        }
+    }
+
+    @Config(qualifiers = "h1024dp")
+    @Test
+    fun `click on profile invokes the expected callback`() {
+        ensureCalledOnceWithParam(A_USER_ID) { callback ->
+            rule.setRoomDetailView(
+                state = aRoomDetailsState(
+                    eventSink = EventsRecorder(expectEvents = false),
+                    roomMemberDetailsState = aUserProfileState(userId = A_USER_ID),
+                ),
+                onProfileClick = callback,
+            )
+            rule.clickOn(R.string.screen_room_details_profile_row_title)
+        }
+    }
 }
 
 private fun <R : TestRule> AndroidComposeTestRule<R, ComponentActivity>.setRoomDetailView(
@@ -249,29 +319,39 @@ private fun <R : TestRule> AndroidComposeTestRule<R, ComponentActivity>.setRoomD
         eventSink = EventsRecorder(expectEvents = false),
     ),
     goBack: () -> Unit = EnsureNeverCalled(),
-    onActionClicked: (RoomDetailsAction) -> Unit = EnsureNeverCalledWithParam(),
+    onActionClick: (RoomDetailsAction) -> Unit = EnsureNeverCalledWithParam(),
     onShareRoom: () -> Unit = EnsureNeverCalled(),
-    onShareMember: (RoomMember) -> Unit = EnsureNeverCalledWithParam(),
     openRoomMemberList: () -> Unit = EnsureNeverCalled(),
     openRoomNotificationSettings: () -> Unit = EnsureNeverCalled(),
     invitePeople: () -> Unit = EnsureNeverCalled(),
     openAvatarPreview: (name: String, url: String) -> Unit = EnsureNeverCalledWithTwoParams(),
     openPollHistory: () -> Unit = EnsureNeverCalled(),
+    openMediaGallery: () -> Unit = EnsureNeverCalled(),
     openAdminSettings: () -> Unit = EnsureNeverCalled(),
+    onJoinCallClick: () -> Unit = EnsureNeverCalled(),
+    onPinnedMessagesClick: () -> Unit = EnsureNeverCalled(),
+    onKnockRequestsClick: () -> Unit = EnsureNeverCalled(),
+    onSecurityAndPrivacyClick: () -> Unit = EnsureNeverCalled(),
+    onProfileClick: (UserId) -> Unit = EnsureNeverCalledWithParam(),
 ) {
     setContent {
         RoomDetailsView(
             state = state,
             goBack = goBack,
-            onActionClicked = onActionClicked,
+            onActionClick = onActionClick,
             onShareRoom = onShareRoom,
-            onShareMember = onShareMember,
             openRoomMemberList = openRoomMemberList,
             openRoomNotificationSettings = openRoomNotificationSettings,
             invitePeople = invitePeople,
             openAvatarPreview = openAvatarPreview,
             openPollHistory = openPollHistory,
+            openMediaGallery = openMediaGallery,
             openAdminSettings = openAdminSettings,
+            onJoinCallClick = onJoinCallClick,
+            onPinnedMessagesClick = onPinnedMessagesClick,
+            onKnockRequestsClick = onKnockRequestsClick,
+            onSecurityAndPrivacyClick = onSecurityAndPrivacyClick,
+            onProfileClick = onProfileClick,
         )
     }
 }

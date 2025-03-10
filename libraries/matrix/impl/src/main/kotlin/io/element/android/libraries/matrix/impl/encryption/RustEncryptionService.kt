@@ -1,27 +1,22 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.impl.encryption
 
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
+import io.element.android.libraries.core.extensions.flatMap
 import io.element.android.libraries.core.extensions.mapFailure
+import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.encryption.BackupState
 import io.element.android.libraries.matrix.api.encryption.BackupUploadState
 import io.element.android.libraries.matrix.api.encryption.EnableRecoveryProgress
 import io.element.android.libraries.matrix.api.encryption.EncryptionService
+import io.element.android.libraries.matrix.api.encryption.IdentityResetHandle
 import io.element.android.libraries.matrix.api.encryption.RecoveryState
 import io.element.android.libraries.matrix.api.sync.SyncState
 import io.element.android.libraries.matrix.impl.sync.RustSyncService
@@ -43,6 +38,7 @@ import org.matrix.rustcomponents.sdk.BackupSteadyStateListener
 import org.matrix.rustcomponents.sdk.Client
 import org.matrix.rustcomponents.sdk.EnableRecoveryProgressListener
 import org.matrix.rustcomponents.sdk.Encryption
+import org.matrix.rustcomponents.sdk.UserIdentity
 import org.matrix.rustcomponents.sdk.BackupUploadState as RustBackupUploadState
 import org.matrix.rustcomponents.sdk.EnableRecoveryProgress as RustEnableRecoveryProgress
 import org.matrix.rustcomponents.sdk.SteadyStateException as RustSteadyStateException
@@ -54,6 +50,7 @@ internal class RustEncryptionService(
     private val dispatchers: CoroutineDispatchers,
 ) : EncryptionService {
     private val service: Encryption = client.encryption()
+    private val sessionId = SessionId(client.session().userId)
 
     private val enableRecoveryProgressMapper = EnableRecoveryProgressMapper()
     private val backupUploadStateMapper = BackupUploadStateMapper()
@@ -97,10 +94,6 @@ internal class RustEncryptionService(
     }
         .stateIn(sessionCoroutineScope, SharingStarted.Eagerly, false)
 
-    fun destroy() {
-        service.destroy()
-    }
-
     override suspend fun enableBackups(): Result<Unit> = withContext(dispatchers.io) {
         runCatching {
             service.enableBackups()
@@ -119,7 +112,8 @@ internal class RustEncryptionService(
                     override fun onUpdate(status: RustEnableRecoveryProgress) {
                         enableRecoveryProgressStateFlow.value = enableRecoveryProgressMapper.map(status)
                     }
-                }
+                },
+                passphrase = null,
             )
                 // enableRecovery returns the encryption key, but we read it from the state flow
                 .let { }
@@ -189,5 +183,44 @@ internal class RustEncryptionService(
         }.mapFailure {
             it.mapRecoveryException()
         }
+    }
+
+    override suspend fun deviceCurve25519(): String? {
+        return runCatching { service.curve25519Key() }.getOrNull()
+    }
+
+    override suspend fun deviceEd25519(): String? {
+        return runCatching { service.ed25519Key() }.getOrNull()
+    }
+
+    override suspend fun startIdentityReset(): Result<IdentityResetHandle?> {
+        return runCatching {
+            service.resetIdentity()
+        }.flatMap { handle ->
+            RustIdentityResetHandleFactory.create(sessionId, handle)
+        }
+    }
+
+    override suspend fun isUserVerified(userId: UserId): Result<Boolean> = runCatching {
+        getUserIdentity(userId).isVerified()
+    }
+
+    override suspend fun pinUserIdentity(userId: UserId): Result<Unit> = runCatching {
+        getUserIdentity(userId).pin()
+    }
+
+    override suspend fun withdrawVerification(userId: UserId): Result<Unit> = runCatching {
+        getUserIdentity(userId).withdrawVerification()
+    }
+
+    private suspend fun getUserIdentity(userId: UserId): UserIdentity {
+        return service.userIdentity(
+            userId = userId.value,
+            // requestFromHomeserverIfNeeded = true,
+        ) ?: error("User identity not found")
+    }
+
+    fun destroy() {
+        service.destroy()
     }
 }

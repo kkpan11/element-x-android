@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.logout.impl
@@ -44,7 +35,7 @@ class LogoutPresenter @Inject constructor(
     @Composable
     override fun present(): LogoutState {
         val localCoroutineScope = rememberCoroutineScope()
-        val logoutAction: MutableState<AsyncAction<String?>> = remember {
+        val logoutAction: MutableState<AsyncAction<Unit>> = remember {
             mutableStateOf(AsyncAction.Uninitialized)
         }
 
@@ -73,7 +64,7 @@ class LogoutPresenter @Inject constructor(
                     if (logoutAction.value.isConfirming() || event.ignoreSdkError) {
                         localCoroutineScope.logout(logoutAction, event.ignoreSdkError)
                     } else {
-                        logoutAction.value = AsyncAction.Confirming
+                        logoutAction.value = AsyncAction.ConfirmingNoParams
                     }
                 }
                 LogoutEvents.CloseDialogs -> {
@@ -100,11 +91,11 @@ class LogoutPresenter @Inject constructor(
     }
 
     private fun CoroutineScope.logout(
-        logoutAction: MutableState<AsyncAction<String?>>,
+        logoutAction: MutableState<AsyncAction<Unit>>,
         ignoreSdkError: Boolean,
     ) = launch {
         suspend {
-            matrixClient.logout(ignoreSdkError)
+            matrixClient.logout(userInitiated = true, ignoreSdkError)
         }.runCatchingUpdatingState(logoutAction)
     }
 }

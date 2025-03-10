@@ -1,23 +1,19 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api
 
+import io.element.android.libraries.core.data.tryOrNull
+import io.element.android.libraries.matrix.api.core.DeviceId
+import io.element.android.libraries.matrix.api.core.MatrixPatterns
 import io.element.android.libraries.matrix.api.core.ProgressCallback
+import io.element.android.libraries.matrix.api.core.RoomAlias
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.RoomIdOrAlias
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.createroom.CreateRoomParameters
@@ -28,25 +24,37 @@ import io.element.android.libraries.matrix.api.notificationsettings.Notification
 import io.element.android.libraries.matrix.api.oidc.AccountManagementAction
 import io.element.android.libraries.matrix.api.pusher.PushersService
 import io.element.android.libraries.matrix.api.room.MatrixRoom
+import io.element.android.libraries.matrix.api.room.MatrixRoomInfo
 import io.element.android.libraries.matrix.api.room.RoomMembershipObserver
+import io.element.android.libraries.matrix.api.room.RoomPreview
+import io.element.android.libraries.matrix.api.room.alias.ResolvedRoomAlias
+import io.element.android.libraries.matrix.api.roomdirectory.RoomDirectoryService
 import io.element.android.libraries.matrix.api.roomlist.RoomListService
+import io.element.android.libraries.matrix.api.roomlist.RoomSummary
+import io.element.android.libraries.matrix.api.sync.SlidingSyncVersion
 import io.element.android.libraries.matrix.api.sync.SyncService
 import io.element.android.libraries.matrix.api.user.MatrixSearchUserResults
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.api.verification.SessionVerificationService
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import java.io.Closeable
+import java.util.Optional
 
 interface MatrixClient : Closeable {
     val sessionId: SessionId
-    val deviceId: String
+    val deviceId: DeviceId
+    val userProfile: StateFlow<MatrixUser>
     val roomListService: RoomListService
     val mediaLoader: MatrixMediaLoader
     val sessionCoroutineScope: CoroutineScope
     val ignoredUsersFlow: StateFlow<ImmutableList<UserId>>
     suspend fun getRoom(roomId: RoomId): MatrixRoom?
+    suspend fun getPendingRoom(roomId: RoomId): RoomPreview?
     suspend fun findDM(userId: UserId): RoomId?
     suspend fun ignoreUser(userId: UserId): Result<Unit>
     suspend fun unignoreUser(userId: UserId): Result<Unit>
@@ -57,12 +65,16 @@ interface MatrixClient : Closeable {
     suspend fun setDisplayName(displayName: String): Result<Unit>
     suspend fun uploadAvatar(mimeType: String, data: ByteArray): Result<Unit>
     suspend fun removeAvatar(): Result<Unit>
+    suspend fun joinRoom(roomId: RoomId): Result<RoomSummary?>
+    suspend fun joinRoomByIdOrAlias(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>): Result<RoomSummary?>
+    suspend fun knockRoom(roomIdOrAlias: RoomIdOrAlias, message: String, serverNames: List<String>): Result<RoomSummary?>
     fun syncService(): SyncService
     fun sessionVerificationService(): SessionVerificationService
     fun pushersService(): PushersService
     fun notificationService(): NotificationService
     fun notificationSettingsService(): NotificationSettingsService
     fun encryptionService(): EncryptionService
+    fun roomDirectoryService(): RoomDirectoryService
     suspend fun getCacheSize(): Long
 
     /**
@@ -72,16 +84,104 @@ interface MatrixClient : Closeable {
 
     /**
      * Logout the user.
-     * Returns an optional URL. When the URL is there, it should be presented to the user after logout for
-     * Relying Party (RP) initiated logout on their account page.
+     *
+     * @param userInitiated if false, the logout came from the HS, no request will be made and the session entry will be kept in the store.
      * @param ignoreSdkError if true, the SDK will ignore any error and delete the session data anyway.
      */
-    suspend fun logout(ignoreSdkError: Boolean): String?
-    suspend fun loadUserDisplayName(): Result<String>
-    suspend fun loadUserAvatarUrl(): Result<String?>
+    suspend fun logout(userInitiated: Boolean, ignoreSdkError: Boolean)
+
+    /**
+     * Retrieve the user profile, will also eventually emit a new value to [userProfile].
+     */
+    suspend fun getUserProfile(): Result<MatrixUser>
     suspend fun getAccountManagementUrl(action: AccountManagementAction?): Result<String?>
     suspend fun uploadMedia(mimeType: String, data: ByteArray, progressCallback: ProgressCallback?): Result<String>
     fun roomMembershipObserver(): RoomMembershipObserver
 
+    /**
+     * Get a room summary flow for a given room ID or alias.
+     * The flow will emit a new value whenever the room summary is updated.
+     * The flow will emit Optional.empty item if the room is not found.
+     */
+    fun getRoomSummaryFlow(roomIdOrAlias: RoomIdOrAlias): Flow<Optional<RoomSummary>>
+
     fun isMe(userId: UserId?) = userId == sessionId
+
+    suspend fun trackRecentlyVisitedRoom(roomId: RoomId): Result<Unit>
+    suspend fun getRecentlyVisitedRooms(): Result<List<RoomId>>
+
+    /**
+     * Resolves the given room alias to a roomID (and a list of servers), if possible.
+     * @param roomAlias the room alias to resolve
+     * @return the resolved room alias if any, an empty result if not found,or an error if the resolution failed.
+     *
+     */
+    suspend fun resolveRoomAlias(roomAlias: RoomAlias): Result<Optional<ResolvedRoomAlias>>
+
+    /**
+     * Enables or disables the sending queue, according to the given parameter.
+     *
+     * The sending queue automatically disables itself whenever sending an
+     * event with it failed (e.g. sending an event via the Timeline),
+     * so it's required to manually re-enable it as soon as
+     * connectivity is back on the device.
+     */
+    suspend fun setAllSendQueuesEnabled(enabled: Boolean)
+
+    /**
+     * Returns a flow of room IDs that have send queue being disabled.
+     * This flow will emit a new value whenever the send queue is disabled for a room.
+     */
+    fun sendQueueDisabledFlow(): Flow<RoomId>
+
+    /**
+     * Return the server name part of the current user ID, using the SDK, and if a failure occurs,
+     * compute it manually.
+     */
+    fun userIdServerName(): String
+
+    /**
+     * Execute generic GET requests through the SDKs internal HTTP client.
+     */
+    suspend fun getUrl(url: String): Result<String>
+
+    /**
+     * Get a room preview for a given room ID or alias. This is especially useful for rooms that the user is not a member of, or hasn't joined yet.
+     */
+    suspend fun getRoomPreview(roomIdOrAlias: RoomIdOrAlias, serverNames: List<String>): Result<RoomPreview>
+
+    /**
+     * Returns the currently used sliding sync version.
+     */
+    suspend fun currentSlidingSyncVersion(): Result<SlidingSyncVersion>
+
+    /**
+     * Returns the available sliding sync versions for the current user.
+     */
+    suspend fun availableSlidingSyncVersions(): Result<List<SlidingSyncVersion>>
+
+    fun canDeactivateAccount(): Boolean
+    suspend fun deactivateAccount(password: String, eraseData: Boolean): Result<Unit>
+}
+
+/**
+ * Get a room info flow for a given room ID or alias.
+ * The flow will emit a new value whenever the room info is updated.
+ * The flow will emit Optional.empty item if the room is not found.
+ */
+fun MatrixClient.getRoomInfoFlow(roomIdOrAlias: RoomIdOrAlias): Flow<Optional<MatrixRoomInfo>> {
+    return getRoomSummaryFlow(roomIdOrAlias)
+        .map { roomSummary -> roomSummary.map { it.info } }
+        .distinctUntilChanged()
+}
+
+/**
+ * Returns a room alias from a room alias name, or null if the name is not valid.
+ * @param name the room alias name ie. the local part of the room alias.
+ */
+fun MatrixClient.roomAliasFromName(name: String): RoomAlias? {
+    return name.takeIf { it.isNotEmpty() }
+        ?.let { "#$it:${userIdServerName()}" }
+        ?.takeIf { MatrixPatterns.isRoomAlias(it) }
+        ?.let { tryOrNull { RoomAlias(it) } }
 }

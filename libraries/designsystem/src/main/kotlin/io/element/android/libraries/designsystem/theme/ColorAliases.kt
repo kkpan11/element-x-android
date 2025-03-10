@@ -1,27 +1,20 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.theme
 
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import io.element.android.compound.annotations.CoreColorToken
 import io.element.android.compound.previews.ColorListPreview
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.SemanticColors
+import io.element.android.compound.tokens.generated.internal.DarkColorTokens
+import io.element.android.compound.tokens.generated.internal.LightColorTokens
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import kotlinx.collections.immutable.persistentMapOf
@@ -30,13 +23,13 @@ import kotlinx.collections.immutable.persistentMapOf
  * Room list.
  */
 @Composable
-fun MaterialTheme.roomListRoomName() = colorScheme.primary
+fun ElementTheme.roomListRoomName() = colors.textPrimary
 
 @Composable
-fun MaterialTheme.roomListRoomMessage() = colorScheme.secondary
+fun ElementTheme.roomListRoomMessage() = colors.textSecondary
 
 @Composable
-fun MaterialTheme.roomListRoomMessageDate() = colorScheme.secondary
+fun ElementTheme.roomListRoomMessageDate() = colors.textSecondary
 
 val SemanticColors.unreadIndicator
     get() = iconAccentTertiary
@@ -138,6 +131,48 @@ val SemanticColors.mentionPillBackground
         Color(0x26f4f7fa)
     }
 
+@OptIn(CoreColorToken::class)
+val SemanticColors.bigCheckmarkBorderColor
+    get() = if (isLight) LightColorTokens.colorGray400 else DarkColorTokens.colorGray400
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.highlightedMessageBackgroundColor
+    get() = if (isLight) LightColorTokens.colorGreen300 else DarkColorTokens.colorGreen300
+
+// Badge colors
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.badgePositiveBackgroundColor
+    get() = if (isLight) LightColorTokens.colorAlphaGreen300 else DarkColorTokens.colorAlphaGreen300
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.badgePositiveContentColor
+    get() = if (isLight) LightColorTokens.colorGreen1100 else DarkColorTokens.colorGreen1100
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.badgeNeutralBackgroundColor
+    get() = if (isLight) LightColorTokens.colorAlphaGray300 else DarkColorTokens.colorAlphaGray300
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.badgeNeutralContentColor
+    get() = if (isLight) LightColorTokens.colorGray1100 else DarkColorTokens.colorGray1100
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.badgeNegativeBackgroundColor
+    get() = if (isLight) LightColorTokens.colorAlphaRed300 else DarkColorTokens.colorAlphaRed300
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.badgeNegativeContentColor
+    get() = if (isLight) LightColorTokens.colorRed1100 else DarkColorTokens.colorRed1100
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.pinnedMessageBannerIndicator
+    get() = if (isLight) LightColorTokens.colorAlphaGray600 else DarkColorTokens.colorAlphaGray600
+
+@OptIn(CoreColorToken::class)
+val SemanticColors.pinnedMessageBannerBorder
+    get() = if (isLight) LightColorTokens.colorAlphaGray400 else DarkColorTokens.colorAlphaGray400
+
 @PreviewsDayNight
 @Composable
 internal fun ColorAliasesPreview() = ElementPreview {
@@ -145,9 +180,9 @@ internal fun ColorAliasesPreview() = ElementPreview {
         backgroundColor = Color.Black,
         foregroundColor = Color.White,
         colors = persistentMapOf(
-            "roomListRoomName" to MaterialTheme.roomListRoomName(),
-            "roomListRoomMessage" to MaterialTheme.roomListRoomMessage(),
-            "roomListRoomMessageDate" to MaterialTheme.roomListRoomMessageDate(),
+            "roomListRoomName" to ElementTheme.roomListRoomName(),
+            "roomListRoomMessage" to ElementTheme.roomListRoomMessage(),
+            "roomListRoomMessageDate" to ElementTheme.roomListRoomMessageDate(),
             "unreadIndicator" to ElementTheme.colors.unreadIndicator,
             "placeholderBackground" to ElementTheme.colors.placeholderBackground,
             "messageFromMeBackground" to ElementTheme.colors.messageFromMeBackground,
@@ -155,6 +190,8 @@ internal fun ColorAliasesPreview() = ElementPreview {
             "progressIndicatorTrackColor" to ElementTheme.colors.progressIndicatorTrackColor,
             "temporaryColorBgSpecial" to ElementTheme.colors.temporaryColorBgSpecial,
             "iconSuccessPrimaryBackground" to ElementTheme.colors.iconSuccessPrimaryBackground,
+            "bigCheckmarkBorderColor" to ElementTheme.colors.bigCheckmarkBorderColor,
+            "highlightedMessageBackgroundColor" to ElementTheme.colors.highlightedMessageBackgroundColor,
         )
     )
 }

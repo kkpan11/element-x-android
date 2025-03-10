@@ -1,25 +1,16 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.preferences.impl.root
 
 import android.app.Activity
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import com.bumble.appyx.core.modality.BuildContext
 import com.bumble.appyx.core.node.Node
 import com.bumble.appyx.core.plugin.Plugin
@@ -33,7 +24,6 @@ import io.element.android.features.logout.api.direct.DirectLogoutView
 import io.element.android.libraries.androidutils.browser.openUrlInChromeCustomTab
 import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.matrix.api.user.MatrixUser
-import timber.log.Timber
 
 @ContributesNode(SessionScope::class)
 class PreferencesRootNode @AssistedInject constructor(
@@ -44,8 +34,7 @@ class PreferencesRootNode @AssistedInject constructor(
 ) : Node(buildContext, plugins = plugins) {
     interface Callback : Plugin {
         fun onOpenBugReport()
-        fun onVerifyClicked()
-        fun onSecureBackupClicked()
+        fun onSecureBackupClick()
         fun onOpenAnalytics()
         fun onOpenAbout()
         fun onOpenDeveloperSettings()
@@ -54,19 +43,16 @@ class PreferencesRootNode @AssistedInject constructor(
         fun onOpenAdvancedSettings()
         fun onOpenUserProfile(matrixUser: MatrixUser)
         fun onOpenBlockedUsers()
-        fun onSignOutClicked()
+        fun onSignOutClick()
+        fun onOpenAccountDeactivation()
     }
 
     private fun onOpenBugReport() {
         plugins<Callback>().forEach { it.onOpenBugReport() }
     }
 
-    private fun onVerifyClicked() {
-        plugins<Callback>().forEach { it.onVerifyClicked() }
-    }
-
-    private fun onSecureBackupClicked() {
-        plugins<Callback>().forEach { it.onSecureBackupClicked() }
+    private fun onSecureBackupClick() {
+        plugins<Callback>().forEach { it.onSecureBackupClick() }
     }
 
     private fun onOpenDeveloperSettings() {
@@ -85,7 +71,7 @@ class PreferencesRootNode @AssistedInject constructor(
         plugins<Callback>().forEach { it.onOpenAbout() }
     }
 
-    private fun onManageAccountClicked(
+    private fun onManageAccountClick(
         activity: Activity,
         url: String?,
         isDark: Boolean,
@@ -96,13 +82,6 @@ class PreferencesRootNode @AssistedInject constructor(
                 darkTheme = isDark,
                 url = it
             )
-        }
-    }
-
-    private fun onSuccessLogout(activity: Activity, url: String?) {
-        Timber.d("Success (direct) logout with result url: $url")
-        url?.let {
-            activity.openUrlInChromeCustomTab(null, false, it)
         }
     }
 
@@ -122,45 +101,44 @@ class PreferencesRootNode @AssistedInject constructor(
         plugins<Callback>().forEach { it.onOpenBlockedUsers() }
     }
 
-    private fun onSignOutClicked() {
-        plugins<Callback>().forEach { it.onSignOutClicked() }
+    private fun onSignOutClick() {
+        plugins<Callback>().forEach { it.onSignOutClick() }
+    }
+
+    private fun onOpenAccountDeactivation() {
+        plugins<Callback>().forEach { it.onOpenAccountDeactivation() }
     }
 
     @Composable
     override fun View(modifier: Modifier) {
         val state = presenter.present()
-        val activity = LocalContext.current as Activity
+        val activity = requireNotNull(LocalActivity.current)
         val isDark = ElementTheme.isLightTheme.not()
         PreferencesRootView(
             state = state,
             modifier = modifier,
-            onBackPressed = this::navigateUp,
+            onBackClick = this::navigateUp,
             onOpenRageShake = this::onOpenBugReport,
             onOpenAnalytics = this::onOpenAnalytics,
             onOpenAbout = this::onOpenAbout,
-            onVerifyClicked = this::onVerifyClicked,
-            onSecureBackupClicked = this::onSecureBackupClicked,
+            onSecureBackupClick = this::onSecureBackupClick,
             onOpenDeveloperSettings = this::onOpenDeveloperSettings,
             onOpenAdvancedSettings = this::onOpenAdvancedSettings,
-            onManageAccountClicked = { onManageAccountClicked(activity, it, isDark) },
+            onManageAccountClick = { onManageAccountClick(activity, it, isDark) },
             onOpenNotificationSettings = this::onOpenNotificationSettings,
             onOpenLockScreenSettings = this::onOpenLockScreenSettings,
             onOpenUserProfile = this::onOpenUserProfile,
             onOpenBlockedUsers = this::onOpenBlockedUsers,
-            onSignOutClicked = {
+            onSignOutClick = {
                 if (state.directLogoutState.canDoDirectSignOut) {
                     state.directLogoutState.eventSink(DirectLogoutEvents.Logout(ignoreSdkError = false))
                 } else {
-                    onSignOutClicked()
+                    onSignOutClick()
                 }
             },
+            onDeactivateClick = this::onOpenAccountDeactivation
         )
 
-        directLogoutView.Render(
-            state = state.directLogoutState,
-            onSuccessLogout = {
-                onSuccessLogout(activity, it)
-            }
-        )
+        directLogoutView.Render(state = state.directLogoutState)
     }
 }

@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.components.receipt
@@ -27,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +51,7 @@ import kotlinx.collections.immutable.ImmutableList
 fun TimelineItemReadReceiptView(
     state: ReadReceiptViewState,
     renderReadReceipts: Boolean,
-    onReadReceiptsClicked: () -> Unit,
+    onReadReceiptsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (state.receipts.isNotEmpty()) {
@@ -70,18 +60,18 @@ fun TimelineItemReadReceiptView(
                 ReadReceiptsAvatars(
                     receipts = state.receipts,
                     modifier = Modifier
-                        .testTag(TestTags.messageReadReceipts)
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable {
-                            onReadReceiptsClicked()
-                        }
-                        .padding(2.dp)
+                            .testTag(TestTags.messageReadReceipts)
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable {
+                                onReadReceiptsClick()
+                            }
+                            .padding(2.dp)
                 )
             }
         }
     } else {
         when (state.sendState) {
-            LocalEventSendState.NotSentYet -> {
+            LocalEventSendState.Sending -> {
                 ReadReceiptsRow(modifier) {
                     Icon(
                         modifier = Modifier.padding(2.dp),
@@ -91,8 +81,7 @@ fun TimelineItemReadReceiptView(
                     )
                 }
             }
-            LocalEventSendState.Canceled -> Unit
-            is LocalEventSendState.SendingFailed -> {
+            is LocalEventSendState.Failed -> {
                 // Error? The timestamp is already displayed in red
             }
             null,
@@ -119,9 +108,9 @@ private fun ReadReceiptsRow(
 ) {
     Row(
         modifier = modifier
-            .fillMaxWidth()
-            .height(AvatarSize.TimelineReadReceipt.dp + 8.dp)
-            .padding(horizontal = 18.dp),
+                .fillMaxWidth()
+                .height(AvatarSize.TimelineReadReceipt.dp + 8.dp)
+                .padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.End,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -141,7 +130,7 @@ private fun ReadReceiptsAvatars(
 ) {
     val avatarSize = AvatarSize.TimelineReadReceipt.dp
     val avatarStrokeSize = 1.dp
-    val avatarStrokeColor = MaterialTheme.colorScheme.background
+    val avatarStrokeColor = ElementTheme.colors.bgCanvasDefault
     val receiptDescription = computeReceiptDescription(receipts)
     Row(
         modifier = modifier
@@ -160,11 +149,11 @@ private fun ReadReceiptsAvatars(
                 .forEachIndexed { index, readReceiptData ->
                     Box(
                         modifier = Modifier
-                            .padding(end = (12.dp + avatarStrokeSize * 2) * index)
-                            .size(size = avatarSize + avatarStrokeSize * 2)
-                            .clip(CircleShape)
-                            .background(avatarStrokeColor)
-                            .zIndex(index.toFloat()),
+                                .padding(end = (12.dp + avatarStrokeSize * 2) * index)
+                                .size(size = avatarSize + avatarStrokeSize * 2)
+                                .clip(CircleShape)
+                                .background(avatarStrokeColor)
+                                .zIndex(index.toFloat()),
                         contentAlignment = Alignment.Center,
                     ) {
                         Avatar(
@@ -207,12 +196,12 @@ private fun computeReceiptDescription(receipts: ImmutableList<ReadReceiptData>):
 
 @PreviewsDayNight
 @Composable
-internal fun TimelineItemReactionsViewPreview(
+internal fun TimelineItemReadReceiptViewPreview(
     @PreviewParameter(ReadReceiptViewStateProvider::class) state: ReadReceiptViewState,
 ) = ElementPreview {
     TimelineItemReadReceiptView(
         state = state,
         renderReadReceipts = true,
-        onReadReceiptsClicked = {},
+        onReadReceiptsClick = {},
     )
 }

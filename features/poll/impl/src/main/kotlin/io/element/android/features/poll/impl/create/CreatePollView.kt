@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.poll.impl.create
@@ -28,8 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,7 +31,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.tooling.preview.PreviewParameter
-import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.poll.impl.R
@@ -57,10 +45,10 @@ import io.element.android.libraries.designsystem.theme.components.Icon
 import io.element.android.libraries.designsystem.theme.components.IconSource
 import io.element.android.libraries.designsystem.theme.components.ListItem
 import io.element.android.libraries.designsystem.theme.components.ListItemStyle
-import io.element.android.libraries.designsystem.theme.components.OutlinedTextField
 import io.element.android.libraries.designsystem.theme.components.Scaffold
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TextButton
+import io.element.android.libraries.designsystem.theme.components.TextField
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
 import io.element.android.libraries.matrix.api.poll.PollKind
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -79,7 +67,7 @@ fun CreatePollView(
     if (state.showBackConfirmation) {
         ConfirmationDialog(
             content = stringResource(id = R.string.screen_create_poll_cancel_confirmation_content_android),
-            onSubmitClicked = { state.eventSink(CreatePollEvents.NavBack) },
+            onSubmitClick = { state.eventSink(CreatePollEvents.NavBack) },
             onDismiss = { state.eventSink(CreatePollEvents.HideConfirmation) }
         )
     }
@@ -87,7 +75,7 @@ fun CreatePollView(
         ConfirmationDialog(
             title = stringResource(id = R.string.screen_edit_poll_delete_confirmation_title),
             content = stringResource(id = R.string.screen_edit_poll_delete_confirmation),
-            onSubmitClicked = { state.eventSink(CreatePollEvents.Delete(confirmed = true)) },
+            onSubmitClick = { state.eventSink(CreatePollEvents.Delete(confirmed = true)) },
             onDismiss = { state.eventSink(CreatePollEvents.HideConfirmation) }
         )
     }
@@ -102,8 +90,8 @@ fun CreatePollView(
             CreatePollTopAppBar(
                 mode = state.mode,
                 saveEnabled = state.canSave,
-                onBackPress = navBack,
-                onSaveClicked = { state.eventSink(CreatePollEvents.Save) }
+                onBackClick = navBack,
+                onSaveClick = { state.eventSink(CreatePollEvents.Save) }
             )
         },
     ) { paddingValues ->
@@ -118,14 +106,10 @@ fun CreatePollView(
         ) {
             item {
                 Column {
-                    Text(
-                        text = stringResource(id = R.string.screen_create_poll_question_desc),
-                        modifier = Modifier.padding(start = 32.dp),
-                        style = ElementTheme.typography.fontBodyMdRegular,
-                    )
                     ListItem(
                         headlineContent = {
-                            OutlinedTextField(
+                            TextField(
+                                label = stringResource(id = R.string.screen_create_poll_question_desc),
                                 value = state.question,
                                 onValueChange = {
                                     state.eventSink(CreatePollEvents.SetQuestion(it))
@@ -133,9 +117,7 @@ fun CreatePollView(
                                 modifier = Modifier
                                     .focusRequester(questionFocusRequester)
                                     .fillMaxWidth(),
-                                placeholder = {
-                                    Text(text = stringResource(id = R.string.screen_create_poll_question_hint))
-                                },
+                                placeholder = stringResource(id = R.string.screen_create_poll_question_hint),
                                 keyboardOptions = keyboardOptions,
                             )
                         }
@@ -146,7 +128,7 @@ fun CreatePollView(
                 val isLastItem = index == state.answers.size - 1
                 ListItem(
                     headlineContent = {
-                        OutlinedTextField(
+                        TextField(
                             value = answer.text,
                             onValueChange = {
                                 state.eventSink(CreatePollEvents.SetAnswer(index, it))
@@ -154,9 +136,7 @@ fun CreatePollView(
                             modifier = Modifier
                                 .then(if (isLastItem) Modifier.focusRequester(answerFocusRequester) else Modifier)
                                 .fillMaxWidth(),
-                            placeholder = {
-                                Text(text = stringResource(id = R.string.screen_create_poll_answer_hint, index + 1))
-                            },
+                            placeholder = stringResource(id = R.string.screen_create_poll_answer_hint, index + 1),
                             keyboardOptions = keyboardOptions,
                         )
                     },
@@ -177,7 +157,7 @@ fun CreatePollView(
                     ListItem(
                         headlineContent = { Text(text = stringResource(id = R.string.screen_create_poll_add_option_btn)) },
                         leadingContent = ListItemContent.Icon(
-                            iconSource = IconSource.Vector(Icons.Default.Add),
+                            iconSource = IconSource.Vector(CompoundIcons.Plus()),
                         ),
                         style = ListItemStyle.Primary,
                         onClick = {
@@ -219,8 +199,8 @@ fun CreatePollView(
 private fun CreatePollTopAppBar(
     mode: CreatePollState.Mode,
     saveEnabled: Boolean,
-    onBackPress: () -> Unit = {},
-    onSaveClicked: () -> Unit = {},
+    onBackClick: () -> Unit = {},
+    onSaveClick: () -> Unit = {},
 ) {
     TopAppBar(
         title = {
@@ -233,7 +213,7 @@ private fun CreatePollTopAppBar(
             )
         },
         navigationIcon = {
-            BackButton(onClick = onBackPress)
+            BackButton(onClick = onBackClick)
         },
         actions = {
             TextButton(
@@ -241,7 +221,7 @@ private fun CreatePollTopAppBar(
                     CreatePollState.Mode.New -> stringResource(id = CommonStrings.action_create)
                     CreatePollState.Mode.Edit -> stringResource(id = CommonStrings.action_done)
                 },
-                onClick = onSaveClicked,
+                onClick = onSaveClick,
                 enabled = saveEnabled,
             )
         }

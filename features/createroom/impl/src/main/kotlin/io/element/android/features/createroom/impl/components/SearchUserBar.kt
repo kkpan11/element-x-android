@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.createroom.impl.components
@@ -53,11 +44,11 @@ fun SearchUserBar(
     showLoader: Boolean,
     selectedUsers: ImmutableList<MatrixUser>,
     active: Boolean,
-    isMultiSelectionEnabled: Boolean,
-    onActiveChanged: (Boolean) -> Unit,
-    onTextChanged: (String) -> Unit,
-    onUserSelected: (MatrixUser) -> Unit,
-    onUserDeselected: (MatrixUser) -> Unit,
+    isMultiSelectionEnable: Boolean,
+    onActiveChange: (Boolean) -> Unit,
+    onTextChange: (String) -> Unit,
+    onUserSelect: (MatrixUser) -> Unit,
+    onUserDeselect: (MatrixUser) -> Unit,
     modifier: Modifier = Modifier,
     showBackButton: Boolean = true,
     placeHolderTitle: String = stringResource(CommonStrings.common_search_for_someone),
@@ -66,14 +57,14 @@ fun SearchUserBar(
 
     SearchBar(
         query = query,
-        onQueryChange = onTextChanged,
+        onQueryChange = onTextChange,
         active = active,
-        onActiveChange = onActiveChanged,
+        onActiveChange = onActiveChange,
         modifier = modifier,
         placeHolderTitle = placeHolderTitle,
         showBackButton = showBackButton,
         contentPrefix = {
-            if (isMultiSelectionEnabled && active && selectedUsers.isNotEmpty()) {
+            if (isMultiSelectionEnable && active && selectedUsers.isNotEmpty()) {
                 // We want the selected users to behave a bit like a top bar - when the list below is scrolled, the colour
                 // should change to indicate elevation.
 
@@ -96,7 +87,7 @@ fun SearchUserBar(
                     contentPadding = PaddingValues(16.dp),
                     selectedUsers = selectedUsers,
                     autoScroll = true,
-                    onUserRemoved = onUserDeselected,
+                    onUserRemove = onUserDeselect,
                     modifier = Modifier.background(appBarContainerColor)
                 )
             }
@@ -109,7 +100,7 @@ fun SearchUserBar(
         resultState = state,
         resultHandler = { users ->
             LazyColumn(state = columnState) {
-                if (isMultiSelectionEnabled) {
+                if (isMultiSelectionEnable) {
                     itemsIndexed(users) { index, searchResult ->
                         SearchMultipleUsersResultItem(
                             modifier = Modifier.fillMaxWidth(),
@@ -117,9 +108,9 @@ fun SearchUserBar(
                             isUserSelected = selectedUsers.contains(searchResult.matrixUser),
                             onCheckedChange = { checked ->
                                 if (checked) {
-                                    onUserSelected(searchResult.matrixUser)
+                                    onUserSelect(searchResult.matrixUser)
                                 } else {
-                                    onUserDeselected(searchResult.matrixUser)
+                                    onUserDeselect(searchResult.matrixUser)
                                 }
                             }
                         )
@@ -132,7 +123,7 @@ fun SearchUserBar(
                         SearchSingleUserResultItem(
                             modifier = Modifier.fillMaxWidth(),
                             searchResult = searchResult,
-                            onClick = { onUserSelected(searchResult.matrixUser) }
+                            onClick = { onUserSelect(searchResult.matrixUser) }
                         )
                         if (index < users.lastIndex) {
                             HorizontalDivider()

@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.theme.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LocalContentColor
@@ -50,6 +42,7 @@ import io.element.android.libraries.designsystem.preview.PreviewGroup
  * @param trailingContent The content to be displayed after the headline content.
  * @param style The style to use for the list item. This may change the color and text styles of the contents. [ListItemStyle.Default] is used by default.
  * @param enabled Whether the list item is enabled. When disabled, will change the color of the headline content and the leading content to use disabled tokens.
+ * @param alwaysClickable Whether the list item should always be clickable, even when disabled.
  * @param onClick The callback to be called when the list item is clicked.
  */
 @Suppress("LongParameterList")
@@ -62,6 +55,7 @@ fun ListItem(
     trailingContent: ListItemContent? = null,
     style: ListItemStyle = ListItemStyle.Default,
     enabled: Boolean = true,
+    alwaysClickable: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = ListItemDefaults.colors(
@@ -74,9 +68,47 @@ fun ListItem(
         disabledLeadingIconColor = ListItemDefaultColors.iconDisabled,
         disabledTrailingIconColor = ListItemDefaultColors.iconDisabled,
     )
+    ListItem(
+        headlineContent = headlineContent,
+        modifier = modifier,
+        supportingContent = supportingContent,
+        leadingContent = leadingContent,
+        trailingContent = trailingContent,
+        colors = colors,
+        enabled = enabled,
+        alwaysClickable = alwaysClickable,
+        onClick = onClick,
+    )
+}
 
+/**
+ * A List Item component to be used in lists and menus with simple layouts, matching the Material 3 guidelines.
+ * @param headlineContent The main content of the list item, usually a text.
+ * @param colors The colors to use for the list item. You can use [ListItemDefaults.colors] to create this.
+ * @param modifier The modifier to be applied to the list item.
+ * @param supportingContent The content to be displayed below the headline content.
+ * @param leadingContent The content to be displayed before the headline content.
+ * @param trailingContent The content to be displayed after the headline content.
+ * @param enabled Whether the list item is enabled. When disabled, will change the color of the headline content and the leading content to use disabled tokens.
+ * @param alwaysClickable Whether the list item should always be clickable, even when disabled.
+ * @param onClick The callback to be called when the list item is clicked.
+ */
+@Suppress("LongParameterList")
+@Composable
+fun ListItem(
+    headlineContent: @Composable () -> Unit,
+    colors: ListItemColors,
+    modifier: Modifier = Modifier,
+    supportingContent: @Composable (() -> Unit)? = null,
+    leadingContent: ListItemContent? = null,
+    trailingContent: ListItemContent? = null,
+    enabled: Boolean = true,
+    alwaysClickable: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
     // We cannot just pass the disabled colors, they must be set manually: https://issuetracker.google.com/issues/280480132
     val headlineColor = if (enabled) colors.headlineColor else colors.disabledHeadlineColor
+    val supportingColor = if (enabled) colors.supportingTextColor else colors.disabledHeadlineColor.copy(alpha = 0.80f)
     val leadingContentColor = if (enabled) colors.leadingIconColor else colors.disabledLeadingIconColor
     val trailingContentColor = if (enabled) colors.trailingIconColor else colors.disabledTrailingIconColor
 
@@ -92,6 +124,7 @@ fun ListItem(
         {
             CompositionLocalProvider(
                 LocalTextStyle provides ElementTheme.materialTypography.bodyMedium,
+                LocalContentColor provides supportingColor,
             ) {
                 content()
             }
@@ -121,7 +154,7 @@ fun ListItem(
         headlineContent = decoratedHeadlineContent,
         modifier = if (onClick != null) {
             Modifier
-                .clickable(enabled = enabled, onClick = onClick)
+                .clickable(enabled = enabled || alwaysClickable, onClick = onClick)
                 .then(modifier)
         } else {
             modifier
@@ -160,14 +193,14 @@ sealed interface ListItemStyle {
 
     @Composable
     fun leadingIconColor() = when (this) {
-        Default -> ListItemDefaultColors.icon
+        Default -> ListItemDefaultColors.leadingIcon
         Primary -> ElementTheme.colors.iconPrimary
         Destructive -> ElementTheme.colors.iconCriticalPrimary
     }
 
     @Composable
     fun trailingIconColor() = when (this) {
-        Default -> ListItemDefaultColors.icon
+        Default -> ListItemDefaultColors.trailingIcon
         Primary -> ElementTheme.colors.iconPrimary
         Destructive -> ElementTheme.colors.iconCriticalPrimary
     }
@@ -177,15 +210,16 @@ object ListItemDefaultColors {
     val headline: Color @Composable get() = ElementTheme.colors.textPrimary
     val headlineDisabled: Color @Composable get() = ElementTheme.colors.textDisabled
     val supportingText: Color @Composable get() = ElementTheme.materialColors.onSurfaceVariant
-    val icon: Color @Composable get() = ElementTheme.colors.iconTertiary
+    val leadingIcon: Color @Composable get() = ElementTheme.colors.iconSecondary
+    val trailingIcon: Color @Composable get() = ElementTheme.colors.iconPrimary
     val iconDisabled: Color @Composable get() = ElementTheme.colors.iconDisabled
 
     val colors: ListItemColors
         @Composable get() = ListItemDefaults.colors(
             headlineColor = headline,
             supportingColor = supportingText,
-            leadingIconColor = icon,
-            trailingIconColor = icon,
+            leadingIconColor = leadingIcon,
+            trailingIconColor = trailingIcon,
             disabledHeadlineColor = headlineDisabled,
             disabledLeadingIconColor = iconDisabled,
             disabledTrailingIconColor = iconDisabled,
@@ -351,33 +385,91 @@ internal fun ListItemPrimaryActionWithIconPreview() = PreviewItems.OneLineListIt
 // endregion
 
 // region: Error state
-@Preview(name = "List item - Error", group = PreviewGroup.ListItems)
+@Preview(name = "List item (2 lines) - Simple - Error", group = PreviewGroup.ListItems)
 @Composable
-internal fun ListItemErrorPreview() = PreviewItems.OneLineListItemPreview(style = ListItemStyle.Destructive)
-
-@Preview(name = "List item - Error & Icon", group = PreviewGroup.ListItems)
-@Composable
-internal fun ListItemErrorWithIconPreview() = PreviewItems.OneLineListItemPreview(
-    style = ListItemStyle.Destructive,
-    leadingContent = PreviewItems.icon(),
+internal fun ListItemTwoLinesSimpleErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    style = ListItemStyle.Destructive
 )
-// endregion
 
-// region: Disabled state
-@Preview(name = "List item - Disabled", group = PreviewGroup.ListItems)
+@Preview(name = "List item (2 lines) - Trailing Checkbox - Error", group = PreviewGroup.ListItems)
 @Composable
-internal fun ListItemDisabledPreview() = PreviewItems.OneLineListItemPreview(enabled = false)
+internal fun ListItemTwoLinesTrailingCheckBoxErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    trailingContent = PreviewItems.checkbox(),
+    style = ListItemStyle.Destructive,
+)
 
-@Preview(name = "List item - Disabled & Icon", group = PreviewGroup.ListItems)
+@Preview(name = "List item (2 lines) - Trailing RadioButton - Error", group = PreviewGroup.ListItems)
 @Composable
-internal fun ListItemDisabledWithIconPreview() = PreviewItems.OneLineListItemPreview(
-    enabled = false,
+internal fun ListItemTwoLinesTrailingRadioButtonErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    trailingContent = PreviewItems.radioButton(),
+    style = ListItemStyle.Destructive,
+)
+
+@Preview(name = "List item (2 lines) - Trailing Switch - Error", group = PreviewGroup.ListItems)
+@Composable
+internal fun ListItemTwoLinesTrailingSwitchErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    trailingContent = PreviewItems.switch(),
+    style = ListItemStyle.Destructive,
+)
+
+@Preview(name = "List item (2 lines) - Trailing Icon - Error", group = PreviewGroup.ListItems)
+@Composable
+internal fun ListItemTwoLinesTrailingIconErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    trailingContent = PreviewItems.icon(),
+    style = ListItemStyle.Destructive,
+)
+
+// region: Leading Checkbox
+@Preview(name = "List item (2 lines) - Leading Checkbox - Error", group = PreviewGroup.ListItems)
+@Composable
+internal fun ListItemTwoLinesLeadingCheckboxErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    leadingContent = PreviewItems.checkbox(),
+    style = ListItemStyle.Destructive,
+)
+
+@Preview(name = "List item (2 lines) - Leading RadioButton - Error", group = PreviewGroup.ListItems)
+@Composable
+internal fun ListItemTwoLinesLeadingRadioButtonErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    leadingContent = PreviewItems.radioButton(),
+    style = ListItemStyle.Destructive,
+)
+
+@Preview(name = "List item (2 lines) - Leading Switch - Error", group = PreviewGroup.ListItems)
+@Composable
+internal fun ListItemTwoLinesLeadingSwitchErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    leadingContent = PreviewItems.switch(),
+    style = ListItemStyle.Destructive,
+)
+
+@Preview(name = "List item (2 lines) - Leading Icon - Error", group = PreviewGroup.ListItems)
+@Composable
+internal fun ListItemTwoLinesLeadingIconErrorPreview() = PreviewItems.TwoLinesListItemPreview(
     leadingContent = PreviewItems.icon(),
+    style = ListItemStyle.Destructive,
+)
+
+@Preview(name = "List item (2 lines) - Both Icons - Error", group = PreviewGroup.ListItems)
+@Composable
+internal fun ListItemTwoLinesBothIconsErrorPreview() = PreviewItems.TwoLinesListItemPreview(
+    leadingContent = PreviewItems.icon(),
+    trailingContent = PreviewItems.icon(),
+    style = ListItemStyle.Destructive,
 )
 // endregion
 
 @Suppress("ModifierMissing")
 private object PreviewItems {
+    @Composable
+    private fun EnabledDisabledElementThemedPreview(
+        content: @Composable (Boolean) -> Unit,
+    ) = ElementThemedPreview {
+        Column {
+            sequenceOf(true, false).forEach {
+                content(it)
+            }
+        }
+    }
+
     @Composable
     fun ThreeLinesListItemPreview(
         modifier: Modifier = Modifier,
@@ -385,12 +477,13 @@ private object PreviewItems {
         leadingContent: ListItemContent? = null,
         trailingContent: ListItemContent? = null,
     ) {
-        ElementThemedPreview {
+        EnabledDisabledElementThemedPreview {
             ListItem(
-                headlineContent = PreviewItems.headline(),
-                supportingContent = PreviewItems.text(),
+                headlineContent = headline(),
+                supportingContent = text(),
                 leadingContent = leadingContent,
                 trailingContent = trailingContent,
+                enabled = it,
                 style = style,
                 modifier = modifier,
             )
@@ -404,12 +497,13 @@ private object PreviewItems {
         leadingContent: ListItemContent? = null,
         trailingContent: ListItemContent? = null,
     ) {
-        ElementThemedPreview {
+        EnabledDisabledElementThemedPreview {
             ListItem(
-                headlineContent = PreviewItems.headline(),
-                supportingContent = PreviewItems.textSingleLine(),
+                headlineContent = headline(),
+                supportingContent = textSingleLine(),
                 leadingContent = leadingContent,
                 trailingContent = trailingContent,
+                enabled = it,
                 style = style,
                 modifier = modifier,
             )
@@ -422,14 +516,13 @@ private object PreviewItems {
         style: ListItemStyle = ListItemStyle.Default,
         leadingContent: ListItemContent? = null,
         trailingContent: ListItemContent? = null,
-        enabled: Boolean = true,
     ) {
-        ElementThemedPreview {
+        EnabledDisabledElementThemedPreview {
             ListItem(
-                headlineContent = PreviewItems.headline(),
+                headlineContent = headline(),
                 leadingContent = leadingContent,
                 trailingContent = trailingContent,
-                enabled = enabled,
+                enabled = it,
                 style = style,
                 modifier = modifier,
             )

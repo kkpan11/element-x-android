@@ -1,34 +1,39 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.impl
 
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.di.CacheDirectory
+import io.element.android.libraries.featureflag.api.FeatureFlagService
+import io.element.android.libraries.featureflag.api.FeatureFlags
+import io.element.android.libraries.matrix.impl.analytics.UtdTracker
 import io.element.android.libraries.matrix.impl.certificates.UserCertificatesProvider
+import io.element.android.libraries.matrix.impl.paths.SessionPaths
+import io.element.android.libraries.matrix.impl.paths.getSessionPaths
 import io.element.android.libraries.matrix.impl.proxy.ProxyProvider
+import io.element.android.libraries.matrix.impl.room.TimelineEventTypeFilterFactory
+import io.element.android.libraries.matrix.impl.util.anonymizedTokens
 import io.element.android.libraries.network.useragent.UserAgentProvider
 import io.element.android.libraries.sessionstorage.api.SessionData
 import io.element.android.libraries.sessionstorage.api.SessionStore
+import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.toolbox.api.systemclock.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
+import org.matrix.rustcomponents.sdk.Client
 import org.matrix.rustcomponents.sdk.ClientBuilder
 import org.matrix.rustcomponents.sdk.Session
+import org.matrix.rustcomponents.sdk.SlidingSyncVersion
+import org.matrix.rustcomponents.sdk.SlidingSyncVersionBuilder
 import org.matrix.rustcomponents.sdk.use
+import timber.log.Timber
+import uniffi.matrix_sdk_crypto.CollectStrategy
+import uniffi.matrix_sdk_crypto.TrustRequirement
 import java.io.File
 import javax.inject.Inject
 
@@ -42,45 +47,108 @@ class RustMatrixClientFactory @Inject constructor(
     private val userCertificatesProvider: UserCertificatesProvider,
     private val proxyProvider: ProxyProvider,
     private val clock: SystemClock,
+    private val analyticsService: AnalyticsService,
+    private val featureFlagService: FeatureFlagService,
+    private val timelineEventTypeFilterFactory: TimelineEventTypeFilterFactory,
+    private val clientBuilderProvider: ClientBuilderProvider,
 ) {
+    private val sessionDelegate = RustClientSessionDelegate(sessionStore, appCoroutineScope, coroutineDispatchers)
+
     suspend fun create(sessionData: SessionData): RustMatrixClient = withContext(coroutineDispatchers.io) {
-        val client = ClientBuilder()
-            .basePath(baseDirectory.absolutePath)
+        val client = getBaseClientBuilder(
+            sessionPaths = sessionData.getSessionPaths(),
+            passphrase = sessionData.passphrase,
+            slidingSyncType = ClientBuilderSlidingSync.Restored,
+        )
             .homeserverUrl(sessionData.homeserverUrl)
             .username(sessionData.userId)
-            .passphrase(sessionData.passphrase)
-            .userAgent(userAgentProvider.provide())
-            .let {
-                // Sadly ClientBuilder.proxy() does not accept null :/
-                // Tracked by https://github.com/matrix-org/matrix-rust-sdk/issues/3159
-                val proxy = proxyProvider.provides()
-                if (proxy != null) {
-                    it.proxy(proxy)
-                } else {
-                    it
-                }
-            }
-            .addRootCertificates(userCertificatesProvider.provides())
-            // FIXME Quick and dirty fix for stopping version requests on startup https://github.com/matrix-org/matrix-rust-sdk/pull/1376
-            .serverVersions(listOf("v1.0", "v1.1", "v1.2", "v1.3", "v1.4", "v1.5"))
             .use { it.build() }
 
         client.restoreSession(sessionData.toSession())
 
+        create(client)
+    }
+
+    suspend fun create(client: Client): RustMatrixClient {
+        val (anonymizedAccessToken, anonymizedRefreshToken) = client.session().anonymizedTokens()
+
         val syncService = client.syncService()
+            .withUtdHook(UtdTracker(analyticsService))
+            .withOfflineMode()
             .finish()
 
-        RustMatrixClient(
-            client = client,
-            syncService = syncService,
+        return RustMatrixClient(
+            innerClient = client,
+            baseDirectory = baseDirectory,
             sessionStore = sessionStore,
             appCoroutineScope = appCoroutineScope,
+            sessionDelegate = sessionDelegate,
+            innerSyncService = syncService,
             dispatchers = coroutineDispatchers,
-            baseDirectory = baseDirectory,
             baseCacheDirectory = cacheDirectory,
             clock = clock,
-        )
+            timelineEventTypeFilterFactory = timelineEventTypeFilterFactory,
+            featureFlagService = featureFlagService,
+        ).also {
+            Timber.tag(it.toString()).d("Creating Client with access token '$anonymizedAccessToken' and refresh token '$anonymizedRefreshToken'")
+        }
     }
+
+    internal suspend fun getBaseClientBuilder(
+        sessionPaths: SessionPaths,
+        passphrase: String?,
+        slidingSyncType: ClientBuilderSlidingSync,
+    ): ClientBuilder {
+        return clientBuilderProvider.provide()
+            .sessionPaths(
+                dataPath = sessionPaths.fileDirectory.absolutePath,
+                cachePath = sessionPaths.cacheDirectory.absolutePath,
+            )
+            .setSessionDelegate(sessionDelegate)
+            .passphrase(passphrase)
+            .userAgent(userAgentProvider.provide())
+            .addRootCertificates(userCertificatesProvider.provides())
+            .autoEnableBackups(true)
+            .autoEnableCrossSigning(true)
+            .useEventCachePersistentStorage(featureFlagService.isFeatureEnabled(FeatureFlags.EventCache))
+            .roomKeyRecipientStrategy(
+                strategy = if (featureFlagService.isFeatureEnabled(FeatureFlags.OnlySignedDeviceIsolationMode)) {
+                    CollectStrategy.IDENTITY_BASED_STRATEGY
+                } else {
+                    CollectStrategy.ERROR_ON_VERIFIED_USER_PROBLEM
+                }
+            )
+            .roomDecryptionTrustRequirement(
+                trustRequirement = if (featureFlagService.isFeatureEnabled(FeatureFlags.OnlySignedDeviceIsolationMode)) {
+                    TrustRequirement.CROSS_SIGNED_OR_LEGACY
+                } else {
+                    TrustRequirement.UNTRUSTED
+                }
+            )
+            .run {
+                // Apply sliding sync version settings
+                when (slidingSyncType) {
+                    ClientBuilderSlidingSync.Restored -> this
+                    ClientBuilderSlidingSync.Discovered -> slidingSyncVersionBuilder(SlidingSyncVersionBuilder.DISCOVER_NATIVE)
+                    ClientBuilderSlidingSync.Native -> slidingSyncVersionBuilder(SlidingSyncVersionBuilder.NATIVE)
+                }
+            }
+            .run {
+                // Workaround for non-nullable proxy parameter in the SDK, since each call to the ClientBuilder returns a new reference we need to keep
+                proxyProvider.provides()?.let { proxy(it) } ?: this
+            }
+    }
+}
+
+sealed interface ClientBuilderSlidingSync {
+    // The proxy will be supplied when restoring the Session.
+    data object Restored : ClientBuilderSlidingSync
+
+    // A Native Sliding Sync instance must be discovered whilst building the session.
+    data object Discovered : ClientBuilderSlidingSync
+
+    // Force using Native Sliding Sync.
+    data object Native : ClientBuilderSlidingSync
 }
 
 private fun SessionData.toSession() = Session(
@@ -89,6 +157,6 @@ private fun SessionData.toSession() = Session(
     userId = userId,
     deviceId = deviceId,
     homeserverUrl = homeserverUrl,
-    slidingSyncProxy = slidingSyncProxy,
+    slidingSyncVersion = SlidingSyncVersion.NATIVE,
     oidcData = oidcData,
 )

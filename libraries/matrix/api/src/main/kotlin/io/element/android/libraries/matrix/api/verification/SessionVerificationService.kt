@@ -1,22 +1,14 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.matrix.api.verification
 
 import androidx.compose.runtime.Immutable
+import io.element.android.libraries.matrix.api.core.UserId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -27,26 +19,25 @@ interface SessionVerificationService {
     val verificationFlowState: StateFlow<VerificationFlowState>
 
     /**
-     * The internal service that checks verification can only run after the initial sync.
-     * This [StateFlow] will notify consumers when the service is ready to be used.
-     */
-    val isReady: StateFlow<Boolean>
-
-    /**
      * Returns whether the current verification status is either: [SessionVerifiedStatus.Unknown], [SessionVerifiedStatus.NotVerified]
      * or [SessionVerifiedStatus.Verified].
      */
     val sessionVerifiedStatus: StateFlow<SessionVerifiedStatus>
 
     /**
-     * Returns whether the current session needs to be verified and the SDK is ready to start the verification.
+     * Returns whether the current session needs to be verified.
      */
-    val canVerifySessionFlow: Flow<Boolean>
+    val needsSessionVerification: Flow<Boolean>
 
     /**
      * Request verification of the current session.
      */
-    suspend fun requestVerification()
+    suspend fun requestCurrentSessionVerification()
+
+    /**
+     * Request verification of the user with the given [userId].
+     */
+    suspend fun requestUserVerification(userId: UserId)
 
     /**
      * Cancels the current verification attempt.
@@ -71,7 +62,27 @@ interface SessionVerificationService {
     /**
      * Returns the verification service state to the initial step.
      */
-    suspend fun reset()
+    suspend fun reset(cancelAnyPendingVerificationAttempt: Boolean)
+
+    /**
+     * Register a listener to be notified of incoming session verification requests.
+     */
+    fun setListener(listener: SessionVerificationServiceListener?)
+
+    /**
+     * Set this particular request as the currently active one and register for
+     * events pertaining it.
+     */
+    suspend fun acknowledgeVerificationRequest(verificationRequest: VerificationRequest.Incoming)
+
+    /**
+     * Accept the previously acknowledged verification request.
+     */
+    suspend fun acceptVerificationRequest()
+}
+
+interface SessionVerificationServiceListener {
+    fun onIncomingSessionRequest(verificationRequest: VerificationRequest.Incoming)
 }
 
 /** Verification status of the current session. */
@@ -85,6 +96,9 @@ sealed interface SessionVerifiedStatus {
 
     /** Verified session status. */
     data object Verified : SessionVerifiedStatus
+
+    /** Returns whether the session is [Verified]. */
+    fun isVerified(): Boolean = this is Verified
 }
 
 /** States produced by the [SessionVerificationService]. */
@@ -94,20 +108,20 @@ sealed interface VerificationFlowState {
     data object Initial : VerificationFlowState
 
     /** Session verification request was accepted by another device. */
-    data object AcceptedVerificationRequest : VerificationFlowState
+    data object DidAcceptVerificationRequest : VerificationFlowState
 
     /** Short Authentication String (SAS) verification started between the 2 devices. */
-    data object StartedSasVerification : VerificationFlowState
+    data object DidStartSasVerification : VerificationFlowState
 
     /** Verification data for the SAS verification received. */
-    data class ReceivedVerificationData(val data: SessionVerificationData) : VerificationFlowState
+    data class DidReceiveVerificationData(val data: SessionVerificationData) : VerificationFlowState
 
     /** Verification completed successfully. */
-    data object Finished : VerificationFlowState
+    data object DidFinish : VerificationFlowState
 
     /** Verification was cancelled by either device. */
-    data object Canceled : VerificationFlowState
+    data object DidCancel : VerificationFlowState
 
     /** Verification failed with an error. */
-    data object Failed : VerificationFlowState
+    data object DidFail : VerificationFlowState
 }

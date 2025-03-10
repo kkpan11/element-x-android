@@ -1,17 +1,8 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.ftue.impl.notifications
@@ -26,7 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -40,8 +31,10 @@ import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.ftue.impl.R
 import io.element.android.libraries.designsystem.atomic.molecules.ButtonColumnMolecule
-import io.element.android.libraries.designsystem.atomic.molecules.IconTitleSubtitleMolecule
 import io.element.android.libraries.designsystem.atomic.pages.HeaderFooterPage
+import io.element.android.libraries.designsystem.background.OnboardingBackground
+import io.element.android.libraries.designsystem.components.BigIcon
+import io.element.android.libraries.designsystem.components.PageTitle
 import io.element.android.libraries.designsystem.components.avatar.Avatar
 import io.element.android.libraries.designsystem.components.avatar.AvatarData
 import io.element.android.libraries.designsystem.components.avatar.AvatarSize
@@ -62,8 +55,9 @@ fun NotificationsOptInView(
 
     HeaderFooterPage(
         modifier = modifier
-            .systemBarsPadding()
+            .statusBarsPadding()
             .fillMaxSize(),
+        background = { OnboardingBackground() },
         header = { NotificationsOptInHeader(modifier = Modifier.padding(top = 60.dp, bottom = 12.dp)) },
         footer = { NotificationsOptInFooter(state) },
     ) {
@@ -75,11 +69,11 @@ fun NotificationsOptInView(
 private fun NotificationsOptInHeader(
     modifier: Modifier = Modifier,
 ) {
-    IconTitleSubtitleMolecule(
+    PageTitle(
         modifier = modifier,
         title = stringResource(R.string.screen_notification_optin_title),
-        subTitle = stringResource(R.string.screen_notification_optin_subtitle),
-        iconImageVector = CompoundIcons.NotificationsSolid(),
+        subtitle = stringResource(R.string.screen_notification_optin_subtitle),
+        iconStyle = BigIcon.Style.Default(CompoundIcons.NotificationsSolid()),
     )
 }
 

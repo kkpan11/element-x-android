@@ -1,23 +1,15 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.poll.impl.history
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -32,13 +24,13 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
@@ -72,12 +64,12 @@ fun PollHistoryView(
         state.eventSink(PollHistoryEvents.LoadMore)
     }
 
-    fun onAnswerSelected(pollStartId: EventId, answerId: String) {
-        state.eventSink(PollHistoryEvents.PollAnswerSelected(pollStartId, answerId))
+    fun onSelectAnswer(pollStartId: EventId, answerId: String) {
+        state.eventSink(PollHistoryEvents.SelectPollAnswer(pollStartId, answerId))
     }
 
-    fun onPollEnd(pollStartId: EventId) {
-        state.eventSink(PollHistoryEvents.PollEndClicked(pollStartId))
+    fun onEndPoll(pollStartId: EventId) {
+        state.eventSink(PollHistoryEvents.EndPoll(pollStartId))
     }
 
     Scaffold(
@@ -109,7 +101,7 @@ fun PollHistoryView(
             }
             PollHistoryFilterButtons(
                 activeFilter = state.activeFilter,
-                onFilterSelected = { state.eventSink(PollHistoryEvents.OnFilterSelected(it)) },
+                onSelectFilter = { state.eventSink(PollHistoryEvents.SelectFilter(it)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -126,9 +118,9 @@ fun PollHistoryView(
                     pollHistoryItems = pollHistoryItems,
                     hasMoreToLoad = state.hasMoreToLoad,
                     isLoading = state.isLoading,
-                    onAnswerSelected = ::onAnswerSelected,
-                    onPollEdit = onEditPoll,
-                    onPollEnd = ::onPollEnd,
+                    onSelectAnswer = ::onSelectAnswer,
+                    onEditPoll = onEditPoll,
+                    onEndPoll = ::onEndPoll,
                     onLoadMore = ::onLoadMore,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -141,7 +133,7 @@ fun PollHistoryView(
 @Composable
 private fun PollHistoryFilterButtons(
     activeFilter: PollHistoryFilter,
-    onFilterSelected: (PollHistoryFilter) -> Unit,
+    onSelectFilter: (PollHistoryFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SingleChoiceSegmentedButtonRow(modifier = modifier) {
@@ -150,7 +142,7 @@ private fun PollHistoryFilterButtons(
                 index = filter.ordinal,
                 count = PollHistoryFilter.entries.size,
                 selected = activeFilter == filter,
-                onClick = { onFilterSelected(filter) },
+                onClick = { onSelectFilter(filter) },
                 text = stringResource(filter.stringResource),
             )
         }
@@ -163,9 +155,9 @@ private fun PollHistoryList(
     pollHistoryItems: ImmutableList<PollHistoryItem>,
     hasMoreToLoad: Boolean,
     isLoading: Boolean,
-    onAnswerSelected: (pollStartId: EventId, answerId: String) -> Unit,
-    onPollEdit: (pollStartId: EventId) -> Unit,
-    onPollEnd: (pollStartId: EventId) -> Unit,
+    onSelectAnswer: (pollStartId: EventId, answerId: String) -> Unit,
+    onEditPoll: (pollStartId: EventId) -> Unit,
+    onEndPoll: (pollStartId: EventId) -> Unit,
     onLoadMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -178,46 +170,61 @@ private fun PollHistoryList(
         items(pollHistoryItems) { pollHistoryItem ->
             PollHistoryItemRow(
                 pollHistoryItem = pollHistoryItem,
-                onAnswerSelected = onAnswerSelected,
-                onPollEdit = onPollEdit,
-                onPollEnd = onPollEnd,
+                onSelectAnswer = onSelectAnswer,
+                onEditPoll = onEditPoll,
+                onEndPoll = onEndPoll,
                 modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp)
             )
         }
         if (pollHistoryItems.isEmpty()) {
             item {
-                val emptyStringResource = if (filter == PollHistoryFilter.PAST) {
-                    stringResource(R.string.screen_polls_history_empty_past)
-                } else {
-                    stringResource(R.string.screen_polls_history_empty_ongoing)
+                Column(
+                    modifier = Modifier.fillParentMaxSize().padding(bottom = 24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    val emptyStringResource = if (filter == PollHistoryFilter.PAST) {
+                        stringResource(R.string.screen_polls_history_empty_past)
+                    } else {
+                        stringResource(R.string.screen_polls_history_empty_ongoing)
+                    }
+                    Text(
+                        text = emptyStringResource,
+                        style = ElementTheme.typography.fontBodyLgRegular,
+                        color = ElementTheme.colors.textSecondary,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp, horizontal = 16.dp),
+                        textAlign = TextAlign.Center,
+                    )
+
+                    if (hasMoreToLoad) {
+                        LoadMoreButton(isLoading = isLoading, onClick = onLoadMore)
+                    }
                 }
-                Text(
-                    text = emptyStringResource,
-                    style = ElementTheme.typography.fontBodyLgRegular,
-                    color = ElementTheme.colors.textSecondary,
-                    modifier = Modifier.padding(vertical = 24.dp, horizontal = 16.dp)
-                )
             }
-        }
-        if (hasMoreToLoad) {
+        } else if (hasMoreToLoad) {
             item {
-                Button(
-                    text = stringResource(CommonStrings.action_load_more),
-                    showProgress = isLoading,
-                    onClick = onLoadMore,
-                    modifier = Modifier.padding(vertical = 24.dp),
-                )
+                LoadMoreButton(isLoading = isLoading, onClick = onLoadMore)
             }
         }
     }
 }
 
 @Composable
+private fun LoadMoreButton(isLoading: Boolean, onClick: () -> Unit) {
+    Button(
+        text = stringResource(CommonStrings.action_load_more),
+        showProgress = isLoading,
+        onClick = onClick,
+        modifier = Modifier.padding(vertical = 24.dp),
+    )
+}
+
+@Composable
 private fun PollHistoryItemRow(
     pollHistoryItem: PollHistoryItem,
-    onAnswerSelected: (pollStartId: EventId, answerId: String) -> Unit,
-    onPollEdit: (pollStartId: EventId) -> Unit,
-    onPollEnd: (pollStartId: EventId) -> Unit,
+    onSelectAnswer: (pollStartId: EventId, answerId: String) -> Unit,
+    onEditPoll: (pollStartId: EventId) -> Unit,
+    onEndPoll: (pollStartId: EventId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -228,15 +235,15 @@ private fun PollHistoryItemRow(
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = pollHistoryItem.formattedDate,
-                color = MaterialTheme.colorScheme.secondary,
+                color = ElementTheme.colors.textSecondary,
                 style = ElementTheme.typography.fontBodySmRegular,
             )
             Spacer(modifier = Modifier.height(4.dp))
             PollContentView(
                 state = pollHistoryItem.state,
-                onAnswerSelected = onAnswerSelected,
-                onPollEdit = onPollEdit,
-                onPollEnd = onPollEnd,
+                onSelectAnswer = onSelectAnswer,
+                onEditPoll = onEditPoll,
+                onEndPoll = onEndPoll,
             )
         }
     }

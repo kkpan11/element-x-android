@@ -1,22 +1,15 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.libraries.designsystem.components.avatar
 
 import androidx.compose.runtime.Immutable
+import io.element.android.libraries.core.data.tryOrNull
+import java.text.BreakIterator
 
 @Immutable
 data class AvatarData(
@@ -26,7 +19,8 @@ data class AvatarData(
     val size: AvatarSize,
 ) {
     val initial by lazy {
-        (name?.takeIf { it.isNotBlank() } ?: id)
+        // For roomIds, use "#" as initial
+        (name?.takeIf { it.isNotBlank() } ?: id.takeIf { !it.startsWith("!") } ?: "#")
             .let { dn ->
                 var startIndex = 0
                 val initial = dn[startIndex]
@@ -35,24 +29,36 @@ data class AvatarData(
                     startIndex++
                 }
 
-                var length = 1
-                var first = dn[startIndex]
+                var next = dn[startIndex]
 
                 // LEFT-TO-RIGHT MARK
-                if (dn.length >= 2 && 0x200e == first.code) {
+                if (dn.length >= 2 && 0x200e == next.code) {
                     startIndex++
-                    first = dn[startIndex]
+                    next = dn[startIndex]
                 }
 
-                // check if it’s the start of a surrogate pair
-                if (first.code in 0xD800..0xDBFF && dn.length > startIndex + 1) {
-                    val second = dn[startIndex + 1]
-                    if (second.code in 0xDC00..0xDFFF) {
-                        length++
+                while (next.isWhitespace()) {
+                    if (dn.length > startIndex + 1) {
+                        startIndex++
+                        next = dn[startIndex]
+                    } else {
+                        break
                     }
                 }
 
-                dn.substring(startIndex, startIndex + length)
+                val fullCharacterIterator = BreakIterator.getCharacterInstance()
+                fullCharacterIterator.setText(dn)
+                val glyphBoundary = tryOrNull { fullCharacterIterator.following(startIndex) }
+                    ?.takeIf { it in startIndex..dn.length }
+
+                when {
+                    // Use the found boundary
+                    glyphBoundary != null -> dn.substring(startIndex, glyphBoundary)
+                    // If no boundary was found, default to the next char if possible
+                    startIndex + 1 < dn.length -> dn.substring(startIndex, startIndex + 1)
+                    // Return a fallback character otherwise
+                    else -> "#"
+                }
             }
             .uppercase()
     }

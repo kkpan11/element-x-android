@@ -1,28 +1,16 @@
 /*
- * Copyright (c) 2023 New Vector Ltd
+ * Copyright 2023, 2024 New Vector Ltd.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial
+ * Please see LICENSE files in the repository root for full details.
  */
 
 package io.element.android.features.messages.impl.timeline.factories.event
 
-import android.text.Spannable
 import android.text.style.URLSpan
-import android.text.util.Linkify
 import androidx.core.text.buildSpannedString
 import androidx.core.text.getSpans
 import androidx.core.text.toSpannable
-import androidx.core.text.util.LinkifyCompat
 import io.element.android.features.location.api.Location
 import io.element.android.features.messages.api.timeline.HtmlConverterProvider
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemAudioContent
@@ -36,11 +24,14 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemTextContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVideoContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVoiceContent
+import io.element.android.features.messages.impl.utils.TextPillificationHelper
 import io.element.android.libraries.androidutils.filesize.FileSizeFormatter
+import io.element.android.libraries.androidutils.text.safeLinkify
 import io.element.android.libraries.core.mimetype.MimeTypes
 import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.featureflag.api.FeatureFlags
 import io.element.android.libraries.matrix.api.core.EventId
+import io.element.android.libraries.matrix.api.permalink.PermalinkParser
 import io.element.android.libraries.matrix.api.timeline.item.event.AudioMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.EmoteMessageType
 import io.element.android.libraries.matrix.api.timeline.item.event.FileMessageType
@@ -67,37 +58,54 @@ class TimelineItemContentMessageFactory @Inject constructor(
     private val fileExtensionExtractor: FileExtensionExtractor,
     private val featureFlagService: FeatureFlagService,
     private val htmlConverterProvider: HtmlConverterProvider,
+    private val permalinkParser: PermalinkParser,
+    private val textPillificationHelper: TextPillificationHelper,
 ) {
-    suspend fun create(content: MessageContent, senderDisplayName: String, eventId: EventId?): TimelineItemEventContent {
+    suspend fun create(
+        content: MessageContent,
+        senderDisambiguatedDisplayName: String,
+        eventId: EventId?,
+    ): TimelineItemEventContent {
         return when (val messageType = content.type) {
             is EmoteMessageType -> {
-                val emoteBody = "* $senderDisplayName ${messageType.body.trimEnd()}"
+                val emoteBody = "* $senderDisambiguatedDisplayName ${messageType.body.trimEnd()}"
                 TimelineItemEmoteContent(
                     body = emoteBody,
-                    htmlDocument = messageType.formatted?.toHtmlDocument(prefix = "* $senderDisplayName"),
-                    formattedBody = parseHtml(messageType.formatted, prefix = "* $senderDisplayName") ?: emoteBody.withLinks(),
+                    htmlDocument = messageType.formatted?.toHtmlDocument(
+                        permalinkParser = permalinkParser,
+                        prefix = "* $senderDisambiguatedDisplayName",
+                    ),
+                    formattedBody = parseHtml(messageType.formatted, prefix = "* $senderDisambiguatedDisplayName") ?: emoteBody.withLinks(),
                     isEdited = content.isEdited,
                 )
             }
             is ImageMessageType -> {
                 val aspectRatio = aspectRatioOf(messageType.info?.width, messageType.info?.height)
                 TimelineItemImageContent(
-                    body = messageType.body.trimEnd(),
+                    filename = messageType.filename,
+                    caption = messageType.caption?.trimEnd(),
+                    formattedCaption = parseHtml(messageType.formattedCaption) ?: messageType.caption?.withLinks(),
+                    isEdited = content.isEdited,
                     mediaSource = messageType.source,
                     thumbnailSource = messageType.info?.thumbnailSource,
                     mimeType = messageType.info?.mimetype ?: MimeTypes.OctetStream,
                     blurhash = messageType.info?.blurhash,
                     width = messageType.info?.width?.toInt(),
                     height = messageType.info?.height?.toInt(),
+                    thumbnailWidth = messageType.info?.thumbnailInfo?.width?.toInt(),
+                    thumbnailHeight = messageType.info?.thumbnailInfo?.height?.toInt(),
                     aspectRatio = aspectRatio,
                     formattedFileSize = fileSizeFormatter.format(messageType.info?.size ?: 0),
-                    fileExtension = fileExtensionExtractor.extractFromName(messageType.body)
+                    fileExtension = fileExtensionExtractor.extractFromName(messageType.filename)
                 )
             }
             is StickerMessageType -> {
                 val aspectRatio = aspectRatioOf(messageType.info?.width, messageType.info?.height)
                 TimelineItemStickerContent(
-                    body = messageType.body.trimEnd(),
+                    filename = messageType.filename,
+                    caption = messageType.caption?.trimEnd(),
+                    formattedCaption = parseHtml(messageType.formattedCaption) ?: messageType.caption?.withLinks(),
+                    isEdited = content.isEdited,
                     mediaSource = messageType.source,
                     thumbnailSource = messageType.info?.thumbnailSource,
                     mimeType = messageType.info?.mimetype ?: MimeTypes.OctetStream,
@@ -106,7 +114,7 @@ class TimelineItemContentMessageFactory @Inject constructor(
                     height = messageType.info?.height?.toInt(),
                     aspectRatio = aspectRatio,
                     formattedFileSize = fileSizeFormatter.format(messageType.info?.size ?: 0),
-                    fileExtension = fileExtensionExtractor.extractFromName(messageType.body)
+                    fileExtension = fileExtensionExtractor.extractFromName(messageType.filename)
                 )
             }
             is LocationMessageType -> {
@@ -115,6 +123,7 @@ class TimelineItemContentMessageFactory @Inject constructor(
                     val body = messageType.body.trimEnd()
                     TimelineItemTextContent(
                         body = body,
+                        pillifiedBody = textPillificationHelper.pillify(body),
                         htmlDocument = null,
                         plainText = body,
                         formattedBody = null,
@@ -131,27 +140,35 @@ class TimelineItemContentMessageFactory @Inject constructor(
             is VideoMessageType -> {
                 val aspectRatio = aspectRatioOf(messageType.info?.width, messageType.info?.height)
                 TimelineItemVideoContent(
-                    body = messageType.body.trimEnd(),
+                    filename = messageType.filename,
+                    caption = messageType.caption?.trimEnd(),
+                    formattedCaption = parseHtml(messageType.formattedCaption) ?: messageType.caption?.withLinks(),
+                    isEdited = content.isEdited,
                     thumbnailSource = messageType.info?.thumbnailSource,
-                    videoSource = messageType.source,
+                    mediaSource = messageType.source,
                     mimeType = messageType.info?.mimetype ?: MimeTypes.OctetStream,
                     width = messageType.info?.width?.toInt(),
                     height = messageType.info?.height?.toInt(),
+                    thumbnailWidth = messageType.info?.thumbnailInfo?.width?.toInt(),
+                    thumbnailHeight = messageType.info?.thumbnailInfo?.height?.toInt(),
                     duration = messageType.info?.duration ?: Duration.ZERO,
                     blurHash = messageType.info?.blurhash,
                     aspectRatio = aspectRatio,
                     formattedFileSize = fileSizeFormatter.format(messageType.info?.size ?: 0),
-                    fileExtension = fileExtensionExtractor.extractFromName(messageType.body)
+                    fileExtension = fileExtensionExtractor.extractFromName(messageType.filename),
                 )
             }
             is AudioMessageType -> {
                 TimelineItemAudioContent(
-                    body = messageType.body.trimEnd(),
+                    filename = messageType.filename,
+                    caption = messageType.caption?.trimEnd(),
+                    formattedCaption = parseHtml(messageType.formattedCaption) ?: messageType.caption?.withLinks(),
+                    isEdited = content.isEdited,
                     mediaSource = messageType.source,
                     duration = messageType.info?.duration ?: Duration.ZERO,
                     mimeType = messageType.info?.mimetype ?: MimeTypes.OctetStream,
                     formattedFileSize = fileSizeFormatter.format(messageType.info?.size ?: 0),
-                    fileExtension = fileExtensionExtractor.extractFromName(messageType.body),
+                    fileExtension = fileExtensionExtractor.extractFromName(messageType.filename),
                 )
             }
             is VoiceMessageType -> {
@@ -159,31 +176,42 @@ class TimelineItemContentMessageFactory @Inject constructor(
                     true -> {
                         TimelineItemVoiceContent(
                             eventId = eventId,
-                            body = messageType.body.trimEnd(),
+                            filename = messageType.filename,
+                            caption = messageType.caption?.trimEnd(),
+                            formattedCaption = parseHtml(messageType.formattedCaption) ?: messageType.caption?.withLinks(),
+                            isEdited = content.isEdited,
                             mediaSource = messageType.source,
                             duration = messageType.info?.duration ?: Duration.ZERO,
                             mimeType = messageType.info?.mimetype ?: MimeTypes.OctetStream,
                             waveform = messageType.details?.waveform?.toImmutableList() ?: persistentListOf(),
+                            formattedFileSize = fileSizeFormatter.format(messageType.info?.size ?: 0),
+                            fileExtension = fileExtensionExtractor.extractFromName(messageType.filename)
                         )
                     }
                     false -> {
                         TimelineItemAudioContent(
-                            body = messageType.body.trimEnd(),
+                            filename = messageType.filename,
+                            caption = messageType.caption?.trimEnd(),
+                            formattedCaption = parseHtml(messageType.formattedCaption) ?: messageType.caption?.withLinks(),
+                            isEdited = content.isEdited,
                             mediaSource = messageType.source,
                             duration = messageType.info?.duration ?: Duration.ZERO,
                             mimeType = messageType.info?.mimetype ?: MimeTypes.OctetStream,
                             formattedFileSize = fileSizeFormatter.format(messageType.info?.size ?: 0),
-                            fileExtension = fileExtensionExtractor.extractFromName(messageType.body),
+                            fileExtension = fileExtensionExtractor.extractFromName(messageType.filename),
                         )
                     }
                 }
             }
             is FileMessageType -> {
-                val fileExtension = fileExtensionExtractor.extractFromName(messageType.body)
+                val fileExtension = fileExtensionExtractor.extractFromName(messageType.filename)
                 TimelineItemFileContent(
-                    body = messageType.body.trimEnd(),
+                    filename = messageType.filename,
+                    caption = messageType.caption?.trimEnd(),
+                    formattedCaption = parseHtml(messageType.formattedCaption) ?: messageType.caption?.withLinks(),
+                    isEdited = content.isEdited,
                     thumbnailSource = messageType.info?.thumbnailSource,
-                    fileSource = messageType.source,
+                    mediaSource = messageType.source,
                     mimeType = messageType.info?.mimetype ?: MimeTypes.fromFileExtension(fileExtension),
                     formattedFileSize = fileSizeFormatter.format(messageType.info?.size ?: 0),
                     fileExtension = fileExtension
@@ -193,7 +221,7 @@ class TimelineItemContentMessageFactory @Inject constructor(
                 val body = messageType.body.trimEnd()
                 TimelineItemNoticeContent(
                     body = body,
-                    htmlDocument = messageType.formatted?.toHtmlDocument(),
+                    htmlDocument = messageType.formatted?.toHtmlDocument(permalinkParser = permalinkParser),
                     formattedBody = parseHtml(messageType.formatted) ?: body.withLinks(),
                     isEdited = content.isEdited,
                 )
@@ -202,7 +230,8 @@ class TimelineItemContentMessageFactory @Inject constructor(
                 val body = messageType.body.trimEnd()
                 TimelineItemTextContent(
                     body = body,
-                    htmlDocument = messageType.formatted?.toHtmlDocument(),
+                    pillifiedBody = textPillificationHelper.pillify(body).safeLinkify(),
+                    htmlDocument = messageType.formatted?.toHtmlDocument(permalinkParser = permalinkParser),
                     formattedBody = parseHtml(messageType.formatted) ?: body.withLinks(),
                     isEdited = content.isEdited,
                 )
@@ -211,6 +240,7 @@ class TimelineItemContentMessageFactory @Inject constructor(
                 val body = messageType.body.trimEnd()
                 TimelineItemTextContent(
                     body = body,
+                    pillifiedBody = textPillificationHelper.pillify(body),
                     htmlDocument = null,
                     formattedBody = body.withLinks(),
                     isEdited = content.isEdited,
@@ -233,7 +263,7 @@ class TimelineItemContentMessageFactory @Inject constructor(
         if (formattedBody == null || formattedBody.format != MessageFormat.HTML) return null
         val result = htmlConverterProvider.provide()
             .fromHtmlToSpans(formattedBody.body.trimEnd())
-            .withFixedURLSpans()
+            .safeLinkify()
         return if (prefix != null) {
             buildSpannedString {
                 append(prefix)
@@ -244,32 +274,11 @@ class TimelineItemContentMessageFactory @Inject constructor(
             result
         }
     }
-
-    private fun CharSequence.withFixedURLSpans(): CharSequence {
-        if (this !is Spannable) return this
-        // Get all URL spans, as they will be removed by LinkifyCompat.addLinks
-        val oldURLSpans = getSpans<URLSpan>(0, length).associateWith {
-            val start = getSpanStart(it)
-            val end = getSpanEnd(it)
-            Pair(start, end)
-        }
-        // Find and set as URLSpans any links present in the text
-        LinkifyCompat.addLinks(this, Linkify.WEB_URLS or Linkify.PHONE_NUMBERS or Linkify.EMAIL_ADDRESSES)
-        // Restore old spans if they don't conflict with the new ones
-        for ((urlSpan, location) in oldURLSpans) {
-            val (start, end) = location
-            if (getSpans<URLSpan>(start, end).isEmpty()) {
-                setSpan(urlSpan, start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
-        }
-        return this
-    }
 }
 
 @Suppress("USELESS_ELVIS")
 private fun String.withLinks(): CharSequence? {
     // Note: toSpannable() can return null when running unit tests
-    val spannable = toSpannable() ?: return null
-    val addedLinks = LinkifyCompat.addLinks(spannable, Linkify.WEB_URLS or Linkify.PHONE_NUMBERS or Linkify.EMAIL_ADDRESSES)
-    return spannable.takeIf { addedLinks }
+    val spannable = safeLinkify().toSpannable() ?: return null
+    return spannable.takeIf { spannable.getSpans<URLSpan>(0, length).isNotEmpty() }
 }
